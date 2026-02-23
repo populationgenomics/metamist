@@ -152,7 +152,7 @@ class ProjectInsightsDb(DbBase):
         return external_ids_value
 
     def parse_project_seqtype_technology_keyed_rows(
-        self, rows: list[Record], value_field: str
+        self, rows: list[dict[Any, Any]], value_field: str
     ) -> dict[ProjectSeqTypeTechnologyKey, Any]:
         """
         Parse rows that are keyed by project, sequencing type, and sequencing technology
@@ -167,13 +167,7 @@ class ProjectInsightsDb(DbBase):
                 row['sequencing_type'],
                 row['sequencing_technology'],
             )
-            if value_field == 'sequencing_group_ids':
-                parsed_rows[key] = [int(sgid) for sgid in row[value_field].split(',')]
-            else:
-                try:
-                    parsed_rows[key] = row[value_field]
-                except KeyError:
-                    parsed_rows[key] = None
+            parsed_rows[key] = row.get(value_field)
         return parsed_rows
 
     async def _get_sequencing_groups_by_analysis_ids(
@@ -182,26 +176,25 @@ class ProjectInsightsDb(DbBase):
         """Get sequencing groups for a list of analysis ids"""
         if not analysis_ids:
             return {}
-        _query = """
-SELECT
-    analysis_id,
-    GROUP_CONCAT(sequencing_group_id) as sequencing_group_ids
-FROM analysis_sequencing_group
-WHERE analysis_id IN :analysis_ids
-GROUP BY analysis_id;
+        _query = t"""
+        SELECT
+            analysis_id,
+            ARRAY_AGG(sequencing_group_id) as sequencing_group_ids
+        FROM analysis_sequencing_group
+        WHERE analysis_id = ANY({analysis_ids})
+        GROUP BY analysis_id;
         """
-        _query_results = await self.connection.fetch_all(
-            _query,
-            {
-                'analysis_ids': analysis_ids,
-            },
-        )
+
+        _query_results = await (
+            await self.connection.pg_connection.execute(_query)
+        ).fetchall()
+
         sequencing_groups_by_analysis_id: dict[
             AnalysisId, list[SequencingGroupInternalId]
         ] = {}
         for row in _query_results:
-            sequencing_groups_by_analysis_id[row['analysis_id']] = [
-                int(sgid) for sgid in row['sequencing_group_ids'].split(',')
+            sequencing_groups_by_analysis_id[row['analysis_id']] = row[
+                'sequencing_group_ids'
             ]
 
         return sequencing_groups_by_analysis_id
@@ -410,33 +403,29 @@ GROUP BY analysis_id;
     async def _total_families_by_project_id_and_seq_fields(
         self, project_ids: list[ProjectId], sequencing_types: list[SequencingType]
     ) -> dict[ProjectSeqTypeTechnologyKey, int]:
-        _query = """
-SELECT
-    f.project,
-    sg.type as sequencing_type,
-    sg.technology as sequencing_technology,
-    COUNT(DISTINCT f.id) as num_families
-FROM
-    family f
-    LEFT JOIN family_participant fp ON f.id = fp.family_id
-    LEFT JOIN sample s ON fp.participant_id = s.participant_id
-    LEFT JOIN sequencing_group sg on sg.sample_id = s.id
-WHERE
-    f.project IN :projects
-    AND sg.type IN :sequencing_types
-GROUP BY
-    f.project,
-    sg.type,
-    sg.technology;
+        _query = t"""
+        SELECT
+            f.project,
+            sg.type as sequencing_type,
+            sg.technology as sequencing_technology,
+            COUNT(DISTINCT f.id) as num_families
+        FROM
+            family f
+            LEFT JOIN family_participant fp ON f.id = fp.family_id
+            LEFT JOIN sample s ON fp.participant_id = s.participant_id
+            LEFT JOIN sequencing_group sg on sg.sample_id = s.id
+        WHERE
+            f.project = ANY({project_ids})
+            AND sg.type = ANY({sequencing_types})
+        GROUP BY
+            f.project,
+            sg.type,
+            sg.technology;
         """
 
-        _query_results = await self.connection.fetch_all(
-            _query,
-            {
-                'projects': project_ids,
-                'sequencing_types': sequencing_types,
-            },
-        )
+        _query_results = await (
+            await self.connection.pg_connection.execute(_query)
+        ).fetchall()
         return self.parse_project_seqtype_technology_keyed_rows(
             _query_results, 'num_families'
         )
@@ -444,31 +433,29 @@ GROUP BY
     async def _total_participants_by_project_id_and_seq_fields(
         self, project_ids: list[ProjectId], sequencing_types: list[SequencingType]
     ) -> dict[ProjectSeqTypeTechnologyKey, int]:
-        _query = """
-SELECT
-    p.project,
-    sg.type as sequencing_type,
-    sg.technology as sequencing_technology,
-    COUNT(DISTINCT p.id) as num_participants
-FROM
-    participant p
-    LEFT JOIN sample s ON p.id = s.participant_id
-    LEFT JOIN sequencing_group sg on sg.sample_id = s.id
-WHERE
-    p.project IN :projects
-    AND sg.type IN :sequencing_types
-GROUP BY
-    p.project,
-    sg.type,
-    sg.technology;
+
+        _query = t"""
+        SELECT
+            p.project,
+            sg.type as sequencing_type,
+            sg.technology as sequencing_technology,
+            COUNT(DISTINCT p.id) as num_participants
+        FROM
+            participant p
+            LEFT JOIN sample s ON p.id = s.participant_id
+            LEFT JOIN sequencing_group sg on sg.sample_id = s.id
+        WHERE
+            p.project = ANY({project_ids})
+            AND sg.type = ANY({sequencing_types})
+        GROUP BY
+            p.project,
+            sg.type,
+            sg.technology;
         """
-        _query_results = await self.connection.fetch_all(
-            _query,
-            {
-                'projects': project_ids,
-                'sequencing_types': sequencing_types,
-            },
-        )
+
+        _query_results = await (
+            await self.connection.pg_connection.execute(_query)
+        ).fetchall()
         return self.parse_project_seqtype_technology_keyed_rows(
             _query_results, 'num_participants'
         )
@@ -476,30 +463,29 @@ GROUP BY
     async def _total_samples_by_project_id_and_seq_fields(
         self, project_ids: list[ProjectId], sequencing_types: list[SequencingType]
     ) -> dict[ProjectSeqTypeTechnologyKey, int]:
-        _query = """
-SELECT
-    s.project,
-    sg.type as sequencing_type,
-    sg.technology as sequencing_technology,
-    COUNT(DISTINCT s.id) as num_samples
-FROM
-    sample s
-    LEFT JOIN sequencing_group sg on sg.sample_id = s.id
-WHERE
-    s.project IN :projects
-    AND sg.type IN :sequencing_types
-GROUP BY
-    s.project,
-    sg.type,
-    sg.technology;
+
+        _query = t"""
+        SELECT
+            s.project,
+            sg.type as sequencing_type,
+            sg.technology as sequencing_technology,
+            COUNT(DISTINCT s.id) as num_samples
+        FROM
+            sample s
+            LEFT JOIN sequencing_group sg on sg.sample_id = s.id
+        WHERE
+            s.project = ANY({project_ids})
+            AND sg.type = ANY({sequencing_types})
+        GROUP BY
+            s.project,
+            sg.type,
+            sg.technology;
         """
-        _query_results = await self.connection.fetch_all(
-            _query,
-            {
-                'projects': project_ids,
-                'sequencing_types': sequencing_types,
-            },
-        )
+
+        _query_results = await (
+            await self.connection.pg_connection.execute(_query)
+        ).fetchall()
+
         return self.parse_project_seqtype_technology_keyed_rows(
             _query_results, 'num_samples'
         )
@@ -507,30 +493,27 @@ GROUP BY
     async def _total_sequencing_groups_by_project_id_and_seq_fields(
         self, project_ids: list[ProjectId], sequencing_types: list[SequencingType]
     ) -> dict[ProjectSeqTypeTechnologyKey, int]:
-        _query = """
-SELECT
-    s.project,
-    sg.type as sequencing_type,
-    sg.technology as sequencing_technology,
-    COUNT(DISTINCT sg.id) as num_sgs
-FROM
-    sequencing_group sg
-    LEFT JOIN sample s on s.id = sg.sample_id
-WHERE
-    s.project IN :projects
-    AND sg.type IN :sequencing_types
-GROUP BY
-    s.project,
-    sg.type,
-    sg.technology;
+        _query = t"""
+        SELECT
+            s.project,
+            sg.type as sequencing_type,
+            sg.technology as sequencing_technology,
+            COUNT(DISTINCT sg.id) as num_sgs
+        FROM
+            sequencing_group sg
+            LEFT JOIN sample s on s.id = sg.sample_id
+        WHERE
+            s.project = ANY({project_ids})
+            AND sg.type = ANY({sequencing_types})
+        GROUP BY
+            s.project,
+            sg.type,
+            sg.technology;
         """
-        _query_results = await self.connection.fetch_all(
-            _query,
-            {
-                'projects': project_ids,
-                'sequencing_types': sequencing_types,
-            },
-        )
+
+        _query_results = await (
+            await self.connection.pg_connection.execute(_query)
+        ).fetchall()
         return self.parse_project_seqtype_technology_keyed_rows(
             _query_results, 'num_sgs'
         )
@@ -540,34 +523,32 @@ GROUP BY
         project_ids: list[ProjectId],
         sequencing_types: list[SequencingType],
     ) -> dict[ProjectSeqTypeTechnologyKey, list[SequencingGroupInternalId]]:
-        _query = """
-SELECT
-    a.project,
-    sg.type as sequencing_type,
-    sg.technology as sequencing_technology,
-    GROUP_CONCAT(DISTINCT asg.sequencing_group_id) as sequencing_group_ids
-FROM
-    analysis a
-    LEFT JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id
-    LEFT JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
-WHERE
-    a.project IN :projects
-    AND sg.type IN :sequencing_types
-    AND a.type = 'CRAM'
-    AND a.status = 'COMPLETED'
-GROUP BY
-    a.project,
-    sg.type,
-    sg.technology;
+        # TODO check CRAM or cram
+        _query = t"""
+        SELECT
+            a.project,
+            sg.type as sequencing_type,
+            sg.technology as sequencing_technology,
+            ARRAY_AGG(DISTINCT asg.sequencing_group_id) as sequencing_group_ids
+        FROM
+            analysis a
+            LEFT JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id
+            LEFT JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
+        WHERE
+            a.project = ANY({project_ids})
+            AND sg.type = ANY({sequencing_types})
+            AND lower(a.type) = 'cram'
+            AND a.status = 'completed'
+        GROUP BY
+            a.project,
+            sg.type,
+            sg.technology;
         """
 
-        _query_results = await self.connection.fetch_all(
-            _query,
-            {
-                'projects': project_ids,
-                'sequencing_types': sequencing_types,
-            },
-        )
+        _query_results = await (
+            await self.connection.pg_connection.execute(_query)
+        ).fetchall()
+
         return self.parse_project_seqtype_technology_keyed_rows(
             _query_results, 'sequencing_group_ids'
         )
@@ -577,46 +558,43 @@ GROUP BY
     ) -> dict[
         ProjectSeqTypeTechnologyKey, dict[SequencingGroupInternalId, AnalysisRow]
     ]:
-        _query = """
-SELECT
-    a.project,
-    a.id as analysis_id,
-    sg.id as sequencing_group_id,
-    sg.type as sequencing_type,
-    sg.technology as sequencing_technology,
-    COALESCE(a.output, ao.output, of.path) as output,
-    a.timestamp_completed
-FROM
-    analysis a
-    LEFT JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id
-    LEFT JOIN analysis_outputs ao ON a.id = ao.analysis_id
-    LEFT JOIN output_file of ON ao.file_id = of.id
-    LEFT JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
-    INNER JOIN (
+        _query = t"""
         SELECT
-            asg.sequencing_group_id,
-            MAX(a.timestamp_completed) as max_timestamp
-        FROM analysis a
-        INNER JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id
-        WHERE a.type='CRAM'
-        AND a.status='COMPLETED'
-        AND a.project IN :projects
-        GROUP BY asg.sequencing_group_id
-    ) max_timestamps ON asg.sequencing_group_id = max_timestamps.sequencing_group_id
-    AND a.timestamp_completed = max_timestamps.max_timestamp
-WHERE
-    a.project IN :projects
-    AND sg.type IN :sequencing_types
-    AND a.type = 'CRAM'
-    AND a.status = 'COMPLETED';
+            a.project,
+            a.id as analysis_id,
+            sg.id as sequencing_group_id,
+            sg.type as sequencing_type,
+            sg.technology as sequencing_technology,
+            COALESCE(a.output, ao.output, of.path) as output,
+            a.timestamp_completed
+        FROM
+            analysis a
+            LEFT JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id
+            LEFT JOIN analysis_outputs ao ON a.id = ao.analysis_id
+            LEFT JOIN output_file of ON ao.file_id = of.id
+            LEFT JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
+            INNER JOIN (
+                SELECT
+                    asg.sequencing_group_id,
+                    MAX(a.timestamp_completed) as max_timestamp
+                FROM analysis a
+                INNER JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id
+                WHERE LOWER(a.type) = 'cram'
+                AND a.status='completed'
+                AND a.project = ANY({project_ids})
+                GROUP BY asg.sequencing_group_id
+            ) max_timestamps ON asg.sequencing_group_id = max_timestamps.sequencing_group_id
+            AND a.timestamp_completed = max_timestamps.max_timestamp
+        WHERE
+            a.project = ANY({project_ids})
+            AND sg.type = ANY({sequencing_types})
+            AND a.type = 'CRAM'
+            AND a.status = 'completed';
         """
-        _query_results = await self.connection.fetch_all(
-            _query,
-            {
-                'projects': project_ids,
-                'sequencing_types': sequencing_types,
-            },
-        )
+
+        _query_results = await (
+            await self.connection.pg_connection.execute(_query)
+        ).fetchall()
 
         cram_timestamps_by_project_id_and_seq_fields: dict[
             ProjectSeqTypeTechnologyKey, dict[SequencingGroupInternalId, AnalysisRow]
@@ -641,44 +619,41 @@ WHERE
     async def _latest_annotate_dataset_by_project_id_and_seq_type(
         self, project_ids: list[ProjectId], sequencing_types: list[str]
     ) -> dict[ProjectSeqTypeKey, AnalysisRow]:
-        _query = """
-SELECT
-    a.project,
-    JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) as sequencing_type,
-    a.id,
-    a.output,
-    a.timestamp_completed
-FROM analysis a
-INNER JOIN (
-    SELECT
-        project,
-        MAX(timestamp_completed) as max_timestamp,
-        JSON_UNQUOTE(JSON_EXTRACT(meta, '$.sequencing_type')) as sequencing_type
-    FROM analysis
-    WHERE
-        status = 'COMPLETED'
-        AND type = 'CUSTOM'
-        AND JSON_EXTRACT(meta, '$.stage') = 'AnnotateDataset'
-        AND JSON_UNQUOTE(JSON_EXTRACT(meta, '$.sequencing_type')) IN :sequencing_types
-    GROUP BY project, JSON_EXTRACT(meta, '$.sequencing_type')
-) max_timestamps ON a.project = max_timestamps.project
-AND a.timestamp_completed = max_timestamps.max_timestamp
-AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) = max_timestamps.sequencing_type
-WHERE
-    a.type = 'CUSTOM'
-    AND a.status = 'COMPLETED'
-    AND a.project IN :projects
-    AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) IN :sequencing_types
-    AND JSON_EXTRACT(a.meta, '$.stage') = 'AnnotateDataset';
-    -- JSON_UNQUOTE is necessary to compare JSON values with IN operator
+
+        _query = t"""
+        SELECT
+            a.project,
+            a.meta ->> 'sequencing_type' as sequencing_type,
+            a.id,
+            a.output,
+            a.timestamp_completed
+        FROM analysis a
+        INNER JOIN (
+            SELECT
+                project,
+                MAX(timestamp_completed) as max_timestamp,
+                meta ->> 'sequencing_type' as sequencing_type
+            FROM analysis
+            WHERE
+                status = 'completed'
+                AND lower(type) = 'custom'
+                AND meta ->> 'stage' = 'AnnotateDataset'
+                AND meta ->> 'sequencing_type' = ANY({sequencing_types})
+            GROUP BY project, meta ->> 'sequencing_type'
+        ) max_timestamps ON a.project = max_timestamps.project
+        AND a.timestamp_completed = max_timestamps.max_timestamp
+        AND a.meta ->> 'sequencing_type' = max_timestamps.sequencing_type
+        WHERE
+            LOWER(a.type) = 'custom'
+            AND a.status = 'completed'
+            AND a.project = ANY({project_ids})
+            AND a.meta ->> 'sequencing_type' = ANY({sequencing_types})
+            AND a.meta ->> 'stage' = 'AnnotateDataset';
         """
-        _query_results = await self.connection.fetch_all(
-            _query,
-            {
-                'projects': project_ids,
-                'sequencing_types': sequencing_types,
-            },
-        )
+
+        _query_results = await (
+            await self.connection.pg_connection.execute(_query)
+        ).fetchall()
         latest_annotate_dataset_by_project_id_and_seq_type: dict[
             ProjectSeqTypeKey, AnalysisRow
         ] = {}
@@ -692,40 +667,38 @@ WHERE
     async def _latest_es_indices_by_project_id_and_seq_type_and_stage(
         self, project_ids: list[ProjectId], sequencing_types: list[str]
     ) -> dict[ProjectSeqTypeStageKey, AnalysisRow]:
-        _query = """
-SELECT
-    a.project,
-    JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) as sequencing_type,
-    a.id,
-    JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.stage')) as stage,
-    a.output,
-    a.timestamp_completed
-FROM analysis a
-INNER JOIN (
-    SELECT
-        project,
-        MAX(timestamp_completed) as max_timestamp,
-        JSON_UNQUOTE(JSON_EXTRACT(meta, '$.sequencing_type')) as sequencing_type,
-        JSON_UNQUOTE(JSON_EXTRACT(meta, '$.stage')) as stage
-    FROM analysis
-    WHERE type='es-index'
-    AND status='COMPLETED'
-    GROUP BY project, JSON_EXTRACT(meta, '$.sequencing_type'), JSON_EXTRACT(meta, '$.stage')
-) max_timestamps ON a.project = max_timestamps.project
-AND a.timestamp_completed = max_timestamps.max_timestamp
-AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) = max_timestamps.sequencing_type
-AND JSON_EXTRACT(a.meta, '$.stage') = max_timestamps.stage
-WHERE
-    a.project IN :projects
-    AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) in :sequencing_types;
+
+        _query = t"""
+        SELECT
+            a.project,
+            a.meta ->> 'sequencing_type' as sequencing_type,
+            a.id,
+            a.meta ->> 'stage' as stage,
+            a.output,
+            a.timestamp_completed
+        FROM analysis a
+        INNER JOIN (
+            SELECT
+                project,
+                MAX(timestamp_completed) as max_timestamp,
+                meta ->> 'sequencing_type' as sequencing_type,
+                meta ->> 'stage' as stage
+            FROM analysis
+            WHERE LOWER(type) = 'es-index'
+            AND status = 'completed'
+            GROUP BY project, meta ->> 'sequencing_type', meta ->> 'stage'
+        ) max_timestamps ON a.project = max_timestamps.project
+        AND a.timestamp_completed = max_timestamps.max_timestamp
+        AND a.meta ->> 'sequencing_type' = max_timestamps.sequencing_type
+        AND a.meta ->> 'stage' = max_timestamps.stage
+        WHERE
+            a.project = ANY({project_ids})
+            AND a.meta ->> 'sequencing_type' = ANY({sequencing_types});
         """
-        _query_results = await self.connection.fetch_all(
-            _query,
-            {
-                'projects': project_ids,
-                'sequencing_types': sequencing_types,
-            },
-        )
+
+        _query_results = await (
+            await self.connection.pg_connection.execute(_query)
+        ).fetchall()
         latest_es_indices_by_project_id_and_seq_type_and_stage: dict[
             ProjectSeqTypeStageKey, AnalysisRow
         ] = {}
@@ -742,48 +715,45 @@ WHERE
     async def _sequencing_group_details_by_project_and_seq_fields(
         self, project_ids: list[ProjectId], sequencing_types: list[str]
     ) -> dict[ProjectSeqTypeTechnologyPlatformKey, list[SequencingGroupDetailRow]]:
-        _query = """
-SELECT
-    f.project,
-    sg.type as sequencing_type,
-    sg.platform as sequencing_platform,
-    sg.technology as sequencing_technology,
-    s.type as sample_type,
-    f.id as family_id,
-    fext.external_id as family_external_id,
-    fp.participant_id as participant_id,
-    pext.external_id as participant_external_id,
-    s.id as sample_id,
-    sext.external_id as sample_external_ids,
-    sg.id as sequencing_group_id
-FROM
-    family f
-    LEFT JOIN family_participant fp ON f.id = fp.family_id
-    LEFT JOIN family_external_id fext ON f.id = fext.family_id
-    LEFT JOIN participant_external_id pext ON fp.participant_id = pext.participant_id
-    LEFT JOIN sample s ON fp.participant_id = s.participant_id
-    LEFT JOIN sample_external_id sext ON s.id = sext.sample_id
-    LEFT JOIN sequencing_group sg on sg.sample_id = s.id
-WHERE
-    f.project IN :projects
-    AND sg.type IN :sequencing_types
-ORDER BY
-    f.project,
-    sg.type,
-    sg.platform,
-    sg.technology,
-    s.type,
-    f.id,
-    fp.participant_id,
-    sg.id;
+
+        _query = t"""
+        SELECT
+            f.project,
+            sg.type as sequencing_type,
+            sg.platform as sequencing_platform,
+            sg.technology as sequencing_technology,
+            s.type as sample_type,
+            f.id as family_id,
+            fext.external_id as family_external_id,
+            fp.participant_id as participant_id,
+            pext.external_id as participant_external_id,
+            s.id as sample_id,
+            sext.external_id as sample_external_ids,
+            sg.id as sequencing_group_id
+        FROM
+            family f
+            LEFT JOIN family_participant fp ON f.id = fp.family_id
+            LEFT JOIN family_external_id fext ON f.id = fext.family_id
+            LEFT JOIN participant_external_id pext ON fp.participant_id = pext.participant_id
+            LEFT JOIN sample s ON fp.participant_id = s.participant_id
+            LEFT JOIN sample_external_id sext ON s.id = sext.sample_id
+            LEFT JOIN sequencing_group sg on sg.sample_id = s.id
+        WHERE
+            f.project = ANY({project_ids})
+            AND sg.type = ANY({sequencing_types})
+        ORDER BY
+            f.project,
+            sg.type,
+            sg.platform,
+            sg.technology,
+            s.type,
+            f.id,
+            fp.participant_id,
+            sg.id;
         """
-        _query_results = await self.connection.fetch_all(
-            _query,
-            {
-                'projects': project_ids,
-                'sequencing_types': sequencing_types,
-            },
-        )
+        _query_results = await (
+            await self.connection.pg_connection.execute(_query)
+        ).fetchall()
         sequencing_group_details_by_project_id_and_seq_fields: dict[
             ProjectSeqTypeTechnologyPlatformKey, list[SequencingGroupDetailRow]
         ] = {}
@@ -815,38 +785,36 @@ ORDER BY
         self, project_ids: list[ProjectId]
     ) -> dict[ProjectSeqGroupKey, StripyReportRow]:
         """Get stripy web report links"""
-        _query = """
-SELECT
-    a.project,
-    a.id,
-    coalesce(a.output, ao.output, of.path) as output,
-    a.timestamp_completed,
-    asg.sequencing_group_id,
-    JSON_EXTRACT(a.meta, '$.outliers_detected') as outliers_detected,
-    JSON_QUERY(a.meta, '$.outlier_loci') as outlier_loci
-FROM analysis a
-LEFT JOIN analysis_outputs ao on a.id=ao.analysis_id
-LEFT JOIN output_file of on of.id = ao.file_id
-LEFT JOIN analysis_sequencing_group asg on asg.analysis_id=a.id
-INNER JOIN (
-    SELECT
-        asg.sequencing_group_id,
-        MAX(a.id) as max_analysis_id
-    FROM analysis a
-    LEFT JOIN analysis_sequencing_group asg on asg.analysis_id=a.id
-    WHERE type='web'
-    AND status='COMPLETED'
-    AND project IN :projects
-    AND JSON_EXTRACT(meta, '$.stage') = 'Stripy'
-    GROUP BY asg.sequencing_group_id
-) latest_analysis ON a.id = latest_analysis.max_analysis_id;
+        _query = t"""
+        SELECT
+            a.project,
+            a.id,
+            coalesce(a.output, ao.output, of.path) as output,
+            a.timestamp_completed,
+            asg.sequencing_group_id,
+            a.meta -> 'outliers_detected' as outliers_detected,
+            a.meta -> 'outlier_loci' as outlier_loci
+        FROM analysis a
+        LEFT JOIN analysis_outputs ao on a.id=ao.analysis_id
+        LEFT JOIN output_file of on of.id = ao.file_id
+        LEFT JOIN analysis_sequencing_group asg on asg.analysis_id=a.id
+        INNER JOIN (
+            SELECT
+                asg.sequencing_group_id,
+                MAX(a.id) as max_analysis_id
+            FROM analysis a
+            LEFT JOIN analysis_sequencing_group asg on asg.analysis_id=a.id
+            WHERE LOWER(type) = 'web'
+            AND status = 'completed'
+            AND project = ANY({project_ids})
+            AND LOWER(meta ->> 'stage') = 'stripy'
+            GROUP BY asg.sequencing_group_id
+        ) latest_analysis ON a.id = latest_analysis.max_analysis_id;
         """
-        _query_results = await self.connection.fetch_all(
-            _query,
-            {
-                'projects': project_ids,
-            },
-        )
+
+        _query_results = await (
+            await self.connection.pg_connection.execute(_query)
+        ).fetchall()
         stripy_reports: dict[ProjectSeqGroupKey, StripyReportRow] = {}
         for row in _query_results:
             key = ProjectSeqGroupKey(row['project'], row['sequencing_group_id'])
@@ -864,36 +832,35 @@ INNER JOIN (
         self, project_ids: list[ProjectId]
     ) -> dict[ProjectSeqGroupKey, AnalysisRow]:
         """Get mito web report links"""
-        _query = """
-SELECT
-    a.project,
-    a.id,
-    coalesce(a.output, ao.output, of.path) as output,
-    a.timestamp_completed,
-    asg.sequencing_group_id
-FROM analysis a
-LEFT JOIN analysis_outputs ao on a.id=ao.analysis_id
-LEFT JOIN output_file of on of.id = ao.file_id
-LEFT JOIN analysis_sequencing_group asg on asg.analysis_id=a.id
-INNER JOIN (
-    SELECT
-        asg.sequencing_group_id,
-        MAX(a.id) as max_analysis_id
-    FROM analysis a
-    LEFT JOIN analysis_sequencing_group asg on asg.analysis_id=a.id
-    WHERE type='web'
-    AND status='COMPLETED'
-    AND project IN :projects
-    AND JSON_EXTRACT(meta, '$.stage') = 'MitoReport'
-    GROUP BY asg.sequencing_group_id
-) latest_analysis ON a.id = latest_analysis.max_analysis_id;
+
+        _query = t"""
+        SELECT
+            a.project,
+            a.id,
+            coalesce(a.output, ao.output, out_file.path) as output,
+            a.timestamp_completed,
+            asg.sequencing_group_id
+        FROM analysis a
+        LEFT JOIN analysis_outputs ao on a.id = ao.analysis_id
+        LEFT JOIN output_file out_file on out_file.id = ao.file_id
+        LEFT JOIN analysis_sequencing_group asg on asg.analysis_id = a.id
+        INNER JOIN (
+            SELECT
+                asg.sequencing_group_id,
+                MAX(a.id) as max_analysis_id
+            FROM analysis a
+            LEFT JOIN analysis_sequencing_group asg on asg.analysis_id = a.id
+            WHERE LOWER(type) = 'web'
+            AND status = 'completed'
+            AND project = ANY({project_ids})
+            AND LOWER(meta ->> 'stage') = 'mitoreport'
+            GROUP BY asg.sequencing_group_id
+        ) latest_analysis ON a.id = latest_analysis.max_analysis_id;
         """
-        _query_results = await self.connection.fetch_all(
-            _query,
-            {
-                'projects': project_ids,
-            },
-        )
+
+        _query_results = await (
+            await self.connection.pg_connection.execute(_query)
+        ).fetchall()
         mito_reports: dict[ProjectSeqGroupKey, AnalysisRow] = {}
         for row in _query_results:
             key = ProjectSeqGroupKey(row['project'], row['sequencing_group_id'])

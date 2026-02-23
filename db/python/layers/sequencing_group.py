@@ -312,7 +312,7 @@ class SequencingGroupLayer(BaseLayer):
                     'Upserting sequencing-groups with assays requires a sample_id to be set for every sequencing-group'
                 )
 
-            await slayer.upsert_assays(assays, open_transaction=False)
+            await slayer.upsert_assays(assays)
 
         to_insert = [sg for sg in sequencing_groups if not sg.id]
         to_update = []
