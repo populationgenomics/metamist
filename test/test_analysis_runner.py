@@ -106,7 +106,7 @@ class TestAnalysisRunner:
         assert db_ars_guid == guids_to_query
 
     @pytest.mark.asyncio
-    async def test_query_throws_error_for_empty_filters(self):
+    async def test_query_does_not_throw_error_for_empty_filters(self):
         """
         Test that the query throws an error if the filters are empty
         """
@@ -114,5 +114,5 @@ class TestAnalysisRunner:
         analysis = self.get_test_analysis('<ar-guid>')
         await self.al.insert_analysis_runner_entry(analysis)
 
-        with pytest.raises(ValueError):
-            _ = await self.al.query(AnalysisRunnerFilter())
+        result = await self.al.query(AnalysisRunnerFilter())
+        assert result

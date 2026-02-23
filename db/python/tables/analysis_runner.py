@@ -36,9 +36,7 @@ class AnalysisRunnerTable(DbBase):
         """
 
         where_params: Template = filter_.to_sql()
-
-        if where_params is None:
-            raise ValueError(f'Invalid filter: {filter_}')
+        wheres_query = t'WHERE {where_params:q}' if where_params is not None else t''
 
         _query = t"""
         SELECT
@@ -46,7 +44,7 @@ class AnalysisRunnerTable(DbBase):
             description, driver_image, config_path, cwd, environment,
             hail_version, batch_url, submitting_user, COALESCE(meta, {'{}'}::jsonb) as meta, output_path, audit_log_id
         FROM analysis_runner
-        WHERE {where_params:q}
+        {wheres_query:q}
         """
         async with self.connection.pg_connection.cursor(
             row_factory=class_row(AnalysisRunnerInternal)
