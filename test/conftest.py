@@ -460,8 +460,7 @@ async def connection_with_project(
     # Refresh projects to load the seeded test-project
     await conn.refresh_projects()
 
-    # Set the project to test-project
-    # Get project name from marker, or default to test-project
+    # Set the project to test-project, or get the name from marker if available
     project_name_marker = request.node.get_closest_marker('project_name')
     project_name: list[str] = project_name_marker.args[0] if project_name_marker else 'test-project'
     conn.update_project(project_name)
