@@ -300,7 +300,9 @@ async def seeded_db(
 
     # Get project name from marker, or default to test-project
     project_name_marker = request.node.get_closest_marker('project_name')
-    project_name: list[str] = project_name_marker.args[0] if project_name_marker else 'test-project'
+    project_name: list[str] = (
+        project_name_marker.args[0] if project_name_marker else 'test-project'
+    )
 
     async with db_pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cur:
@@ -462,7 +464,9 @@ async def connection_with_project(
 
     # Set the project to test-project, or get the name from marker if available
     project_name_marker = request.node.get_closest_marker('project_name')
-    project_name: list[str] = project_name_marker.args[0] if project_name_marker else 'test-project'
+    project_name: list[str] = (
+        project_name_marker.args[0] if project_name_marker else 'test-project'
+    )
     conn.update_project(project_name)
 
     yield conn
