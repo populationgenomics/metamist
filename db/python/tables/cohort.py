@@ -1,6 +1,5 @@
 import dataclasses
 import datetime
-from string.templatelib import Template
 
 from psycopg import sql
 from psycopg.rows import class_row, scalar_row
@@ -61,7 +60,7 @@ class CohortTable(DbBase):
         filter_status = filter_.status
         filter_.status = None  # reset filter and use to filter on the rows fetched
 
-        where_params: Template = filter_.to_sql(
+        where_params = filter_.to_sql(
             field_overrides={
                 'id': 'c.id',
                 'name': 'c.name',
@@ -72,6 +71,7 @@ class CohortTable(DbBase):
         )
         if where_params is None:
             raise ValueError(f'Invalid filter: {filter_}')
+
         _query = t"""
         SELECT
         id, name, template_id, description, author, project, status,
@@ -89,13 +89,11 @@ class CohortTable(DbBase):
         WHERE {where_params:q}
         """
 
-        rows = await (
-            await self.connection.pg_connection.connection.execute(_query)
-        ).fetchall()
+        rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
         cohorts_list = []
         for cohort_row in rows:
             is_active = cohort_row['status'] == CohortStatus.active.value
-            is_invalid = parse_sql_bool(cohort_row.pop('is_invalid'))
+            is_invalid = cohort_row.pop('is_invalid')
 
             if is_active:
                 cohort_status = (
@@ -125,9 +123,9 @@ class CohortTable(DbBase):
     ) -> tuple[set[ProjectId], list[CohortTemplateInternal]]:
         """Query CohortTemplates"""
 
-        wheres_params: Template = filter_.to_sql(field_overrides={})
+        wheres_params = filter_.to_sql(field_overrides={})
 
-        if not list(wheres_params):
+        if wheres_params is None:
             raise ValueError(f'Invalid filter: {filter_}')
 
         _query = t'SELECT id, name, description, criteria, project FROM cohort_template WHERE {wheres_params:q}'
