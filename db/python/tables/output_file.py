@@ -94,15 +94,15 @@ class OutputFileTable(DbBase):
                 {file_obj.size},
                 {file_obj.valid},
                 {parent_id})
-            ON DUPLICATE KEY UPDATE
-                basename = VALUES(basename),
-                dirname = VALUES(dirname),
-                nameroot = VALUES(nameroot),
-                nameext = VALUES(nameext),
-                file_checksum = VALUES(file_checksum),
-                size = VALUES(size),
-                valid = VALUES(valid),
-                parent_id = VALUES(parent_id)
+            ON CONFLICT (path) DO UPDATE SET
+                basename = EXCLUDED.basename,
+                dirname = EXCLUDED.dirname,
+                nameroot = EXCLUDED.nameroot,
+                nameext = EXCLUDED.nameext,
+                file_checksum = EXCLUDED.file_checksum,
+                size = EXCLUDED.size,
+                valid = EXCLUDED.valid,
+                parent_id = EXCLUDED.parent_id
             RETURNING id
             """
 
@@ -124,9 +124,11 @@ class OutputFileTable(DbBase):
         # and we used this over ON DUPLICATE because there are reported deadlocks with that
         # syntax in high concurrency situations?
         add_analysis_output = t"""
-            INSERT IGNORE INTO analysis_outputs
+            INSERT INTO analysis_outputs
                 (analysis_id, file_id, json_structure, output)
-            VALUES ({analysis_id}, {file_id}, {json_structure}, {output})"""
+            VALUES 
+                ({analysis_id}, {file_id}, {json_structure}, {output})
+            ON CONFLICT DO NOTHING"""
 
         await self.connection.pg_connection.execute(add_analysis_output)
 
@@ -206,12 +208,12 @@ class OutputFileTable(DbBase):
             # Add file_id condition if file_ids is not empty
             if file_ids:
                 # Add file_ids to query parameters
-                conditions.append(t'file_id IS NOT NULL AND file_id NOT IN {file_ids}')
+                conditions.append(t'file_id IS NOT NULL AND file_id <> ALL({file_ids})')
 
             # Add output condition if outputs is not empty
             if outputs:
                 # Add outputs to query parameters
-                conditions.append(t'output IS NOT NULL AND output NOT IN {outputs}')
+                conditions.append(t'output IS NOT NULL AND output <> ALL({outputs})')
 
             # Join the conditions with OR since either can be valid
             if conditions:
@@ -220,7 +222,7 @@ class OutputFileTable(DbBase):
                 )
 
             # Execute the query only if either file_ids or outputs were provided
-            await self.connection.execute(update_analysis_outputs)
+            await self.connection.pg_connection.execute(update_analysis_outputs)
 
     async def find_files_from_dict(
         self,

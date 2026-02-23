@@ -3,6 +3,8 @@ from collections.abc import Generator
 from typing import Any
 
 import pytest
+from google.auth.credentials import AnonymousCredentials
+from google.cloud.storage import Client
 from testcontainers.core.container import DockerContainer
 
 from db.python.connect import Connection
@@ -18,10 +20,19 @@ from models.models import (
 )
 from models.models.analysis import AnalysisInternal
 
+def custom_get_gcs_client():
+    """Create the custom client instance with the desired configuration"""
+    return Client(
+        credentials=AnonymousCredentials(),
+        project='test',
+        client_options={'api_endpoint': 'http://localhost:4443'},
+    )
 
 @pytest.fixture(autouse=True)
-def fake_gcs() -> Generator[DockerContainer]:
-    """Provides a dummy Google Cloud storage bucket for testing"""
+def fake_gcs(monkeypatch) -> Generator[DockerContainer]:
+    """Provides a mocked Google Cloud storage bucket for testing"""
+    monkeypatch.setattr('models.models.output_file.get_gcs_client', custom_get_gcs_client)
+
     absolute_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')  # noqa: PTH100, PTH118, PTH120
     gcs = (
         DockerContainer('fsouza/fake-gcs-server')
@@ -101,10 +112,6 @@ class TestOutputFiles:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(
-        reason='Testing analysis outputs is dependent on analysis functionality'
-    )
-    # TODO Implement analysis output tests when analysis is migrated
     async def test_output_str(
         self, connection_with_project: Connection, fake_sequencing_group: int
     ):
@@ -135,12 +142,8 @@ class TestOutputFiles:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(
-        reason='Testing analysis outputs is dependent on analysis functionality'
-    )
-    # TODO Implement analysis output tests when analysis is migrated
     async def test_gs_output_path(
-        self, connection_with_project: Connection, fake_sequencing_group: int
+        self, connection_with_project: Connection, fake_sequencing_group: int, fake_gcs
     ):
         """
         Test how the output(s) behave when you create an analysis by passing in
@@ -183,10 +186,6 @@ class TestOutputFiles:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(
-        reason='Testing analysis outputs is dependent on analysis functionality'
-    )
-    # TODO Implement analysis output tests when analysis is migrated
     async def test_create_with_str_on_outputs(
         self, connection_with_project: Connection, fake_sequencing_group: int
     ):
@@ -230,10 +229,6 @@ class TestOutputFiles:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(
-        reason='Testing analysis outputs is dependent on analysis functionality'
-    )
-    # TODO Implement analysis output tests when analysis is migrated
     async def test_dict_with_outputs(
         self, connection_with_project: Connection, fake_sequencing_group: int
     ):
@@ -325,10 +320,6 @@ class TestOutputFiles:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(
-        reason='Testing analysis outputs is dependent on analysis functionality'
-    )
-    # TODO Implement analysis output tests when analysis is migrated
     async def test_outputs_contains_protocol(
         self, connection_with_project: Connection, fake_sequencing_group: int
     ):
@@ -395,10 +386,7 @@ class TestOutputFiles:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(
-        reason='Testing analysis outputs is dependent on analysis functionality'
-    )
-    # TODO Implement analysis output tests when analysis is migrated
+    @pytest.mark.project_name(['project-test'])
     async def test_project_deletion(
         self, connection_with_project: Connection, fake_sequencing_group: int
     ):
