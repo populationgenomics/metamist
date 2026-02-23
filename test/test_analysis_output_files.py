@@ -21,6 +21,7 @@ from models.models.analysis import AnalysisInternal
 
 @pytest.fixture(autouse=True)
 def fake_gcs() -> Generator[DockerContainer]:
+    """Provides a dummy Google Cloud storage bucket for testing"""
     absolute_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')  # noqa: PTH100, PTH118, PTH120
     gcs = (
         DockerContainer('fsouza/fake-gcs-server')
@@ -100,7 +101,9 @@ class TestOutputFiles:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(reason="Testing analysis outputs is dependent on analysis functionality")
+    @pytest.mark.skip(
+        reason='Testing analysis outputs is dependent on analysis functionality'
+    )
     # TODO Implement analysis output tests when analysis is migrated
     async def test_output_str(
         self, connection_with_project: Connection, fake_sequencing_group: int
@@ -132,7 +135,9 @@ class TestOutputFiles:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(reason="Testing analysis outputs is dependent on analysis functionality")
+    @pytest.mark.skip(
+        reason='Testing analysis outputs is dependent on analysis functionality'
+    )
     # TODO Implement analysis output tests when analysis is migrated
     async def test_gs_output_path(
         self, connection_with_project: Connection, fake_sequencing_group: int
@@ -178,7 +183,9 @@ class TestOutputFiles:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(reason="Testing analysis outputs is dependent on analysis functionality")
+    @pytest.mark.skip(
+        reason='Testing analysis outputs is dependent on analysis functionality'
+    )
     # TODO Implement analysis output tests when analysis is migrated
     async def test_create_with_str_on_outputs(
         self, connection_with_project: Connection, fake_sequencing_group: int
@@ -223,7 +230,9 @@ class TestOutputFiles:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(reason="Testing analysis outputs is dependent on analysis functionality")
+    @pytest.mark.skip(
+        reason='Testing analysis outputs is dependent on analysis functionality'
+    )
     # TODO Implement analysis output tests when analysis is migrated
     async def test_dict_with_outputs(
         self, connection_with_project: Connection, fake_sequencing_group: int
@@ -316,7 +325,9 @@ class TestOutputFiles:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(reason="Testing analysis outputs is dependent on analysis functionality")
+    @pytest.mark.skip(
+        reason='Testing analysis outputs is dependent on analysis functionality'
+    )
     # TODO Implement analysis output tests when analysis is migrated
     async def test_outputs_contains_protocol(
         self, connection_with_project: Connection, fake_sequencing_group: int
@@ -355,8 +366,8 @@ class TestOutputFiles:
                     outputs=outputs_valid,
                 )
             )
-        except ValueError:
-            self.fail()
+        except ValueError as e:
+            pytest.fail(f'Received ValueError: {e}')
 
         # Setup the invalid outputs.
         outputs_invalid = outputs_valid.copy()
@@ -384,7 +395,9 @@ class TestOutputFiles:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(reason="Testing analysis outputs is dependent on analysis functionality")
+    @pytest.mark.skip(
+        reason='Testing analysis outputs is dependent on analysis functionality'
+    )
     # TODO Implement analysis output tests when analysis is migrated
     async def test_project_deletion(
         self, connection_with_project: Connection, fake_sequencing_group: int
@@ -412,12 +425,20 @@ class TestOutputFiles:
             )
         )
 
-        assert (await self.row_count('analysis_outputs')) == 3
-        assert (await self.row_count('output_file')) == 3
+        # Helper to count rows in a table
+        async def row_count(table: str) -> int:
+            cur = await connection_with_project.pg_connection.execute(
+                t'SELECT COUNT(*) as count FROM {table:i}'
+            )
+            row = await cur.fetchone()
+            return row['count'] if row else 0
 
-        pttable = ProjectPermissionsTable(self.connection)
-        project = self.project_id_map[self.project_id]
-        assert await pttable.delete_project_data(project)
+        assert (await row_count('analysis_outputs')) == 3
+        assert (await row_count('output_file')) == 3
 
-        assert (await self.row_count('analysis_outputs')) == 0
-        assert (await self.row_count('output_file')) == 0
+        proj_permission_table = ProjectPermissionsTable(connection_with_project)
+        project = connection_with_project.project
+        assert await proj_permission_table.delete_project_data(project)
+
+        assert (await row_count('analysis_outputs')) == 0
+        assert (await row_count('output_file')) == 0
