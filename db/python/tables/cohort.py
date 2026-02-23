@@ -69,8 +69,12 @@ class CohortTable(DbBase):
                 'project': 'c.project',
             }
         )
-        if where_params is None:
+        if where_params is None and filter_status is None:
             raise ValueError(f'Invalid filter: {filter_}')
+
+        where_sub_query = (
+            t'WHERE {where_params:q}' if where_params is not None else t''
+        )  # allow query based on derived status values
 
         _query = t"""
         SELECT
@@ -85,8 +89,7 @@ class CohortTable(DbBase):
             where csg.cohort_id = c.id
             and (sg.archived or not s.active)
         ) as is_invalid
-        FROM cohort c
-        WHERE {where_params:q}
+        FROM cohort c {where_sub_query:q}
         """
 
         rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
