@@ -141,7 +141,7 @@ class SequencingGroupTable(DbBase):
         )
         where_templates.append(remaining_filters)
 
-        where = t'WHERE {sql.SQL(' AND ').join([t for t in where_templates if t is not None]):q}'
+        where = t'WHERE {sql.SQL(" AND ").join(where_templates):q}'
 
         base_query_components.append(where)
 
