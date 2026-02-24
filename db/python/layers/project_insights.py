@@ -929,7 +929,7 @@ class ProjectInsightsDb(DbBase):
         self, project_names: list[str], sequencing_types: list[str]
     ):
         """Combines the results of the above queries into a response"""
-        projects = self._connection.get_and_check_access_to_projects_for_names(
+        projects = self.connection.get_and_check_access_to_projects_for_names(
             project_names=project_names, allowed_roles=ReadAccessRoles
         )
         project_ids: list[ProjectId] = [project.id for project in projects]
@@ -971,7 +971,7 @@ class ProjectInsightsDb(DbBase):
             + list(latest_es_indices_by_project_id_and_seq_type_and_stage.values())
         )
 
-        sequencing_technologies = await SeqTechTable(self._connection).get()
+        sequencing_technologies = await SeqTechTable(self.connection).get()
         # Get all possible combinations of the projects, sequencing types, and sequencing technologies
         combinations = itertools.product(
             projects, sequencing_types, sequencing_technologies
@@ -1030,7 +1030,7 @@ class ProjectInsightsDb(DbBase):
         self, project_names: list[str], sequencing_types: list[str]
     ):
         """Combines the results of the queries above into a response"""
-        projects = self._connection.get_and_check_access_to_projects_for_names(
+        projects = self.connection.get_and_check_access_to_projects_for_names(
             project_names=project_names, allowed_roles=ReadAccessRoles
         )
         project_ids: list[ProjectId] = [project.id for project in projects]
@@ -1062,8 +1062,8 @@ class ProjectInsightsDb(DbBase):
             + list(latest_es_indices_by_project_id_and_seq_type_and_stage.values())
         )
 
-        sequencing_platforms = await SeqPlatformTable(self._connection).get()
-        sequencing_technologies = await SeqTechTable(self._connection).get()
+        sequencing_platforms = await SeqPlatformTable(self.connection).get()
+        sequencing_technologies = await SeqTechTable(self.connection).get()
 
         # Get all possible combinations of the projects, sequencing types, platforms, and technologies
         combinations = itertools.product(
