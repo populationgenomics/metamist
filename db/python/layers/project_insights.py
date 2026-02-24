@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, NamedTuple
 
 from databases.interfaces import Record
+from psycopg import sql
 
 from db.python.enum_tables import SequencingPlatformTable as SeqPlatformTable
 from db.python.enum_tables import SequencingTechnologyTable as SeqTechTable
@@ -642,17 +643,17 @@ class ProjectInsightsDb(DbBase):
             SELECT
                 project,
                 MAX(timestamp_completed) as max_timestamp,
-                meta ->> 'sequencing_type' as sequencing_type
+                LOWER(meta ->> 'sequencing_type') as sequencing_type
             FROM analysis
             WHERE
                 status = 'completed'
                 AND type = 'custom'
                 AND LOWER(meta ->> 'stage') = 'annotatedataset'
                 AND LOWER(meta ->> 'sequencing_type') = ANY({sequencing_types_param})
-            GROUP BY project, meta ->> 'sequencing_type'
+            GROUP BY project, LOWER(meta ->> 'sequencing_type')
         ) max_timestamps ON a.project = max_timestamps.project
         AND a.timestamp_completed = max_timestamps.max_timestamp
-        AND LOWER(a.meta ->> 'sequencing_type') = LOWER(max_timestamps.sequencing_type)
+        AND LOWER(a.meta ->> 'sequencing_type') = max_timestamps.sequencing_type
         WHERE
             a.type = 'custom'
             AND a.status = 'completed'
@@ -692,16 +693,16 @@ class ProjectInsightsDb(DbBase):
             SELECT
                 project,
                 MAX(timestamp_completed) as max_timestamp,
-                meta ->> 'sequencing_type' as sequencing_type,
-                meta ->> 'stage' as stage
+                LOWER(meta ->> 'sequencing_type') as sequencing_type,
+                LOWER(meta ->> 'stage') as stage
             FROM analysis
             WHERE type = 'es-index'
             AND status = 'completed'
-            GROUP BY project, sequencing_type, stage
+            GROUP BY project, LOWER(meta ->> 'sequencing_type'), LOWER(meta ->> 'stage')
         ) max_timestamps ON a.project = max_timestamps.project
         AND a.timestamp_completed = max_timestamps.max_timestamp
-        AND LOWER(a.meta ->> 'sequencing_type') = LOWER(max_timestamps.sequencing_type)
-        AND LOWER(a.meta ->> 'stage') = LOWER(max_timestamps.stage)
+        AND LOWER(a.meta ->> 'sequencing_type') = max_timestamps.sequencing_type
+        AND LOWER(a.meta ->> 'stage') = max_timestamps.stage
         WHERE
             a.project = ANY({project_ids})
             AND LOWER(a.meta ->> 'sequencing_type') = ANY({sequencing_types_param});
@@ -763,6 +764,7 @@ class ProjectInsightsDb(DbBase):
             fp.participant_id,
             sg.id;
         """
+
         _query_results = await (
             await self.connection.pg_connection.execute(_query)
         ).fetchall()
@@ -807,15 +809,15 @@ class ProjectInsightsDb(DbBase):
             a.meta -> 'outliers_detected' as outliers_detected,
             a.meta -> 'outlier_loci' as outlier_loci
         FROM analysis a
-        LEFT JOIN analysis_outputs ao on a.id=ao.analysis_id
+        LEFT JOIN analysis_outputs ao on a.id = ao.analysis_id
         LEFT JOIN output_file of on of.id = ao.file_id
-        LEFT JOIN analysis_sequencing_group asg on asg.analysis_id=a.id
+        LEFT JOIN analysis_sequencing_group asg on asg.analysis_id = a.id
         INNER JOIN (
             SELECT
                 asg.sequencing_group_id,
                 MAX(a.id) as max_analysis_id
             FROM analysis a
-            LEFT JOIN analysis_sequencing_group asg on asg.analysis_id=a.id
+            LEFT JOIN analysis_sequencing_group asg on asg.analysis_id = a.id
             WHERE type = 'web'
             AND status = 'completed'
             AND project = ANY({project_ids})
