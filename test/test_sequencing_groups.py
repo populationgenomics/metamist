@@ -6,13 +6,15 @@ import pytest
 
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
-from db.python.layers import SequencingGroupLayer
+from db.python.layers import SampleLayer, SequencingGroupLayer
 from db.python.tables.sequencing_group import (
     SequencingGroupFilter,
     SequencingGroupTable,
 )
 from models.models import (
+    PRIMARY_EXTERNAL_ORG,
     AssayUpsertInternal,
+    SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
 from test.conftest import GraphQLQueryFunction
@@ -25,37 +27,18 @@ async def test_sample(connection_with_project: Connection) -> int:
     This is a temporary fixture until sample layer is migrated.
     @TODO replace this when ready
     """
-    project_id = connection_with_project.project_id
+    sample_layer = SampleLayer(connection_with_project)
+    sample = SampleUpsertInternal(
+        project=connection_with_project.project_id,
+        type='blood',
+        active=True,
+        external_ids={PRIMARY_EXTERNAL_ORG: 'EX_ID'},
+        meta={'meta_key': 'meta_value'},
+    )
 
-    conn = connection_with_project.pg_connection
-    # Create audit_log entry first
-    create_audit_log = t"""
-        INSERT INTO audit_log (author, auth_project)
-        VALUES ('test', {project_id})
-        RETURNING id"""
-    cur = await conn.execute(create_audit_log)
-    row = await cur.fetchone()
-    assert row is not None
-    audit_log_id = row['id']
+    await sample_layer.upsert_sample(sample)
 
-    insert_sample = t"""
-        INSERT INTO sample
-            (project, meta, type, active, author, audit_log_id)
-        VALUES ({project_id}, '{{"meta_key": "meta_value"}}', 'blood', true, 'test_aurthor', {audit_log_id})
-        RETURNING id;"""
-
-    cur = await conn.execute(insert_sample)
-    row = await cur.fetchone()
-    assert row is not None
-    sample_id = row['id']
-
-    insert_external_id = t"""
-        INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
-        VALUES ({project_id}, {sample_id}, 'default', 'TESTING001', {audit_log_id})
-        """
-    await conn.execute(insert_external_id)
-
-    return sample_id
+    return sample.id
 
 
 @pytest.fixture
@@ -286,6 +269,91 @@ class TestSequencingGroup:
         )
         assert len(sgs) == 1
         assert sgs[0].id == inital_sgs[1].id
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_query_with_empty_filters(
+        self,
+        connection_with_project: Connection,
+        sequencing_group_model: SequencingGroupUpsertInternal,
+    ):
+        sample_layer = SampleLayer(connection_with_project)
+        sg_layer = SequencingGroupLayer(connection_with_project)
+
+        # Create a second sequencing group with different sample and assays for testing
+        new_sample = SampleUpsertInternal(
+            project=connection_with_project.project_id,
+            type='saliva',
+            active=True,
+            external_ids={PRIMARY_EXTERNAL_ORG: 'EX_ID_2'},
+            meta={'meta_key': 'meta_value'},
+        )
+        await sample_layer.upsert_sample(new_sample)
+
+        new_sg = SequencingGroupUpsertInternal(
+            type='exome',
+            technology='long-read',
+            platform='ILLUMINA',
+            meta={
+                'meta-key': 'meta-value',
+            },
+            sample_id=new_sample.id,
+            external_ids={'ext': 'some-ext-id-2'},
+            assays=[
+                AssayUpsertInternal(
+                    type='sequencing',
+                    external_ids={},
+                    meta={
+                        'sequencing_type': 'exome',
+                        'sequencing_platform': 'long-read',
+                        'sequencing_technology': 'illumina',
+                    },
+                )
+            ],
+        )
+
+        # Add both the fixture sg model and the new model to the db
+        await sg_layer.upsert_sequencing_groups([sequencing_group_model, new_sg])
+
+        # Assert that the sequencing groups and their assays are distinct
+        assert len(sequencing_group_model.assays) == 1
+        assert len(new_sg.assays) == 1
+        assert sequencing_group_model.assays[0] != new_sg.assays[0]
+        assert sequencing_group_model.sample_id != new_sg.sample_id
+
+        # Test that empty sample and assay filters don't cause a narrowing-down of the results
+        empty_filter = SequencingGroupFilter(
+            sample=SequencingGroupFilter.SequencingGroupSampleFilter(),
+            assay=SequencingGroupFilter.SequencingGroupAssayFilter(),
+        )
+        result = await sg_layer.query(empty_filter)
+        result_ids = [r.id for r in result]
+
+        assert len(result) == 2
+        assert sequencing_group_model.id in result_ids
+        assert new_sg.id in result_ids
+
+        # Test that an assay filter does narrow down the result
+        assay_filter = SequencingGroupFilter(
+            assay=SequencingGroupFilter.SequencingGroupAssayFilter(
+                id=GenericFilter(eq=new_sg.assays[0].id)
+            )
+        )
+        result = await sg_layer.query(assay_filter)
+
+        assert len(result) == 1
+        assert result[0].id == new_sg.id
+
+        # Test that a sample filter does narrow down the result
+        sample_filter = SequencingGroupFilter(
+            sample=SequencingGroupFilter.SequencingGroupSampleFilter(
+                id=GenericFilter(eq=new_sg.sample_id)
+            )
+        )
+        result = await sg_layer.query(sample_filter)
+
+        assert len(result) == 1
+        assert result[0].id == new_sg.id
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
