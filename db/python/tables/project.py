@@ -1,3 +1,4 @@
+from string.templatelib import Template
 from typing import TYPE_CHECKING, Any
 
 from psycopg import sql
@@ -46,13 +47,7 @@ class ProjectPermissionsTable:
         """
         Get projects that are accessible by the specified user
         """
-        parameters: dict[str, str] = {
-            'user': user,
-            'project_creators_group_name': GROUP_NAME_PROJECT_CREATORS,
-            'members_admin_group_name': GROUP_NAME_MEMBERS_ADMIN,
-        }
-
-        _query = """
+        _query = t"""
             -- Check what admin groups the user belongs to, if they belong
             -- to project-creators then a project_admin role will be added to
             -- all projects, if they belong to members-admin then a `project_member_admin`
@@ -60,30 +55,30 @@ class ProjectPermissionsTable:
             WITH admin_roles AS (
                 SELECT
                     CASE (g.name)
-                        WHEN %(project_creators_group_name)s THEN 'project_admin'
-                        WHEN %(members_admin_group_name)s THEN 'project_member_admin'
+                        WHEN {GROUP_NAME_PROJECT_CREATORS} THEN 'project_admin'
+                        WHEN {GROUP_NAME_MEMBERS_ADMIN} THEN 'project_member_admin'
                     END
                 as role
                 FROM "group" g
                 JOIN group_member gm
                 ON gm.group_id = g.id
-                WHERE gm.member = %(user)s
-                AND g.name in (%(project_creators_group_name)s, %(members_admin_group_name)s)
+                WHERE gm.member = {user}
+                AND g.name in ({GROUP_NAME_PROJECT_CREATORS}, {GROUP_NAME_MEMBERS_ADMIN})
             ),
             -- Combine together the project roles and the admin roles
             project_roles AS (
                 SELECT pm.project_id, pm.member, pm.role
                 FROM project_member pm
-                WHERE pm.member = %(user)s
+                WHERE pm.member = {user}
                 UNION ALL
-                SELECT p.id as project_id, %(user)s as member, ar.role::project_member_role
+                SELECT p.id as project_id, {user} as member, ar.role::project_member_role
                 FROM project p
                 JOIN admin_roles ar ON TRUE
             )
             SELECT
                 p.id,
                 p.name,
-                coalesce(p.meta, '{}') as meta,
+                coalesce(p.meta, '{{}}') as meta,
                 p.dataset,
                 array_agg(pr.role) as roles
             FROM project p
@@ -97,8 +92,7 @@ class ProjectPermissionsTable:
 
         conn = self.connection.pg_connection
         async with conn.cursor(row_factory=class_row(Project)) as acur:
-            await acur.execute(_query, parameters)
-
+            await acur.execute(_query)
             projects = await acur.fetchall()
 
         for project in projects:
@@ -121,17 +115,17 @@ class ProjectPermissionsTable:
     async def check_if_member_in_group_by_name(self, group_name: str, member: str):
         """Check if a user exists in the group"""
 
-        _query = """
+        _query = t"""
             SELECT gm.member, g.name
             FROM "group" g
             JOIN group_member gm ON g.id = gm.group_id
-            WHERE g.name = %(group_name)s
-            AND gm.member = %(member)s
+            WHERE g.name = {group_name}
+            AND gm.member = {member}
             LIMIT 1
         """
 
         conn = self.connection.pg_connection
-        cur = await conn.execute(_query, {'group_name': group_name, 'member': member})
+        cur = await conn.execute(_query)
         row = await cur.fetchone()
 
         return row is not None
@@ -170,21 +164,15 @@ class ProjectPermissionsTable:
     ):
         """Create project row"""
         await self.check_project_creator_permissions(author)
+        audit_log_id = await self.audit_log_id()
 
-        _query = """
+        _query = t"""
             INSERT INTO project (name, dataset, audit_log_id)
-            VALUES (%(name)s, %(dataset)s, %(audit_log_id)s)
+            VALUES ({project_name}, {dataset_name}, {audit_log_id})
             RETURNING id
         """
-        values: dict[str, Any] = {
-            'name': project_name,
-            'dataset': dataset_name,
-            'audit_log_id': await self.audit_log_id(),
-        }
 
-        conn = self.connection.pg_connection
-
-        cur = await conn.execute(_query, values)
+        cur = await self.connection.pg_connection.execute(_query)
         row = await cur.fetchone()
         assert row
         project_id = row['id']
@@ -200,29 +188,20 @@ class ProjectPermissionsTable:
         await self.check_project_creator_permissions(author)
 
         meta = update.get('meta')
+        audit_log_id = await self.audit_log_id()
 
-        fields: dict[str, Any] = {
-            'audit_log_id': await self.audit_log_id(),
-            'name': project_name,
-        }
-
-        setters = [sql.SQL('audit_log_id = %(audit_log_id)s')]
+        setters = [t'audit_log_id = {audit_log_id}']
 
         if meta is not None and len(meta) > 0:
-            fields['meta'] = meta
             setters.append(
-                sql.SQL(
-                    "meta = json_merge_patch(COALESCE(meta, '{}'::jsonb),  %(meta)s)"
-                )
+                t"meta = json_merge_patch(COALESCE(meta, '{{}}'::jsonb),  {meta})"
             )
         fields_str = sql.SQL(',').join(setters)
 
-        _query = sql.SQL(
-            'UPDATE project SET {fields_str} WHERE name = %(name)s'
-        ).format(fields_str=fields_str)
+        _query = t'UPDATE project SET {fields_str:q} WHERE name = {project_name}'
 
         conn = self.connection.pg_connection
-        await conn.execute(_query, fields)
+        await conn.execute(_query)
 
     async def delete_project_data(self, project: Project) -> bool:
         """
@@ -231,116 +210,116 @@ class ProjectPermissionsTable:
         if not project.is_test_project:
             raise ValueError('2025-12-04: refusing to delete non-test project')
 
-        delete_queries: list[sql.SQL] = [
-            sql.SQL("""
+        project_id = project.id
+
+        delete_queries: list[Template] = [
+            t"""
             DELETE FROM comment WHERE id IN (
                 SELECT ac.comment_id FROM assay_comment ac
                 INNER JOIN assay a ON ac.assay_id = a.id
                 INNER JOIN sample s ON a.sample_id = s.id
-                WHERE s.project = %(project)s
+                WHERE s.project = {project_id}
 
                 UNION
                 SELECT fc.comment_id FROM family_comment fc
                 INNER JOIN family f ON fc.family_id = f.id
-                WHERE f.project = %(project)s
+                WHERE f.project = {project_id}
 
                 UNION
                 SELECT pc.comment_id FROM participant_comment pc
                 INNER JOIN participant p ON pc.participant_id = p.id
-                WHERE p.project = %(project)s
+                WHERE p.project = {project_id}
 
                 UNION
                 SELECT comment_id FROM project_comment
-                WHERE project_id = %(project)s
+                WHERE project_id = {project_id}
 
                 UNION
                 SELECT sc.comment_id FROM sample_comment sc
                 INNER JOIN sample s ON sc.sample_id = s.id
-                WHERE s.project = %(project)s
+                WHERE s.project = {project_id}
 
                 UNION
                 SELECT sgc.comment_id FROM sequencing_group_comment sgc
                 INNER JOIN sequencing_group sg ON sgc.sequencing_group_id = sg.id
                 INNER JOIN sample s ON sg.sample_id = s.id
-                WHERE s.project = %(project)s
+                WHERE s.project = {project_id}
             )
-            """),
-            sql.SQL('DELETE FROM project_member WHERE project_id = %(project)s'),
-            sql.SQL("""
+            """,
+            t'DELETE FROM project_member WHERE project_id = {project_id}',
+            t"""
             DELETE FROM participant_phenotypes WHERE participant_id IN (
-                SELECT id FROM participant WHERE project = %(project)s
+                SELECT id FROM participant WHERE project = {project_id}
             )
-            """),
-            sql.SQL("""
+            """,
+            t"""
             DELETE FROM family_participant WHERE family_id IN (
-                SELECT id FROM family WHERE project = %(project)s
+                SELECT id FROM family WHERE project = {project_id}
             )
-            """),
-            sql.SQL('DELETE FROM family_external_id WHERE project = %(project)s'),
-            sql.SQL('DELETE FROM family WHERE project = %(project)s'),
-            sql.SQL(
-                'DELETE FROM sequencing_group_external_id WHERE project = %(project)s'
-            ),
-            sql.SQL('DELETE FROM sample_external_id WHERE project = %(project)s'),
-            sql.SQL('DELETE FROM participant_external_id WHERE project = %(project)s'),
-            sql.SQL('DELETE FROM assay_external_id WHERE project = %(project)s'),
-            sql.SQL("""
+            """,
+            t'DELETE FROM family_external_id WHERE project = {project_id}',
+            t'DELETE FROM family WHERE project = {project_id}',
+            t'DELETE FROM sequencing_group_external_id WHERE project = {project_id}',
+            t'DELETE FROM sample_external_id WHERE project = {project_id}',
+            t'DELETE FROM participant_external_id WHERE project = {project_id}',
+            t'DELETE FROM assay_external_id WHERE project = {project_id}',
+            t"""
             DELETE FROM sequencing_group_assay WHERE sequencing_group_id IN (
                 SELECT sg.id FROM sequencing_group sg
                 INNER JOIN sample ON sample.id = sg.sample_id
-                WHERE sample.project = %(project)s
+                WHERE sample.project = {project_id}
             )
-            """),
-            sql.SQL("""
+            """,
+            t"""
             DELETE FROM analysis_sequencing_group WHERE sequencing_group_id IN (
                 SELECT sg.id FROM sequencing_group sg
                 INNER JOIN sample ON sample.id = sg.sample_id
-                WHERE sample.project = %(project)s
+                WHERE sample.project = {project_id}
             )
-            """),
-            sql.SQL("""
+            """,
+            t"""
             DELETE FROM output_file WHERE id IN (
                 SELECT file_id FROM analysis_outputs ao
                 INNER JOIN analysis a ON ao.analysis_id = a.id
-                WHERE a.project = %(project)s
+                WHERE a.project = {project_id}
             )
-            """),
-            sql.SQL("""
+            """,
+            t"""
             DELETE FROM analysis_sequencing_group WHERE analysis_id IN (
-                SELECT id FROM analysis WHERE project = %(project)s
+                SELECT id FROM analysis WHERE project = {project_id}
             )
-            """),
-            sql.SQL("""
+            """,
+            t"""
             DELETE FROM analysis_cohort WHERE cohort_id IN (
-                SELECT id FROM cohort WHERE project = %(project)s
+                SELECT id FROM cohort WHERE project = {project_id}
             )
-            """),
-            sql.SQL("""
+            """,
+            t"""
             DELETE FROM cohort_sequencing_group WHERE cohort_id IN (
-                SELECT id FROM cohort WHERE project = %(project)s
+                SELECT id FROM cohort WHERE project = {project_id}
             )
-            """),
-            sql.SQL('DELETE FROM cohort_template WHERE project = %(project)s'),
-            sql.SQL('DELETE FROM cohort WHERE project = %(project)s'),
-            sql.SQL("""
+            """,
+            t'DELETE FROM cohort_template WHERE project = {project_id}',
+            t'DELETE FROM cohort WHERE project = {project_id}',
+            t"""
             DELETE FROM assay WHERE sample_id IN (
-                SELECT id FROM sample WHERE project = %(project)s
+                SELECT id FROM sample WHERE project = {project_id}
             )
-            """),
-            sql.SQL("""
+            """,
+            t"""
             DELETE FROM sequencing_group WHERE sample_id IN (
-                SELECT id FROM sample WHERE project = %(project)s
+                SELECT id FROM sample WHERE project = {project_id}
             )
-            """),
-            sql.SQL('DELETE FROM sample WHERE project = %(project)s'),
-            sql.SQL('DELETE FROM participant WHERE project = %(project)s'),
-            sql.SQL('DELETE FROM analysis WHERE project = %(project)s'),
+            """,
+            t'DELETE FROM sample WHERE project = {project_id}',
+            t'DELETE FROM participant WHERE project = {project_id}',
+            t'DELETE FROM analysis WHERE project = {project_id}',
         ]
 
         conn = self.connection.pg_connection
         async with conn.transaction():
             for query in delete_queries:
-                await conn.execute(query, {'project': project.id})
+                await conn.execute(query)
 
         return True
 
@@ -358,12 +337,11 @@ class ProjectPermissionsTable:
         ):
             # Get existing rows so that we can keep the existing audit log ids
             await cur.execute(
-                """
+                t"""
                 SELECT project_id, member, role, audit_log_id
                 FROM project_member
-                WHERE project_id = %(project_id)s
-                """,
-                {'project_id': project.id},
+                WHERE project_id = {project.id}
+                """
             )
             existing_rows = await cur.fetchall()
 
@@ -373,11 +351,10 @@ class ProjectPermissionsTable:
 
             # delete existing rows for project
             await cur.execute(
-                """
+                t"""
                 DELETE FROM project_member
-                WHERE project_id = %(project_id)s
-                """,
-                {'project_id': project.id},
+                WHERE project_id = {project.id}
+                """
             )
 
             new_audit_log_id = await self.audit_log_id()

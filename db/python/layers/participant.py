@@ -3,6 +3,8 @@ from collections import defaultdict
 from enum import Enum
 from typing import Any
 
+from psycopg.pq import TransactionStatus
+
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
@@ -357,7 +359,8 @@ class ParticipantLayer(BaseLayer):
             # if there are no participants to add, skip the next step
             return '0 participants updated'
 
-        async with self.connection.connection.transaction():
+        conn = self.connection.pg_connection
+        async with conn.transaction():
             sample_ids_to_update = {
                 external_sample_map_with_no_pid[external_id]: pid
                 for external_id, pid in unlinked_participants.items()
@@ -407,7 +410,8 @@ class ParticipantLayer(BaseLayer):
         # currently only does the seqr metadata template
 
         # filter to non-comment rows
-        async with self.connection.connection.transaction():
+        conn = self.connection.pg_connection
+        async with conn.transaction():
             ppttable = ParticipantPhenotypeTable(self.connection)
 
             self._validate_individual_metadata_headers(headers)
@@ -596,7 +600,7 @@ class ParticipantLayer(BaseLayer):
         return id_map
 
     async def get_external_participant_id_to_internal_sequencing_group_id_map(
-        self, project: int, sequencing_type: str = None
+        self, project: int, sequencing_type: str | None = None
     ) -> list[tuple[str, int]]:
         """
         Get a map of {external_participant_id} -> {internal_sequencing_group_id}
@@ -616,11 +620,16 @@ class ParticipantLayer(BaseLayer):
     # region UPSERTS / UPDATES
 
     async def upsert_participant(
-        self, participant: ParticipantUpsertInternal, project: ProjectId = None
+        self,
+        participant: ParticipantUpsertInternal,
+        project: ProjectId | None = None,
     ) -> ParticipantUpsertInternal:
         """Create a single participant"""
+        conn = self.connection.pg_connection
+        in_transaction = conn.info.transaction_status == TransactionStatus.INTRANS
+        with_function = conn.transaction if not in_transaction else NoOpAenter
 
-        async with self.connection.transaction():
+        async with with_function():
             if participant.id:
                 project_ids = await self.pttable.get_project_ids_for_participant_ids(
                     [participant.id]
@@ -669,19 +678,13 @@ class ParticipantLayer(BaseLayer):
     async def upsert_participants(
         self,
         participants: list[ParticipantUpsertInternal],
-        open_transaction=True,
+        project: ProjectId | None = None,
     ):
         """Batch upsert a list of participants with sequences"""
-        with_function = (
-            self.connection.pg_connection.transaction
-            if open_transaction
-            else NoOpAenter
-        )
-
-        async with with_function():
+        async with self.connection.transaction():
             # Create or update participants
             for p in participants:
-                await self.upsert_participant(p)
+                await self.upsert_participant(p, project=project)
 
         # Format and return response
         return participants
