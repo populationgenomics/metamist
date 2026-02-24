@@ -84,7 +84,7 @@ class SequencingGroupTable(DbBase):
             assay_where_condition = sg_filter.assay.to_sql(a_overrides)
             base_query_components.append(
                 t"""
-                INNER JOIN sequencing_group_assay sga ON sg.id = sga.sequencing_group_id'
+                INNER JOIN sequencing_group_assay sga ON sg.id = sga.sequencing_group_id
                 INNER JOIN assay a ON sga.assay_id = a.id"""
             )
 
@@ -141,7 +141,7 @@ class SequencingGroupTable(DbBase):
         )
         where_templates.append(remaining_filters)
 
-        where = t'WHERE ' + sql.SQL(' AND ').join(where_templates)
+        where = t'WHERE {sql.SQL(' AND ').join([t for t in where_templates if t is not None]):q}'
 
         base_query_components.append(where)
 
