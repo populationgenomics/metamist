@@ -1657,6 +1657,8 @@ class Query:  # entry point to graphql.
                     SequencingGroupFilter.SequencingGroupAssayFilter(
                         meta=graphql_meta_filter_to_internal_filter(assay_meta),
                     )
+                    if assay_meta
+                    else None
                 ),
                 has_cram=has_cram,
                 has_gvcf=has_gvcf,
