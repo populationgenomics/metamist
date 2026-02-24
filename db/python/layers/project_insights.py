@@ -403,6 +403,8 @@ class ProjectInsightsDb(DbBase):
     async def _total_families_by_project_id_and_seq_fields(
         self, project_ids: list[ProjectId], sequencing_types: list[SequencingType]
     ) -> dict[ProjectSeqTypeTechnologyKey, int]:
+
+        sequencing_types_param = [st.lower() for st in sequencing_types]
         _query = t"""
         SELECT
             f.project,
@@ -416,7 +418,7 @@ class ProjectInsightsDb(DbBase):
             LEFT JOIN sequencing_group sg on sg.sample_id = s.id
         WHERE
             f.project = ANY({project_ids})
-            AND sg.type = ANY({sequencing_types})
+            AND sg.type = ANY({sequencing_types_param})
         GROUP BY
             f.project,
             sg.type,
@@ -434,6 +436,7 @@ class ProjectInsightsDb(DbBase):
         self, project_ids: list[ProjectId], sequencing_types: list[SequencingType]
     ) -> dict[ProjectSeqTypeTechnologyKey, int]:
 
+        sequencing_types_param = [st.lower() for st in sequencing_types]
         _query = t"""
         SELECT
             p.project,
@@ -446,7 +449,7 @@ class ProjectInsightsDb(DbBase):
             LEFT JOIN sequencing_group sg on sg.sample_id = s.id
         WHERE
             p.project = ANY({project_ids})
-            AND sg.type = ANY({sequencing_types})
+            AND sg.type = ANY({sequencing_types_param})
         GROUP BY
             p.project,
             sg.type,
@@ -464,6 +467,7 @@ class ProjectInsightsDb(DbBase):
         self, project_ids: list[ProjectId], sequencing_types: list[SequencingType]
     ) -> dict[ProjectSeqTypeTechnologyKey, int]:
 
+        sequencing_types_param = [st.lower() for st in sequencing_types]
         _query = t"""
         SELECT
             s.project,
@@ -475,7 +479,7 @@ class ProjectInsightsDb(DbBase):
             LEFT JOIN sequencing_group sg on sg.sample_id = s.id
         WHERE
             s.project = ANY({project_ids})
-            AND sg.type = ANY({sequencing_types})
+            AND sg.type = ANY({sequencing_types_param})
         GROUP BY
             s.project,
             sg.type,
@@ -493,6 +497,8 @@ class ProjectInsightsDb(DbBase):
     async def _total_sequencing_groups_by_project_id_and_seq_fields(
         self, project_ids: list[ProjectId], sequencing_types: list[SequencingType]
     ) -> dict[ProjectSeqTypeTechnologyKey, int]:
+
+        sequencing_types_param = [st.lower() for st in sequencing_types]
         _query = t"""
         SELECT
             s.project,
@@ -504,7 +510,7 @@ class ProjectInsightsDb(DbBase):
             LEFT JOIN sample s on s.id = sg.sample_id
         WHERE
             s.project = ANY({project_ids})
-            AND sg.type = ANY({sequencing_types})
+            AND sg.type = ANY({sequencing_types_param})
         GROUP BY
             s.project,
             sg.type,
@@ -523,7 +529,8 @@ class ProjectInsightsDb(DbBase):
         project_ids: list[ProjectId],
         sequencing_types: list[SequencingType],
     ) -> dict[ProjectSeqTypeTechnologyKey, list[SequencingGroupInternalId]]:
-        # TODO check CRAM or cram
+
+        sequencing_types_param = [st.lower() for st in sequencing_types]
         _query = t"""
         SELECT
             a.project,
@@ -536,8 +543,8 @@ class ProjectInsightsDb(DbBase):
             LEFT JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
         WHERE
             a.project = ANY({project_ids})
-            AND sg.type = ANY({sequencing_types})
-            AND lower(a.type) = 'cram'
+            AND sg.type = ANY({sequencing_types_param})
+            AND a.type = 'cram'
             AND a.status = 'completed'
         GROUP BY
             a.project,
@@ -558,6 +565,8 @@ class ProjectInsightsDb(DbBase):
     ) -> dict[
         ProjectSeqTypeTechnologyKey, dict[SequencingGroupInternalId, AnalysisRow]
     ]:
+
+        sequencing_types_param = [st.lower() for st in sequencing_types]
         _query = t"""
         SELECT
             a.project,
@@ -579,7 +588,7 @@ class ProjectInsightsDb(DbBase):
                     MAX(a.timestamp_completed) as max_timestamp
                 FROM analysis a
                 INNER JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id
-                WHERE LOWER(a.type) = 'cram'
+                WHERE a.type = 'cram'
                 AND a.status='completed'
                 AND a.project = ANY({project_ids})
                 GROUP BY asg.sequencing_group_id
@@ -587,8 +596,8 @@ class ProjectInsightsDb(DbBase):
             AND a.timestamp_completed = max_timestamps.max_timestamp
         WHERE
             a.project = ANY({project_ids})
-            AND sg.type = ANY({sequencing_types})
-            AND a.type = 'CRAM'
+            AND sg.type = ANY({sequencing_types_param})
+            AND a.type = 'cram'
             AND a.status = 'completed';
         """
 
@@ -620,6 +629,7 @@ class ProjectInsightsDb(DbBase):
         self, project_ids: list[ProjectId], sequencing_types: list[str]
     ) -> dict[ProjectSeqTypeKey, AnalysisRow]:
 
+        sequencing_types_param = [st.lower() for st in sequencing_types]
         _query = t"""
         SELECT
             a.project,
@@ -636,19 +646,19 @@ class ProjectInsightsDb(DbBase):
             FROM analysis
             WHERE
                 status = 'completed'
-                AND lower(type) = 'custom'
-                AND meta ->> 'stage' = 'AnnotateDataset'
-                AND meta ->> 'sequencing_type' = ANY({sequencing_types})
+                AND type = 'custom'
+                AND LOWER(meta ->> 'stage') = 'annotatedataset'
+                AND LOWER(meta ->> 'sequencing_type') = ANY({sequencing_types_param})
             GROUP BY project, meta ->> 'sequencing_type'
         ) max_timestamps ON a.project = max_timestamps.project
         AND a.timestamp_completed = max_timestamps.max_timestamp
-        AND a.meta ->> 'sequencing_type' = max_timestamps.sequencing_type
+        AND LOWER(a.meta ->> 'sequencing_type') = LOWER(max_timestamps.sequencing_type)
         WHERE
-            LOWER(a.type) = 'custom'
+            a.type = 'custom'
             AND a.status = 'completed'
             AND a.project = ANY({project_ids})
-            AND a.meta ->> 'sequencing_type' = ANY({sequencing_types})
-            AND a.meta ->> 'stage' = 'AnnotateDataset';
+            AND LOWER(a.meta ->> 'sequencing_type') = ANY({sequencing_types_param})
+            AND LOWER(a.meta ->> 'stage') = 'annotatedataset';
         """
 
         _query_results = await (
@@ -668,6 +678,7 @@ class ProjectInsightsDb(DbBase):
         self, project_ids: list[ProjectId], sequencing_types: list[str]
     ) -> dict[ProjectSeqTypeStageKey, AnalysisRow]:
 
+        sequencing_types_param = [st.lower() for st in sequencing_types]
         _query = t"""
         SELECT
             a.project,
@@ -684,16 +695,16 @@ class ProjectInsightsDb(DbBase):
                 meta ->> 'sequencing_type' as sequencing_type,
                 meta ->> 'stage' as stage
             FROM analysis
-            WHERE LOWER(type) = 'es-index'
+            WHERE type = 'es-index'
             AND status = 'completed'
-            GROUP BY project, meta ->> 'sequencing_type', meta ->> 'stage'
+            GROUP BY project, sequencing_type, stage
         ) max_timestamps ON a.project = max_timestamps.project
         AND a.timestamp_completed = max_timestamps.max_timestamp
-        AND a.meta ->> 'sequencing_type' = max_timestamps.sequencing_type
-        AND a.meta ->> 'stage' = max_timestamps.stage
+        AND LOWER(a.meta ->> 'sequencing_type') = LOWER(max_timestamps.sequencing_type)
+        AND LOWER(a.meta ->> 'stage') = LOWER(max_timestamps.stage)
         WHERE
             a.project = ANY({project_ids})
-            AND a.meta ->> 'sequencing_type' = ANY({sequencing_types});
+            AND LOWER(a.meta ->> 'sequencing_type') = ANY({sequencing_types_param});
         """
 
         _query_results = await (
@@ -716,6 +727,7 @@ class ProjectInsightsDb(DbBase):
         self, project_ids: list[ProjectId], sequencing_types: list[str]
     ) -> dict[ProjectSeqTypeTechnologyPlatformKey, list[SequencingGroupDetailRow]]:
 
+        sequencing_types_param = [st.lower() for st in sequencing_types]
         _query = t"""
         SELECT
             f.project,
@@ -740,7 +752,7 @@ class ProjectInsightsDb(DbBase):
             LEFT JOIN sequencing_group sg on sg.sample_id = s.id
         WHERE
             f.project = ANY({project_ids})
-            AND sg.type = ANY({sequencing_types})
+            AND sg.type = ANY({sequencing_types_param})
         ORDER BY
             f.project,
             sg.type,
@@ -804,7 +816,7 @@ class ProjectInsightsDb(DbBase):
                 MAX(a.id) as max_analysis_id
             FROM analysis a
             LEFT JOIN analysis_sequencing_group asg on asg.analysis_id=a.id
-            WHERE LOWER(type) = 'web'
+            WHERE type = 'web'
             AND status = 'completed'
             AND project = ANY({project_ids})
             AND LOWER(meta ->> 'stage') = 'stripy'
@@ -850,7 +862,7 @@ class ProjectInsightsDb(DbBase):
                 MAX(a.id) as max_analysis_id
             FROM analysis a
             LEFT JOIN analysis_sequencing_group asg on asg.analysis_id = a.id
-            WHERE LOWER(type) = 'web'
+            WHERE type = 'web'
             AND status = 'completed'
             AND project = ANY({project_ids})
             AND LOWER(meta ->> 'stage') = 'mitoreport'
