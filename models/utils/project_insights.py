@@ -4,12 +4,14 @@ from typing import NamedTuple
 from models.models import ProjectId
 from models.models.sequencing_group import SequencingGroupInternalId
 
+
 AnalysisId = int
 SequencingType = str
 SequencingTechnology = str
 SequencingPlatform = str
 
 # util data models for project insights queries
+
 
 # This layer has a lot of different queries, so we'll define some namedtuples to help us keep track of the keys
 class ProjectSeqTypeKey(NamedTuple):  # noqa: D101
