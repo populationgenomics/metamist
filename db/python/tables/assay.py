@@ -228,7 +228,7 @@ class AssayTable(DbBase):
             INNER JOIN assay a ON sga.assay_id = a.id
             LEFT JOIN sample s ON a.sample_id = s.id
             LEFT JOIN assay_external_id ae ON a.id = ae.assay_id
-            WHERE {wheres_q}
+            WHERE {wheres_q:q}
             GROUP BY
                 a.id, a.sample_id, a.type, a.meta,
                 s.project, sga.sequencing_group_id
