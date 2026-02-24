@@ -1,5 +1,5 @@
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 
@@ -24,9 +24,6 @@ from models.models import (
 )
 
 
-@pytest.mark.skip(
-    reason='Analysis really is reliant on almost every other migration. Best to uncomment once the others are completed.'
-)
 class TestAnalysis:
     """Test sample class"""
 
@@ -96,7 +93,7 @@ class TestAnalysis:
         self.genome_sequencing_group_id: int = sample.sequencing_groups[0].id
         self.exome_sequencing_group_id: int = sample.sequencing_groups[1].id
 
-    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_get_analysis_by_id(self):
         """
         Test getting an analysis by id
@@ -115,7 +112,7 @@ class TestAnalysis:
         assert analysis.type == 'cram'
         assert analysis.status == AnalysisStatus.COMPLETED
 
-    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_empty_query(self):
         """
         Test empty IDs to see the query construction
@@ -123,7 +120,7 @@ class TestAnalysis:
         analyses = await self.al.query(AnalysisFilter(id=GenericFilter(in_=[])))
         assert len(analyses) == 0
 
-    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_add_cram(self):
         """
         Test adding an analysis of type CRAM
@@ -151,7 +148,7 @@ class TestAnalysis:
         assert analysis_sgs[0]['sequencing_group_id'] == 1
         assert analysis_sgs[0]['analysis_id'] == analyses[0]['id']
 
-    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_get_analysis(self):
         """
         Test adding an analysis of type ANALYSIS_RUNNER
@@ -190,7 +187,8 @@ class TestAnalysis:
 
         assert expected == analyses
 
-    @pytest.mark.asyncio
+    @pytest.mark.skip('prepare_query_from_dict_field not implemented')
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_get_analysis_by_meta_isnull(self):
         """
         Test getting an analysis by a meta query that uses isnull
@@ -232,7 +230,8 @@ class TestAnalysis:
 
         assert expected == analyses
 
-    @pytest.mark.asyncio
+    @pytest.mark.skip('prepare_query_from_dict_field not implemented')
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_get_analysis_by_meta_in_(self):
         """
         Test getting an analysis by a meta query that uses in_ filter. These filters
@@ -273,7 +272,7 @@ class TestAnalysis:
 
         assert expected == analyses
 
-    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_get_sample_cram_path_map_for_seqr(self):
         """
         Exercise get_sample_cram_path_map_for_seqr()
@@ -297,7 +296,7 @@ class TestAnalysis:
         )
         assert isinstance(id_map, list)
 
-    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_get_sgs_by_analysis_id_with_no_eids(self):
         """
         Test get_sgs_by_analysis_id()
@@ -367,11 +366,11 @@ class TestAnalysis:
         assert genome_id == sgs[0].id
         assert exome_id == sgs[1].id
 
-    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_create_analysis_with_timestamp(self):
         """Tests that analyses can be backdated by suppling timestamp_completed"""
         # Test creation with a manually-set timestamp
-        test_timestamp = datetime(year=2013, month=2, day=22)
+        test_timestamp = datetime(2013, 2, 22, 0, 0, tzinfo=timezone.utc)
         a_id = await self.al.create_analysis(
             AnalysisInternal(
                 type='analysis-runner',
@@ -387,7 +386,8 @@ class TestAnalysis:
 
         assert test_timestamp == init_analysis[0].timestamp_completed
 
-    @pytest.mark.asyncio
+    @pytest.mark.skip('output_file.py not migrated yet')
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_update_analysis(self):
         """
         Test Analysis update
@@ -459,7 +459,7 @@ class TestAnalysis:
 
         assert expected == analyses
 
-    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_route_update_active(self):
         """
         Test that update_analysis(active=False) is effective

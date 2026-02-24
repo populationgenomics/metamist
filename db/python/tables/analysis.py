@@ -84,9 +84,10 @@ class AnalysisTable(DbBase):
                 )
 
             ordered_keys = sorted(kv_pairs.keys())
-            identifiers = [sql.Identifier(k) for k in ordered_keys]
-            cs_keys = sql.SQL(', ').join(identifiers)
-            cs_values = sql.SQL(', ').join(t'{kv_pairs[k]}' for k in ordered_keys)
+            cs_keys = sql.SQL(', ').join(sql.Identifier(k) for k in ordered_keys)
+            cs_values = sql.SQL(', ').join(
+                sql.Literal(kv_pairs[k]) for k in ordered_keys
+            )
 
             _query = t"""
                 INSERT INTO analysis ({cs_keys:q})
@@ -191,8 +192,10 @@ class AnalysisTable(DbBase):
             )
 
         if meta is not None and len(meta) > 0:
-            meta = Jsonb(meta)
-            setters.append(t'meta = JSON_MERGE_PATCH(COALESCE(meta, "{{}}"), {meta})')
+            meta_value = Jsonb(meta)
+            setters.append(
+                t"meta = JSON_MERGE_PATCH(COALESCE(meta, '{{}}'), {meta_value})"
+            )
 
         fields_str = sql.SQL(', ').join(setters)
         _query = t'UPDATE analysis SET {fields_str:q} WHERE id = {analysis_id}'
@@ -214,7 +217,7 @@ class AnalysisTable(DbBase):
                 'or project to filter on'
             )
 
-        where_conditions = filter_.to_sql(
+        where_condition = filter_.to_sql(
             {
                 'id': 'a.id',
                 'sequencing_group_id': 'a_sg.sequencing_group_id',
@@ -228,8 +231,6 @@ class AnalysisTable(DbBase):
             },
         )
 
-        where_str = sql.SQL(' AND ').join(where_conditions)
-
         _query = t"""
             SELECT
                 a.id,
@@ -240,12 +241,12 @@ class AnalysisTable(DbBase):
                 a.active,
                 a.author,
                 a.meta,
-                GROUP_CONCAT(distinct a_sg.sequencing_group_id) as _sequencing_group_ids,
-                GROUP_CONCAT(distinct a_c.cohort_id) as _cohort_ids
+                string_agg(distinct a_sg.sequencing_group_id::text, ',') as _sequencing_group_ids,
+                string_agg(distinct a_c.cohort_id::text, ',') as _cohort_ids
             FROM analysis a
             LEFT JOIN analysis_sequencing_group a_sg ON a.id = a_sg.analysis_id
             LEFT JOIN analysis_cohort a_c ON a.id = a_c.analysis_id
-            WHERE {where_str:q}
+            WHERE {where_condition:q}
             GROUP BY a.id
         """
         acur = await self.connection.pg_connection.execute(_query)
@@ -526,22 +527,22 @@ class AnalysisTable(DbBase):
         participant_ids: list[int] | None = None,
     ) -> list[dict[str, str]]:
         """Get (ext_sample_id, cram_path, internal_id) map"""
-        filters = [
+        where_conditions = [
             t'a.active',
-            t'a.type = "cram"',
-            t'a.status = "completed"',
+            t"a.type = 'cram'",
+            t"a.status = 'completed'",
             t'peid.project = {project}',
             t'peid.name = {PRIMARY_EXTERNAL_ORG}',
         ]
         if sequencing_types:
-            filters.append(
-                t'JSON_VALUE(a.meta, "$.sequencing_type") = ANY({sequencing_types})'
+            where_conditions.append(
+                t"JSON_VALUE(a.meta, '$.sequencing_type') = ANY({sequencing_types})"
             )
 
         if participant_ids:
-            filters.append(t'peid.participant_id = ANY({participant_ids})')
+            where_conditions.append(t'peid.participant_id = ANY({participant_ids})')
 
-        where_str = sql.SQL(' AND ').join(filters)
+        where_clause = sql.SQL(' AND ').join(where_conditions)
 
         _query = t"""
             SELECT a.id, peid.external_id as participant_id, a.output as output, sg.id as sequencing_group_id
@@ -550,7 +551,7 @@ class AnalysisTable(DbBase):
             INNER JOIN sequencing_group sg ON a_sg.sequencing_group_id = sg.id
             INNER JOIN sample s ON sg.sample_id = s.id
             INNER JOIN participant_external_id peid ON s.participant_id = peid.participant_id
-            WHERE {where_str:q}
+            WHERE {where_clause:q}
             ORDER BY a.timestamp_completed DESC;
         """
 

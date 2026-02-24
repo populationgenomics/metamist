@@ -665,7 +665,6 @@ class ParticipantLayer(BaseLayer):
                 await slayer.upsert_samples(
                     participant.samples,
                     project=project,
-                    open_transaction=False,
                 )
 
             if participant.phenotypes:
