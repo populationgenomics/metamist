@@ -1,5 +1,5 @@
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -370,7 +370,7 @@ class TestAnalysis:
     async def test_create_analysis_with_timestamp(self):
         """Tests that analyses can be backdated by suppling timestamp_completed"""
         # Test creation with a manually-set timestamp
-        test_timestamp = datetime(2013, 2, 22, 0, 0, tzinfo=timezone.utc)
+        test_timestamp = datetime(2013, 2, 22, 0, 0, tzinfo=UTC)
         a_id = await self.al.create_analysis(
             AnalysisInternal(
                 type='analysis-runner',
