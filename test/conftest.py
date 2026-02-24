@@ -298,6 +298,12 @@ async def seeded_db(
         if group not in valid_admin_groups:
             raise ValueError(f'Invalid admin group in marker: {group}')
 
+    # Get project name from marker, or default to test-project
+    project_name_marker = request.node.get_closest_marker('project_name')
+    project_name: list[str] = (
+        project_name_marker.args[0] if project_name_marker else 'test-project'
+    )
+
     async with db_pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cur:
             # Create groups for project creators and members admin
@@ -318,9 +324,9 @@ async def seeded_db(
             )
 
             # Create a test project and get its ID
-            await cur.execute("""
+            await cur.execute(t"""
                 INSERT INTO project (name, dataset, meta)
-                VALUES ('test-project', 'test-dataset', '{}')
+                VALUES ({project_name}, 'test-dataset', '{{}}')
                 RETURNING id
             """)
             row = await cur.fetchone()
@@ -422,6 +428,7 @@ async def connection(
 
 @pytest.fixture
 async def connection_with_project(
+    request: pytest.FixtureRequest,
     db_pool: AsyncConnectionPool[AsyncConnection[DictRow]],
     seeded_db: None,  # Fixture dependency - ensures database is seeded first  # noqa: ARG001
     monkeypatch: pytest.MonkeyPatch,
@@ -455,8 +462,12 @@ async def connection_with_project(
     # Refresh projects to load the seeded test-project
     await conn.refresh_projects()
 
-    # Set the project to test-project
-    conn.update_project('test-project')
+    # Set the project to test-project, or get the name from marker if available
+    project_name_marker = request.node.get_closest_marker('project_name')
+    project_name: list[str] = (
+        project_name_marker.args[0] if project_name_marker else 'test-project'
+    )
+    conn.update_project(project_name)
 
     yield conn
 
@@ -472,4 +483,8 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         'markers',
         'admin_groups(groups: list[str]): Specify admin groups for the test user in the seeded db.',
+    )
+    config.addinivalue_line(
+        'markers',
+        'project_name(name: str): Specify the name of the test project in the seeded test db.',
     )
