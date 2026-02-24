@@ -27,18 +27,37 @@ async def test_sample(connection_with_project: Connection) -> int:
     This is a temporary fixture until sample layer is migrated.
     @TODO replace this when ready
     """
-    sample_layer = SampleLayer(connection_with_project)
-    sample = SampleUpsertInternal(
-        project=connection_with_project.project_id,
-        type='blood',
-        active=True,
-        external_ids={PRIMARY_EXTERNAL_ORG: 'EX_ID'},
-        meta={'meta_key': 'meta_value'},
-    )
+    project_id = connection_with_project.project_id
 
-    await sample_layer.upsert_sample(sample)
+    conn = connection_with_project.pg_connection
+    # Create audit_log entry first
+    create_audit_log = t"""
+        INSERT INTO audit_log (author, auth_project)
+        VALUES ('test', {project_id})
+        RETURNING id"""
+    cur = await conn.execute(create_audit_log)
+    row = await cur.fetchone()
+    assert row is not None
+    audit_log_id = row['id']
 
-    return sample.id
+    insert_sample = t"""
+        INSERT INTO sample
+            (project, meta, type, active, author, audit_log_id)
+        VALUES ({project_id}, '{{"meta_key": "meta_value"}}', 'blood', true, 'test_aurthor', {audit_log_id})
+        RETURNING id;"""
+
+    cur = await conn.execute(insert_sample)
+    row = await cur.fetchone()
+    assert row is not None
+    sample_id = row['id']
+
+    insert_external_id = t"""
+        INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
+        VALUES ({project_id}, {sample_id}, 'default', 'TESTING001', {audit_log_id})
+        """
+    await conn.execute(insert_external_id)
+
+    return sample_id
 
 
 @pytest.fixture
