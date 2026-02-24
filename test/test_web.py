@@ -42,7 +42,7 @@ from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
     sequencing_group_id_transform_to_raw,
 )
-from test.testbase import TEST_PROJECT_NAME, DbIsolatedTest, run_as_sync
+# from test.testbase import TEST_PROJECT_NAME, DbIsolatedTest, run_as_sync
 
 
 default_assay_meta = {
