@@ -1,4 +1,5 @@
 import dataclasses
+import re
 from collections.abc import Callable, Sequence
 from enum import Enum
 from string.templatelib import Template
@@ -100,7 +101,7 @@ class GenericFilter[T](SMBase):
         """Override to ensure we can hash this object"""
         return hash(self.get_hashable_value())
 
-    def to_sql(self, column: str | Template) -> Template:
+    def to_sql(self, column: str | Template) -> Template | None:
         """
         Convert to SQL, and avoid SQL injection.
 
@@ -172,7 +173,15 @@ class GenericFilter[T](SMBase):
         if len(filters_rm_none) == 0:
             return None
 
-        return sql.SQL(' AND ').join(filters_rm_none)
+        # Join Template objects using the + operator
+        if len(filters_rm_none) == 1:
+            return filters_rm_none[0]
+
+        result = filters_rm_none[0]
+        for f in filters_rm_none[1:]:
+            result = result + t' AND ' + f
+
+        return result
 
     def transform(self, func: Callable[[T], X]) -> GenericFilter[X]:
         """
@@ -192,6 +201,124 @@ class GenericFilter[T](SMBase):
             startswith=func(self.startswith) if self.startswith else None,
             isnull=self.isnull,
         )
+
+    def to_jsonpath_exists(self, column_name: str, jsonb_expression: str) -> Template:  # noqa: PLR0912
+        r"""
+        Convert a GenericFilter to a JSONPath exists query for JSONB columns with array filtering.
+
+        This is used for filtering on nested JSON arrays, e.g., finding all assays where
+        any element in the 'reads' array has a 'size' >= 10000.
+
+        Args:
+            column_name: The column name (e.g., 'a.meta' or 'meta')
+            jsonb_expression: The JSON path expression (e.g., 'reads[*].basename')
+
+        Returns:
+            Template for jsonb_path_exists() query
+
+        Example:
+            GenericFilter(gte=10000).to_jsonpath_exists('a.meta', 'reads[*].size')
+            # Returns: jsonb_path_exists(a.meta, '$.reads[*] ? (@.size >= 10000)')
+
+            GenericFilter(contains='fastq.gz').to_jsonpath_exists('a.meta', 'reads[*].basename')
+            # Returns: jsonb_path_exists(a.meta, '$.reads[*] ? (@.basename like_regex "fastq\.gz")')
+        """
+
+        # Parse the jsonb_expression to extract array path and field
+        # e.g., 'reads[*].basename' -> array_path='reads[*]', field='basename'
+        match = re.match(r'^(.+\[\*\])\.(.+)$', jsonb_expression)
+        if not match:
+            raise ValueError(
+                f'Invalid JSONB expression: {jsonb_expression}. '
+                f'Expected format: "array[*].field"'
+            )
+
+        array_path = match.group(1)  # 'reads[*]'
+        field = match.group(2)  # 'basename'
+
+        # Build JSONPath predicates
+        predicates = []
+
+        if self.eq is not None:
+            if isinstance(self.eq, str):
+                predicates.append(f'@.{field} == "{self.eq}"')
+            else:
+                predicates.append(f'@.{field} == {self.eq}')
+
+        if self.neq is not None:
+            if isinstance(self.neq, str):
+                predicates.append(f'@.{field} != "{self.neq}"')
+            else:
+                predicates.append(f'@.{field} != {self.neq}')
+
+        if self.gt is not None:
+            predicates.append(f'@.{field} > {self.gt}')
+
+        if self.gte is not None:
+            predicates.append(f'@.{field} >= {self.gte}')
+
+        if self.lt is not None:
+            predicates.append(f'@.{field} < {self.lt}')
+
+        if self.lte is not None:
+            predicates.append(f'@.{field} <= {self.lte}')
+
+        if self.contains is not None:
+            # Escape special regex characters for JSONPath like_regex
+            # Double backslashes for PostgreSQL JSONPath parser
+            escaped = re.escape(str(self.contains)).replace('\\', '\\\\')
+            predicates.append(f'@.{field} like_regex "{escaped}"')
+
+        if self.icontains is not None:
+            escaped = re.escape(str(self.icontains)).replace('\\', '\\\\')
+            predicates.append(f'@.{field} like_regex "{escaped}" flag "i"')
+
+        if self.startswith is not None:
+            escaped = re.escape(str(self.startswith)).replace('\\', '\\\\')
+            predicates.append(f'@.{field} like_regex "^{escaped}"')
+
+        if self.in_ is not None and len(self.in_) > 0:
+            # (@.field == val1 || @.field == val2 || ...)
+            in_conditions = []
+            for val in self.in_:
+                if isinstance(val, str):
+                    in_conditions.append(f'@.{field} == "{val}"')
+                else:
+                    in_conditions.append(f'@.{field} == {val}')
+            predicates.append(f'({" || ".join(in_conditions)})')
+
+        if self.nin is not None and len(self.nin) > 0:
+            # !(@.field == val1 || @.field == val2 || ...)
+            nin_conditions = []
+            for val in self.nin:
+                if isinstance(val, str):
+                    nin_conditions.append(f'@.{field} == "{val}"')
+                else:
+                    nin_conditions.append(f'@.{field} == {val}')
+            predicates.append(f'!({" || ".join(nin_conditions)})')
+
+        if self.isnull is not None:
+            if self.isnull:
+                # Match where field is null or doesn't exist
+                predicates.append(f'(@.{field} == null || !exists(@.{field}))')
+            else:
+                # Match where field exists and is not null
+                predicates.append(f'(exists(@.{field}) && @.{field} != null)')
+
+        if not predicates:
+            raise ValueError('No filter conditions specified')
+
+        # Combine predicates with AND
+        predicate_str = ' && '.join(predicates)
+
+        # Build the JSONPath: $.array[*] ? (predicate)
+        # Don't add quotes - psycopg will handle that when passing as parameter
+        json_path_str = f'$.{array_path} ? ({predicate_str})'
+
+        # Build the Template - pass JSONPath as a parameter
+        column_parts = sql.Identifier(*column_name.split('.'))
+
+        return t'jsonb_path_exists({column_parts:i}, {json_path_str})'
 
 
 GenericMetaFilter = dict[str, GenericFilter[Any]]
@@ -349,6 +476,10 @@ def prepare_query_from_dict_field(
     """
     Prepare a SQL query from a dict field, which is a dict of GenericFilters.
     Usually this is a JSON field in the database that we want to query on.
+
+    Supports two modes:
+    1. Simple key-value: 'meta' column with key 'foo' -> meta ->> 'foo'
+    2. Array filtering: 'meta' column with key 'reads[*].size' -> jsonb_path_exists(meta, '$.reads[*] ? (@.size >= 10000)')
     """
     wheres: list[Template | None] = []
 
@@ -356,33 +487,31 @@ def prepare_query_from_dict_field(
         if '"' in key:
             raise ValueError('Meta key contains " character, which is not allowed')
 
-        # Build JSON extraction expression as a Template
-        # Creates: ("column_name" ->> 'key')::type for typed casts
-        # or just "column_name" ->> 'key' for text
-        json_expr: Template
-        col_parts = column_name.split('.')
-        cast_type: str = infer_type_from_filter(field_filter)
-        if cast_type != 'string':
-            # Cast the JSON text extraction to the appropriate type
-            # Use sql.SQL for the cast type to avoid treating it as an identifier
-            json_expr = (
-                t'({sql.Identifier(*col_parts):i} ->> {key})::{sql.SQL(cast_type):q}'
-            )
+        # Check if this is array filtering (contains '[*]')
+        if '[*]' in key:
+            # Use JSONPath exists for array filtering
+            where_filter = field_filter.to_jsonpath_exists(column_name, key)
         else:
-            # No cast needed for string type, just extract the text
-            json_expr = t'{sql.Identifier(*col_parts):i} ->> {key}'
+            # Simple key-value extraction with type casting
+            column_parts = sql.Identifier(*column_name.split('.'))
+            cast_type: str = infer_type_from_filter(field_filter)
 
-        # Construct sql where clause for this key and filter
-        where_filter = field_filter.to_sql(
-            column=f'{column_name}_{key}',
-            column_expression=json_expr,
-        )
+            json_expr = t'{column_parts:i}->>{key}'
+            if cast_type != 'string':
+                # Cast the JSON text extraction to the appropriate type
+                # Use sql.SQL() to insert the type name as a literal, not a parameter
+                json_expr = t'({json_expr:q})::{sql.SQL(cast_type):q}'
 
-        # If we are using an exclusion filter (nin, neq)
-        # we also include rows where the key doesn't exist or the json
-        # value is null. The exception is if isnull=False
-        if key in ('nin', 'neq') and not field_filter.isnull:
-            where_filter = t'({where_filter} OR {json_expr} IS NULL)'
+            # Construct sql where clause for this key and filter
+            where_filter = field_filter.to_sql(column=json_expr)
+
+            # If we are using an exclusion filter (nin, neq)
+            # we also include rows where the key doesn't exist or the json
+            # value is null. The exception is if isnull=False
+            if field_filter.isnull is not False and (
+                field_filter.nin or field_filter.neq
+            ):
+                where_filter = t'({where_filter:q} OR {json_expr:q} IS NULL)'
 
         wheres.append(where_filter)
 
@@ -390,4 +519,5 @@ def prepare_query_from_dict_field(
     if len(wheres_rm_none) == 0:
         return None
 
+    # Join Template objects using the + operator
     return sql.SQL(' AND ').join(wheres_rm_none)

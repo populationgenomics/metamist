@@ -648,6 +648,11 @@ class TestGenericFilters:
         assert results[0]['test_string'] == 'test'
         assert results[0]['test_int'] == 100
 
+
+@pytest.mark.asyncio
+class TestGenericDictFilters:
+    """Test generic filters in a dictionary context against real database"""
+
     async def test_dict_field_eq(
         self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
     ):

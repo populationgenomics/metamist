@@ -7,15 +7,25 @@ import pytest
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers import SequencingGroupLayer
+from db.python.layers.sample import SampleLayer
 from db.python.tables.sequencing_group import (
     SequencingGroupFilter,
     SequencingGroupTable,
 )
+from models.base import PRIMARY_EXTERNAL_ORG
 from models.models import (
     AssayUpsertInternal,
     SequencingGroupUpsertInternal,
 )
+from models.models.sample import SampleUpsertInternal
 from test.conftest import GraphQLQueryFunction
+
+
+DEFAULT_SEQUENCING_META = {
+    'sequencing_type': 'genome',
+    'sequencing_platform': 'short-read',
+    'sequencing_technology': 'illumina',
+}
 
 
 @pytest.fixture
@@ -699,3 +709,156 @@ class TestSequencingGroup:
         }
 
         assert result == expected_output
+
+
+@pytest.mark.asyncio
+class TestAssayMetaFiltersGraphQL:
+    """Test generic filters in a GraphQL context against real database"""
+
+    @pytest.fixture(autouse=True)
+    async def setup(
+        self,
+        connection_with_project: Connection,
+    ):
+        # Insert sample into test project, and get sample_id
+        sample_layer = SampleLayer(connection_with_project)
+
+        def get_external_ids(number: int) -> dict[str, str]:
+            return {'default': f'SEQ{number:02d}', 'collaborator2': f'CBSEQ_{number}'}
+
+        def get_assay_meta_for_read(read):
+            return {
+                '1': 1,
+                'nested': {'nested': 'dict'},
+                'alpha': ['b', 'e', 't'],
+                'reads-double-nested': [[read]],
+                'reads': [read],
+                **DEFAULT_SEQUENCING_META,
+            }
+
+        self.reads = [
+            {'size': 10000, 'basename': 'gs://bucket/foobar.fastq.gz'},
+            {'size': 5000, 'basename': 'gs://bucket/foobar2.fastq.gz'},
+            {'size': 20000, 'basename': 'gs://bucket/foobar3.fq.gz'},
+        ]
+
+        await sample_layer.upsert_sample(
+            SampleUpsertInternal(
+                project=connection_with_project.project_id,
+                external_ids={PRIMARY_EXTERNAL_ORG: 'TEST_META_FILTER'},
+                type='blood',
+                active=True,
+                meta={'test_key': 'test_value'},
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform=f'illumina{i + 1:02d}',
+                        meta={'sg_key': 'sg_value'},
+                        external_ids=get_external_ids(i + 1),
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta=get_assay_meta_for_read(read),
+                                external_ids=get_external_ids(i + 1),
+                            )
+                        ],
+                    )
+                    for i, read in enumerate(self.reads)
+                ],
+            )
+        )
+
+    @pytest.mark.project_roles(['reader', 'writer'])
+    async def test_graphql_assay_filter(
+        self,
+        connection_with_project: Connection,
+        graphql_query: GraphQLQueryFunction,
+    ):
+        """
+        Test that demonstrates how GraphQL basic sequencing group filtering would work.
+        """
+
+        assert connection_with_project.project is not None
+        project_name = str(connection_with_project.project.name)
+
+        # Insert sequencing group and assay data
+        _query = """
+            query SgByAssayMeta($project: StrGraphQLFilter!) {
+                sequencingGroups(project: $project) {
+                    id
+                    type
+                    assays {
+                        meta
+                    }
+                }
+            }
+        """
+        variables = {
+            'project': {'eq': project_name},
+        }
+
+        results = await graphql_query(_query, variables=variables)
+
+        assert 'data' in results
+        assert 'sequencingGroups' in results['data']
+        results = results['data']['sequencingGroups']
+
+        # Verify that the filter correctly handles JSON path-like keys
+        assert len(results) == len(self.reads)
+        for r in results:
+            assert r.get('id')
+            assert r.get('type')
+
+    @pytest.mark.project_roles(['reader', 'writer'])
+    async def test_graphql_assay_meta_filter(
+        self,
+        connection_with_project: Connection,
+        graphql_query: GraphQLQueryFunction,
+    ):
+        """
+        Test that demonstrates how GraphQL assayMeta filtering would work.
+        """
+        assert connection_with_project.project is not None
+        project_name = str(connection_with_project.project.name)
+
+        # Insert sequencing group and assay data
+        _query = """
+            query SgByAssayMeta($project: StrGraphQLFilter!, $assayMeta: JSON!) {
+                sequencingGroups(project: $project, assayMeta: $assayMeta) {
+                    id
+                    type
+                    assays {
+                        meta
+                    }
+                }
+            }
+        """
+        variables = {
+            'project': {'eq': project_name},
+            'assayMeta': {
+                'reads[*].basename': {'contains': 'fastq.gz'},
+                'reads[*].size': {'gte': 10000},
+            },
+        }
+
+        results = await graphql_query(_query, variables=variables)
+
+        assert 'data' in results
+        assert 'sequencingGroups' in results['data']
+        results = results['data']['sequencingGroups']
+
+        # Verify that the filter correctly handles JSON path-like keys
+        assert len(results) > 0
+        for r in results:
+            assert r.get('id')
+            assert r.get('type')
+            assert 'assays' in r
+            for assay in r['assays']:
+                assert 'meta' in assay
+                assert 'reads' in assay['meta']
+                for read in assay['meta']['reads']:
+                    assert 'basename' in read
+                    assert 'size' in read
+                    assert 'fastq.gz' in read['basename']
+                    assert read['size'] >= 10000
