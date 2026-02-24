@@ -83,13 +83,14 @@ class AnalysisTable(DbBase):
                     timestamp_completed or datetime.datetime.now(datetime.UTC)
                 )
 
-            filtered_pairs = {k: v for k, v in kv_pairs.items() if v is not None}
-            cs_keys = sql.SQL(', ').join(filtered_pairs.keys())
-            cs_values = sql.SQL(', ').join(t'{k}' for k in filtered_pairs)
+            ordered_keys = sorted(kv_pairs.keys())
+            identifiers = [sql.Identifier(k) for k in ordered_keys]
+            cs_keys = sql.SQL(', ').join(identifiers)
+            cs_values = sql.SQL(', ').join(t'{kv_pairs[k]}' for k in ordered_keys)
 
             _query = t"""
-                INSERT INTO analysis ({cs_keys})
-                VALUES ({cs_values})
+                INSERT INTO analysis ({cs_keys:q})
+                VALUES ({cs_values:q})
                 RETURNING id
             """
 
@@ -194,7 +195,7 @@ class AnalysisTable(DbBase):
             setters.append(t'meta = JSON_MERGE_PATCH(COALESCE(meta, "{{}}"), {meta})')
 
         fields_str = sql.SQL(', ').join(setters)
-        _query = t'UPDATE analysis SET {fields_str} WHERE id = {analysis_id}'
+        _query = t'UPDATE analysis SET {fields_str:q} WHERE id = {analysis_id}'
 
         await self.connection.pg_connection.execute(_query)
 
@@ -375,8 +376,7 @@ class AnalysisTable(DbBase):
         if len(rows) == 0:
             raise NotFoundError(f"Couldn't find any analysis with type {analysis_type}")
 
-        latest_analysis = rows[0]
-        latest_analysis_data = dict(latest_analysis)
+        latest_analysis_data = rows[0]
         analysis_outputs_by_aid = await self.get_file_outputs_by_analysis_ids(
             [row['id'] for row in rows]
         )
