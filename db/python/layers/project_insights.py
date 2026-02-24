@@ -6,7 +6,6 @@ from datetime import datetime
 from typing import Any, NamedTuple
 
 from databases.interfaces import Record
-from psycopg import sql
 
 from db.python.enum_tables import SequencingPlatformTable as SeqPlatformTable
 from db.python.enum_tables import SequencingTechnologyTable as SeqTechTable
