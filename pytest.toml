@@ -16,6 +16,7 @@ python_files = [
     "test_comment.py",
     "test_meta_table.py",
     "test_enum_tables.py",
+    "test_analysis_runner.py",
     "test_cohort.py",
     "test_cohort_status.py"
 ]

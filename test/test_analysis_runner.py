@@ -1,27 +1,25 @@
 import datetime
 
+import pytest
+
+from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers.analysis_runner import AnalysisRunnerLayer
 from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from models.models.analysis_runner import AnalysisRunnerInternal
-from test.testbase import DbIsolatedTest, run_as_sync
 
 
-class TestAnalysisRunner(DbIsolatedTest):
+class TestAnalysisRunner:
     """Test sample class"""
 
-    @run_as_sync
-    async def setUp(self) -> None:
-        # don't need to await because it's tagged @run_as_sync
-        super().setUp()
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection_with_project: Connection) -> None:
+        self.al = AnalysisRunnerLayer(connection_with_project)
+        self.project_id = connection_with_project.project_id
 
-        self.al = AnalysisRunnerLayer(self.connection)
-
-    @run_as_sync
-    async def test_insert(self):
-        """Test insert"""
-        analysis = AnalysisRunnerInternal(
-            ar_guid='<ar-guid>',
+    def get_test_analysis(self, ar_guid_param: str) -> AnalysisRunnerInternal:
+        return AnalysisRunnerInternal(
+            ar_guid=ar_guid_param,
             project=self.project_id,
             output_path='output_path',
             timestamp=datetime.datetime(2024, 1, 1),
@@ -39,12 +37,17 @@ class TestAnalysisRunner(DbIsolatedTest):
             batch_url='batch_url',
             meta={'meta': 'meta'},
         )
+
+    @pytest.mark.asyncio
+    async def test_insert(self) -> None:
+        """Test insert"""
+        analysis = self.get_test_analysis('<ar-guid>')
         await self.al.insert_analysis_runner_entry(analysis)
 
         db_ars = await self.al.query(
             AnalysisRunnerFilter(ar_guid=GenericFilter(eq=analysis.ar_guid))
         )
-        self.assertEqual(len(db_ars), 1)
+        assert len(db_ars) == 1
         field_to_compare = [
             'project',
             'output_path',
@@ -64,39 +67,17 @@ class TestAnalysisRunner(DbIsolatedTest):
         ]
         for field in field_to_compare:
             # check each field is the same
-            self.assertEqual(
-                getattr(db_ars[0], field),
-                getattr(analysis, field),
-                msg='Field: ' + field,
+            assert getattr(db_ars[0], field) == getattr(analysis, field), (
+                'Field: ' + field
             )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_query(self):
         """
         Query all the Filter fields to check they work correctly
         """
-        analyses = [
-            AnalysisRunnerInternal(
-                ar_guid=f'<ar-guid-{i + 1}>',
-                project=self.project_id,
-                output_path='output_path',
-                timestamp=datetime.datetime(2024, 1, 1),
-                access_level='test',
-                repository='repository',
-                config_path='config_path',
-                environment='gcp',
-                submitting_user='submitting_user',
-                commit='commit',
-                script='script',
-                description='description',
-                hail_version='1.0',
-                cwd='cwd',
-                driver_image='driver_image',
-                batch_url='batch_url',
-                meta={'meta': 'meta'},
-            )
-            for i in range(3)
-        ]
+        analyses = [self.get_test_analysis(f'<ar-guid-{i + 1}>') for i in range(3)]
+
         for analysis in analyses:
             await self.al.insert_analysis_runner_entry(analysis)
 
@@ -111,7 +92,7 @@ class TestAnalysisRunner(DbIsolatedTest):
         )
 
         # return all 3
-        self.assertEqual(len(db_ars), 3)
+        assert len(db_ars) == 3
 
         # get one for 2 of the ar-guids
         guids_to_query = {a.ar_guid for a in analyses[:2]}
@@ -120,5 +101,18 @@ class TestAnalysisRunner(DbIsolatedTest):
                 ar_guid=GenericFilter(in_=list(guids_to_query)),
             )
         )
-        self.assertEqual(len(db_ars), 2)
-        self.assertSetEqual({a.ar_guid for a in db_ars}, guids_to_query)
+        assert len(db_ars) == 2
+        db_ars_guid = {a.ar_guid for a in db_ars}
+        assert db_ars_guid == guids_to_query
+
+    @pytest.mark.asyncio
+    async def test_query_does_not_throw_error_for_empty_filters(self):
+        """
+        Test that the query throws an error if the filters are empty
+        """
+
+        analysis = self.get_test_analysis('<ar-guid>')
+        await self.al.insert_analysis_runner_entry(analysis)
+
+        result = await self.al.query(AnalysisRunnerFilter())
+        assert result
