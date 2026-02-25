@@ -646,10 +646,15 @@ class TestWeb:
                 f'Fields for category {k} did not match'
 
     @pytest.mark.asyncio
-    async def test_project_summary_multiple_participants_and_filter(self):
+    @pytest.mark.project_roles(['writer'])
+    async def test_project_summary_multiple_participants_and_filter(
+        self,
+        test_participant: ParticipantUpsertInternal,
+        test_participant_2: ParticipantUpsertInternal
+    ):
         """Try with multiple participants as some extra security"""
-        await self.partl.upsert_participants(
-            participants=[get_test_participant(), get_test_participant_2()]
+        await self.participant_layer.upsert_participants(
+            participants=[test_participant, test_participant_2]
         )
 
         expected_fields = {
@@ -689,11 +694,11 @@ class TestWeb:
             )
         )
 
-        nested_participants = await self.webl.query_participants(
-            pfilter.to_internal(project=self.project_id), limit=None
+        nested_participants = await self.web_layer.query_participants(
+            pfilter.to_internal(project=self.connection.project_id), limit=None
         )
 
-        self.assertEqual(1, len(nested_participants))
+        assert len(nested_participants) == 1
         result = ProjectParticipantGridResponse.from_params(
             nested_participants,
             filter_fields=pfilter,
@@ -708,16 +713,13 @@ class TestWeb:
             sorted_result_fields = sorted(
                 result.fields[k], key=lambda x: x.key
             )  # sort by key
-            self.assertEqual(
-                sorted_expected_fields,
-                sorted_result_fields,
-                msg=f'Fields for category {k} did not match',
-            )
+            assert sorted_expected_fields == sorted_result_fields, \
+                f'Fields for category {k} did not match'
 
     @pytest.mark.asyncio
     async def test_field_with_space(self):
         """Test filtering on a meta field with spaces"""
-        await self.partl.upsert_participants(
+        await self.participant_layer.upsert_participants(
             participants=[get_test_participant(), get_test_participant_2()]
         )
 
@@ -726,7 +728,7 @@ class TestWeb:
                 meta={'field with spaces': GenericFilter[Any](contains='field wi')}
             )
         )
-        nested_participants = await self.webl.query_participants(
+        nested_participants = await self.web_layer.query_participants(
             pfilter.to_internal(project=self.project_id), limit=None
         )
 
@@ -738,7 +740,7 @@ class TestWeb:
         Insert a sequencing-group, archive it, then check that the summary
         doesn't return that sequencing group
         """
-        participants = await self.partl.upsert_participants(
+        participants = await self.participant_layer.upsert_participants(
             participants=[get_test_participant()]
         )
         assert (
@@ -757,7 +759,7 @@ class TestWeb:
             meta={'new-meta': 'value'},
         )
 
-        participants = await self.webl.query_participants(
+        participants = await self.web_layer.query_participants(
             ParticipantFilter(), limit=None
         )
         summary_sgs = participants[0].samples[0].sequencing_groups

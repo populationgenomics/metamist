@@ -92,18 +92,18 @@ class ParticipantTable:
         # Check filter for the sample table and sample_external_id table
         if filter_.sample or filter_.sequencing_group or filter_.assay:
             if filter_.sample:
-                wheres.append(
-                    filter_.sample.to_sql(
-                        {
-                            'id': 's.id',
-                            'type': 's.type',
-                            'meta': 's.meta',
-                            'sample_root_id': 's.sample_root_id',
-                            'sample_parent_id': 's.sample_parent_id',
-                        },
-                        exclude=['external_id'],
-                    )
+                sample_filter_sql = filter_.sample.to_sql(
+                    {
+                        'id': 's.id',
+                        'type': 's.type',
+                        'meta': 's.meta',
+                        'sample_root_id': 's.sample_root_id',
+                        'sample_parent_id': 's.sample_parent_id',
+                    },
+                    exclude=['external_id'],
                 )
+                if sample_filter_sql:
+                    wheres.append(sample_filter_sql)
 
             query_template += t' INNER JOIN sample s ON s.participant_id = pp.id'
 
