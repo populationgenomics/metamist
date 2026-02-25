@@ -73,17 +73,17 @@ class ParticipantTable:
         # Join on the participant_external_id table
         # always join, query optimiser can figure it out
         # Start by getting the project name, id, meta and external_id
-        wheres.append(
-            filter_.to_sql(
-                {
-                    'project': 'pp.project',
-                    'id': 'pp.id',
-                    'meta': 'pp.meta',
-                    'external_id': 'peid.external_id',
-                },
-                exclude=['family', 'sample', 'sequencing_group', 'assay'],
-            )
+        filter_sql = filter_.to_sql(
+            {
+                'project': 'pp.project',
+                'id': 'pp.id',
+                'meta': 'pp.meta',
+                'external_id': 'peid.external_id',
+            },
+            exclude=['family', 'sample', 'sequencing_group', 'assay'],
         )
+        if filter_sql is not None:
+            wheres.append(filter_sql)
 
         query_template += (
             t' INNER JOIN participant_external_id peid ON pp.id = peid.participant_id'
@@ -174,7 +174,7 @@ class ParticipantTable:
                 """
 
         # WHERE, ORDER BY, LIMIT, OFFSET
-        query_template += t' WHERE ' + sql.SQL(' AND ').join(wheres) if wheres else t''
+        query_template += t' WHERE {sql.SQL(" AND ").join(wheres):q}' if wheres else t''
         query_template += t' ORDER BY pp.id' if (limit or skip) else t''
         query_template += t' LIMIT {limit}' if limit else t''
         query_template += t' OFFSET {skip}' if skip else t''

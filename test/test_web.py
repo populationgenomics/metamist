@@ -344,7 +344,7 @@ def test_participant_2() -> ParticipantUpsertInternal:
 
 
 SINGLE_PARTICIPANT_SUMMARY_RESULT = ProjectSummaryInternal(
-    project=WebProject(id=1, name='test-project', meta={}, dataset='test'),
+    project=WebProject(id=1, name='test-project', meta={}, dataset='test-dataset'),
     total_samples=1,
     total_participants=1,
     total_sequencing_groups=1,
@@ -398,16 +398,18 @@ class TestWeb:
 
     @pytest.fixture(autouse=True)
     async def setUp(self, connection_with_project: Connection) -> None:
-        self.webl = WebLayer(connection_with_project)
-        self.partl = ParticipantLayer(connection_with_project)
-        self.pil = ProjectInsightsLayer(connection_with_project)
-        self.sampl = SampleLayer(connection_with_project)
-        self.seql = AssayLayer(connection_with_project)
+        self.connection = connection_with_project
+
+        self.web_layer = WebLayer(connection_with_project)
+        self.participant_layer = ParticipantLayer(connection_with_project)
+        self.proj_insights_layer = ProjectInsightsLayer(connection_with_project)
+        self.sample_layer = SampleLayer(connection_with_project)
+        self.sq_layer = AssayLayer(connection_with_project)
 
     @pytest.mark.asyncio
     async def test_project_summary_empty(self):
         """Test getting the summary for a project"""
-        result = await self.webl.get_project_summary()
+        result = await self.web_layer.get_project_summary()
 
         # Expect an empty project
         expected = ProjectSummaryInternal(
@@ -425,26 +427,32 @@ class TestWeb:
         assert expected == result
 
     @pytest.mark.asyncio
-    async def test_project_summary_single_entry(self):
+    @pytest.mark.project_roles(['writer'])
+    async def test_project_summary_single_entry(
+        self,
+        test_participant: ParticipantUpsertInternal
+    ):
         """Test project summary with a single participant with all fields"""
         # Now add a participant with a sample and sequence
-        await self.partl.upsert_participants(participants=[get_test_participant()])
+        await self.participant_layer.upsert_participants(participants=[test_participant])
 
-        result = await self.webl.get_project_summary()
-        self.assertDataclassEqual(SINGLE_PARTICIPANT_SUMMARY_RESULT, result)
+        result = await self.web_layer.get_project_summary()
+        assert SINGLE_PARTICIPANT_SUMMARY_RESULT == result
 
     @pytest.mark.asyncio
-    async def test_project_summary_to_external(self):
+    @pytest.mark.project_roles(['writer'])
+    async def test_project_summary_to_external(
+        self,
+        test_participant: ParticipantUpsertInternal
+    ):
         """Test project summary to_external function"""
         # Now add a participant with a sample and sequence
-        await self.partl.upsert_participants(participants=[get_test_participant()])
+        await self.participant_layer.upsert_participants(participants=[test_participant])
 
-        summary = await self.webl.get_project_summary()
-        self.assertEqual(
-            SINGLE_PARTICIPANT_SUMMARY_RESULT.to_external(),
-            summary.to_external(),
-        )
-        internal_participants = await self.webl.query_participants(
+        summary = await self.web_layer.get_project_summary()
+        assert SINGLE_PARTICIPANT_SUMMARY_RESULT.to_external() == summary.to_external()
+
+        internal_participants = await self.web_layer.query_participants(
             ParticipantFilter(), limit=None
         )
 
@@ -455,28 +463,20 @@ class TestWeb:
         )
 
         assert isinstance(internal_participants[0].samples, list)
-        self.assertIsInstance(internal_participants[0].samples[0].id, int)
-        self.assertIsInstance(ex_result.participants[0].samples[0].id, str)
-        self.assertEqual(
-            sample_id_transform_to_raw(ex_result.participants[0].samples[0].id),
-            internal_participants[0].samples[0].id,
-        )
+        assert isinstance(internal_participants[0].samples[0].id, int)
+        assert isinstance(ex_result.participants[0].samples[0].id, str)
+        assert sample_id_transform_to_raw(ex_result.participants[0].samples[0].id) == internal_participants[0].samples[0].id
 
         assert isinstance(internal_participants[0].samples[0].sequencing_groups, list)
         assert isinstance(ex_result.participants[0].samples[0].sequencing_groups, list)
 
-        self.assertIsInstance(
+        assert isinstance(
             internal_participants[0].samples[0].sequencing_groups[0].id, int
         )
-        self.assertIsInstance(
+        assert isinstance(
             ex_result.participants[0].samples[0].sequencing_groups[0].id, str
         )
-        self.assertEqual(
-            sequencing_group_id_transform_to_raw(
-                ex_result.participants[0].samples[0].sequencing_groups[0].id
-            ),
-            internal_participants[0].samples[0].sequencing_groups[0].id,
-        )
+        assert sequencing_group_id_transform_to_raw(ex_result.participants[0].samples[0].sequencing_groups[0].id) == internal_participants[0].samples[0].sequencing_groups[0].id
 
         assert isinstance(
             internal_participants[0].samples[0].sequencing_groups[0].assays, list
@@ -484,11 +484,11 @@ class TestWeb:
         assert isinstance(
             ex_result.participants[0].samples[0].sequencing_groups[0].assays, list
         )
-        self.assertIsInstance(
+        assert isinstance(
             internal_participants[0].samples[0].sequencing_groups[0].assays[0],
             AssayInternal,
         )
-        self.assertIsInstance(
+        assert isinstance(
             ex_result.participants[0].samples[0].sequencing_groups[0].assays[0], Assay
         )
 
