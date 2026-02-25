@@ -21,7 +21,8 @@ python_files = [
     "test_cohort_status.py",
     "test_update_participant_family.py",
     "test_pedigree.py",
-    "test_search.py"
+    "test_search.py",
+    "test_graphql.py"
 ]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
