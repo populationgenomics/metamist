@@ -11,14 +11,12 @@ from db.python.tables.sequencing_group import (
     SequencingGroupFilter,
     SequencingGroupTable,
 )
-from models.base import PRIMARY_EXTERNAL_ORG
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     AssayUpsertInternal,
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
-from models.models.sample import SampleUpsertInternal
 from test.conftest import GraphQLQueryFunction
 
 
