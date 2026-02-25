@@ -101,7 +101,7 @@ class FamilyParticipantTable(DbBase):
         """
 
         where_params: Template = filter_.to_sql()
-        if not list(where_params):
+        if where_params is None:
             raise ValueError('No filter provided')
 
         join_type = t'LEFT' if include_participants_not_in_families else t'INNER'

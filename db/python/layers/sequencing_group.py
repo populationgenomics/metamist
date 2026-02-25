@@ -1,6 +1,7 @@
 from datetime import date
 
 from db.python.connect import Connection
+from db.python.filters.generic import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer
 from db.python.tables.sample import SampleTable

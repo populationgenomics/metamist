@@ -1,8 +1,9 @@
 import datetime
 from random import randint
 
-from graphql.error import GraphQLError
+import pytest
 
+from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers import CohortLayer, SampleLayer, SequencingGroupLayer
 from db.python.tables.cohort import CohortFilter
@@ -16,7 +17,7 @@ from models.models import (
 from models.models.cohort import CohortCriteriaInternal, CohortUpdateBody
 from models.utils.cohort_id_format import cohort_id_format
 from models.utils.cohort_template_id_format import cohort_template_id_format
-from test.testbase import DbIsolatedTest, run_as_sync
+from test.conftest import GraphQLQueryFunction
 
 
 def get_sample_model(eid, s_type='blood', sg_type='genome', plat='illumina'):
@@ -49,15 +50,14 @@ INVALID = 'invalid'
 ARCHIVED = 'archived'
 
 
-class TestStatusInCohortDBLayer(DbIsolatedTest):
+class TestStatusInCohortDBLayer:
     """Test cohort status related functions implemented in the DB layer"""
 
-    @run_as_sync
-    async def setUp(self):
-        super().setUp()
-
-        self.cohort_layer = CohortLayer(self.connection)
-        self.sample_layer = SampleLayer(self.connection)
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection_with_project: Connection):
+        self.cohort_layer = CohortLayer(connection_with_project)
+        self.sample_layer = SampleLayer(connection_with_project)
+        self.project_id = connection_with_project.project_id
 
         self.sample_a = await self.sample_layer.upsert_sample(
             get_sample_model('A', 'saliva', 'exome', 'ONT')
@@ -77,7 +77,7 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
             ),
         )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_create_custom_cohort_and_verify_status(self):
         """
         Test to create a custom cohort and verify its status
@@ -87,16 +87,17 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
         created_cohort_in_list = await self.cohort_layer.query(
             CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
         )
-        self.assertTrue(created_cohort_in_list)
-        self.assertTrue(len(created_cohort_in_list) == 1)
+        assert created_cohort_in_list
+        assert len(created_cohort_in_list) == 1
 
         created_cohort = created_cohort_in_list[0]
-        self.assertEqual(created_cohort.id, self.cohort.cohort_id)
-        self.assertEqual(created_cohort.description, self.cohort_description)
-        self.assertEqual(created_cohort.name, self.cohort_name)
-        self.assertEqual(created_cohort.status, CohortStatus.active)
+        assert created_cohort.id == self.cohort.cohort_id
+        assert created_cohort.description == self.cohort_description
+        assert created_cohort.name == self.cohort_name
+        assert created_cohort.status == CohortStatus.active
 
-    @run_as_sync
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
     async def test_query_cohort_with_inactive_sample(self):
         """Test cohort status when inactive sample"""
 
@@ -108,13 +109,16 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
                 CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
             )
         )[0]
-        self.assertEqual(cohort.status, CohortStatus.invalid)
+        assert cohort.status == CohortStatus.invalid
 
-    @run_as_sync
-    async def test_query_cohort_with_archived_sg(self):
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_query_cohort_with_archived_sg(
+        self, connection_with_project: Connection
+    ):
         """Test cohort status when archived sequencing group"""
 
-        await (SequencingGroupLayer(self.connection)).archive_sequencing_group(
+        await (SequencingGroupLayer(connection_with_project)).archive_sequencing_group(
             sequencing_group_id=self.sgA_raw[0]
         )
         cohort = (
@@ -122,40 +126,42 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
                 CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
             )
         )[0]
-        self.assertEqual(cohort.status, CohortStatus.invalid)
+        assert cohort.status == CohortStatus.invalid
 
-    @run_as_sync
-    async def test_query_cohort_status_with_all_active(self):
+    @pytest.mark.asyncio
+    async def test_query_cohort_status_with_all_active(self, connection_with_project):
         """
         Test computed cohort status when sample/s active,
         sg/s not archived and cohort status is active in the DB"""
 
         queried_sample = await self.sample_layer.get_by_id(sample_id=self.sample_a.id)
-        self.assertTrue(queried_sample.active)
+        assert queried_sample.active
 
-        queried_sg_list = await (SequencingGroupLayer(self.connection)).query(
+        queried_sg_list = await (SequencingGroupLayer(connection_with_project)).query(
             SequencingGroupFilter(
                 id=GenericFilter(in_=[self.sgA_raw[0], self.sgA_raw[1]])
             )
         )
-        self.assertFalse(queried_sg_list[0].archived)
-        self.assertFalse(queried_sg_list[1].archived)
+        assert not queried_sg_list[0].archived
+        assert not queried_sg_list[1].archived
 
         # query directly from the cohort table as the returned status is computed runtime based on sample, sg and cohort
-        cohort_raw_entry = await self.connection.connection.fetch_one(
-            'SELECT status FROM cohort where id = :cohort_id',
-            {'cohort_id': self.cohort.cohort_id},
-        )
-        self.assertEqual(dict(cohort_raw_entry)['status'], CohortStatus.active.value)
+        cohort_raw_entry = await (
+            await connection_with_project.pg_connection.execute(
+                t'SELECT status FROM cohort where id = {self.cohort.cohort_id}'
+            )
+        ).fetchone()
+        assert cohort_raw_entry['status'] == CohortStatus.active.value
 
         cohort = (
             await self.cohort_layer.query(
                 CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
             )
         )[0]
-        self.assertEqual(cohort.status, CohortStatus.active)
+        assert cohort.status == CohortStatus.active
 
-    @run_as_sync
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
     async def test_query_cohort_with_at_least_one_inactive_sample(self):
         """Test cohort status when at least one sample is inactive"""
 
@@ -180,19 +186,17 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
                 CohortFilter(id=GenericFilter(eq=new_cohort.cohort_id))
             )
         )[0]
-        self.assertEqual(cohort.status, CohortStatus.invalid)
+        assert cohort.status == CohortStatus.invalid
 
-    @run_as_sync
-    async def test_query_cohort_with_archived_db_status(self):
+    @pytest.mark.asyncio
+    async def test_query_cohort_with_archived_db_status(
+        self, connection_with_project: Connection
+    ):
         """Test computed cohort status when cohort is archived in the DB"""
 
         # directly update without using the cohort_db_layer
-        await self.connection.connection.fetch_one(
-            'UPDATE cohort SET status = :status WHERE id = :cohort_id',
-            {
-                'cohort_id': self.cohort.cohort_id,
-                'status': CohortUpdateStatus.archived.value,
-            },
+        await connection_with_project.pg_connection.execute(
+            t'UPDATE cohort SET status = {CohortUpdateStatus.archived.value} WHERE id = {self.cohort.cohort_id}',
         )
 
         cohort = (
@@ -200,15 +204,15 @@ class TestStatusInCohortDBLayer(DbIsolatedTest):
                 CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
             )
         )[0]
-        self.assertEqual(cohort.status, CohortStatus.archived)
+        assert cohort.status == CohortStatus.archived
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_query_cohort_in_get_template_by_cohort_id(self):
         """Test template query for retrieved based on cohort id"""
         template = await self.cohort_layer.get_template_by_cohort_id(
             self.cohort.cohort_id
         )
-        self.assertTrue(template)
+        assert template
 
 
 CREATE_COHORT_MUTATION = """
@@ -230,19 +234,20 @@ CREATE_COHORT_MUTATION = """
 """
 
 
-class TestCohortStatusGraphQL(DbIsolatedTest):
+class TestCohortStatusGraphQL:
     """Test cohort querying via GraphQL"""
 
-    @run_as_sync
-    async def setUp(self):
-        super().setUp()
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection_with_project: Connection):
 
-        self.cohort_layer = CohortLayer(self.connection)
-        self.sample_a = await (SampleLayer(self.connection)).upsert_sample(
+        self.cohort_layer = CohortLayer(connection_with_project)
+        self.sample_a = await (SampleLayer(connection_with_project)).upsert_sample(
             get_sample_model('A', 'saliva', 'exome', 'ONT')
         )
         self.cohort_name = 'Sample cohort'
         self.cohort_description = 'Sample cohort description'
+        self.project_id = connection_with_project.project_id
+        self.project_name = connection_with_project.project.name
 
         self.cohort = await self.cohort_layer.create_cohort_from_criteria(
             project_to_write=self.project_id,
@@ -256,34 +261,42 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
         )
         self.cohort_id_formatted = cohort_id_format(self.cohort.cohort_id)
 
-    @run_as_sync
-    async def test_create_custom_cohort_response_for_status(self):
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_create_custom_cohort_response_for_status(
+        self, graphql_query: GraphQLQueryFunction
+    ):
         """Test status field in create_custom_cohort mutation response"""
 
-        mutation_result = (
-            await self.run_graphql_query_async(
-                CREATE_COHORT_MUTATION,
-                variables={
-                    'project': self.project_name,
-                    'cohortSpec': {
-                        'name': 'TestCohort1',
-                        'description': 'TestCohortDescription',
-                    },
-                    'cohortCriteria': {
-                        'projects': [self.project_name],
-                        'sampleType': ['blood'],
-                    },
+        mutation_result = await graphql_query(
+            CREATE_COHORT_MUTATION,
+            variables={
+                'project': self.project_name,
+                'cohortSpec': {
+                    'name': 'TestCohort1',
+                    'description': 'TestCohortDescription',
                 },
-            )
-        )['cohort']['createCohortFromCriteria']['createdCohort']
-        self.assertEqual(mutation_result['status'], ACTIVE)
+                'cohortCriteria': {
+                    'projects': [self.project_name],
+                    'sampleType': ['blood'],
+                },
+            },
+        )
 
-    @run_as_sync
-    async def test_query_cohort_with_filter_by_id(self):
+        cohort = mutation_result['data']['cohort']['createCohortFromCriteria'][
+            'createdCohort'
+        ]
+        assert cohort['status'] == ACTIVE
+
+    @pytest.mark.asyncio
+    async def test_query_cohort_with_filter_by_id(
+        self, graphql_query: GraphQLQueryFunction
+    ):
         """Test status field in GraphQL query cohort (by id)"""
 
-        query_cohort_incl_status = await self.run_graphql_query_async(
-            """
+        query_cohort_incl_status = (
+            await graphql_query(
+                """
             query CohortQuery($cohort_id: String!) {
                 cohorts(id: {eq: $cohort_id}) {
                     name
@@ -300,27 +313,30 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                 }
             }
         """,
-            {'cohort_id': self.cohort_id_formatted},
-        )
+                {'cohort_id': self.cohort_id_formatted},
+            )
+        )['data']
 
-        self.assertEqual(len(query_cohort_incl_status['cohorts']), 1)
+        assert len(query_cohort_incl_status['cohorts']) == 1
         queried_cohort = query_cohort_incl_status['cohorts'][0]
 
-        self.assertEqual(queried_cohort['name'], self.cohort_name)
-        self.assertEqual(queried_cohort['description'], self.cohort_description)
-
-        self.assertEqual(
-            queried_cohort['sequencingGroups'][0]['sample']['project']['name'],
-            self.project_name,
+        assert queried_cohort['name'] == self.cohort_name
+        assert queried_cohort['description'] == self.cohort_description
+        assert (
+            queried_cohort['sequencingGroups'][0]['sample']['project']['name']
+            == self.project_name
         )
-        self.assertEqual(
-            queried_cohort['sequencingGroups'][1]['sample']['project']['name'],
-            self.project_name,
+        assert (
+            queried_cohort['sequencingGroups'][1]['sample']['project']['name']
+            == self.project_name
         )
-        self.assertEqual(queried_cohort['status'], ACTIVE)
+        assert queried_cohort['status'] == ACTIVE
 
-    @run_as_sync
-    async def test_query_cohort_with_filter_status_eq(self):
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_query_cohort_with_filter_status_eq(
+        self, graphql_query: GraphQLQueryFunction
+    ):
         """Test GraphQL query cohort with filter by status (eq)"""
 
         query_cohort_filter_status_eq = """
@@ -332,33 +348,40 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
             }
         """
 
-        query_cohort_status_eq = await self.run_graphql_query_async(
-            query_cohort_filter_status_eq,
-            {'cohort_status': ACTIVE},
-        )
+        query_cohort_status_eq = (
+            await graphql_query(
+                query_cohort_filter_status_eq,
+                {'cohort_status': ACTIVE},
+            )
+        )['data']
 
-        self.assertTrue(query_cohort_status_eq['cohorts'])
+        assert query_cohort_status_eq['cohorts']
         queried_cohort = query_cohort_status_eq['cohorts'][0]
 
-        self.assertEqual(queried_cohort['name'], self.cohort_name)
-        self.assertEqual(queried_cohort['status'], ACTIVE)
+        assert queried_cohort['name'] == self.cohort_name
+        assert queried_cohort['status'] == ACTIVE
 
         # update cohort status and retrieve
         await self.cohort_layer.update_cohort(
             CohortUpdateBody(status=CohortUpdateStatus.archived), self.cohort.cohort_id
         )
-        query_cohort_status_eq = await self.run_graphql_query_async(
-            query_cohort_filter_status_eq,
-            {'cohort_status': ACTIVE},
-        )
-        self.assertFalse(query_cohort_status_eq['cohorts'])
+        query_cohort_status_eq = (
+            await graphql_query(
+                query_cohort_filter_status_eq,
+                {'cohort_status': ACTIVE},
+            )
+        )['data']
+        assert not query_cohort_status_eq['cohorts']
 
-    @run_as_sync
-    async def test_query_cohort_with_filter_status_in(self):
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_query_cohort_with_filter_status_in(
+        self, graphql_query: GraphQLQueryFunction
+    ):
         """Test GraphQL query cohort with filter by status (in)"""
 
         _ = (
-            await self.run_graphql_query_async(
+            await graphql_query(
                 CREATE_COHORT_MUTATION,
                 variables={
                     'project': self.project_name,
@@ -372,7 +395,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                     },
                 },
             )
-        )['cohort']['createCohortFromCriteria']['createdCohort']
+        )['data']['cohort']['createCohortFromCriteria']['createdCohort']
 
         query_cohort_filter_status_in = """
             query CohortQuery($cohort_status_list: [CohortStatus!]!) {
@@ -382,90 +405,116 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
             }
         """
 
-        query_cohort_status_in = await self.run_graphql_query_async(
-            query_cohort_filter_status_in,
-            {'cohort_status_list': [ACTIVE]},
-        )
-        self.assertTrue(len(query_cohort_status_in['cohorts']) == 2)
+        query_cohort_status_in = (
+            await graphql_query(
+                query_cohort_filter_status_in,
+                {'cohort_status_list': [ACTIVE]},
+            )
+        )['data']
+
+        assert len(query_cohort_status_in['cohorts']) == 2
         for cohort in query_cohort_status_in['cohorts']:
-            self.assertEqual(cohort['status'], ACTIVE)
+            assert cohort['status'] == ACTIVE
 
         # update cohort status and retrieve
         await self.cohort_layer.update_cohort(
             CohortUpdateBody(status=CohortUpdateStatus.archived), self.cohort.cohort_id
         )
 
-        query_cohort_status_in = await self.run_graphql_query_async(
-            query_cohort_filter_status_in,
-            {'cohort_status_list': [ACTIVE]},
-        )
-        self.assertTrue(len(query_cohort_status_in['cohorts']) == 1)
+        query_cohort_status_in = (
+            await graphql_query(
+                query_cohort_filter_status_in,
+                {'cohort_status_list': [ACTIVE]},
+            )
+        )['data']
+        assert len(query_cohort_status_in['cohorts']) == 1
 
-    @run_as_sync
-    async def test_query_cohort_with_filter_status_nin(self):
+    @pytest.mark.asyncio
+    async def test_query_cohort_with_filter_status_nin(
+        self, graphql_query: GraphQLQueryFunction
+    ):
         """Test GraphQL query cohort with filter by status (not in)"""
 
-        query_cohort_status_nin = await self.run_graphql_query_async(
-            """
+        query_cohort_status_nin = (
+            await graphql_query(
+                """
             query CohortQuery($cohort_status_list: [CohortStatus!]!) {
                 cohorts(status: {nin: $cohort_status_list}) {
                     status
                 }
             }
         """,
-            {'cohort_status_list': [ACTIVE]},
-        )
-        self.assertFalse(query_cohort_status_nin['cohorts'])
+                {'cohort_status_list': [ACTIVE]},
+            )
+        )['data']
+        assert not query_cohort_status_nin['cohorts']
 
-    @run_as_sync
-    async def test_query_cohort_with_filter_status_criteria_not_defined(self):
+    @pytest.mark.asyncio
+    async def test_query_cohort_with_filter_status_criteria_not_defined(
+        self, graphql_query: GraphQLQueryFunction
+    ):
         """Test GraphQL query cohort with filter by status (filter criteria is not one of eq, in or nin)"""
 
-        query_cohorts = await self.run_graphql_query_async(
-            """
+        query_cohorts = (
+            await graphql_query(
+                """
             query CohortQuery($cohort_status: CohortStatus!) {
                 cohorts(status: {gt: $cohort_status}) {
                     status
                 }
             }
         """,
-            {'cohort_status': ACTIVE},
-        )
-        self.assertTrue(query_cohorts['cohorts'])
+                {'cohort_status': ACTIVE},
+            )
+        )['data']
+        assert query_cohorts['cohorts']
 
-    @run_as_sync
-    async def test_query_info_of_non_existent_cohort(self):
+    @pytest.mark.asyncio
+    async def test_query_info_of_non_existent_cohort(
+        self, graphql_query: GraphQLQueryFunction
+    ):
         """Test GraphQL query cohort by non-existent cohort id"""
 
-        query_cohorts = await self.run_graphql_query_async(
-            """
+        query_cohorts = (
+            await graphql_query(
+                """
             query CohortQuery($cohort_id: String!) {
                 cohorts(id: {eq: $cohort_id}) {
                     status
                 }
             }
         """,
-            {'cohort_id': cohort_id_format(self.cohort.cohort_id + randint(1, 100))},
-        )
-        self.assertFalse(query_cohorts['cohorts'])
+                {
+                    'cohort_id': cohort_id_format(
+                        self.cohort.cohort_id + randint(1, 100)
+                    )
+                },
+            )
+        )['data']
+        assert not query_cohorts['cohorts']
 
-    @run_as_sync
-    async def test_query_cohort_with_invalid_status_filter_value(self):
+    @pytest.mark.asyncio
+    async def test_query_cohort_with_invalid_status_filter_value(
+        self, graphql_query: GraphQLQueryFunction
+    ):
         """Test GraphQL query cohort by non-existent cohort status"""
 
-        with self.assertRaises(GraphQLError):
-            _ = await self.run_graphql_query_async(
-                """
+        response = await graphql_query(
+            """
                 query CohortQuery($cohort_status: CohortStatus!) {
                     cohorts(status: {eq: $cohort_status}) {
+                    id
                     }
                 }
             """,
-                {'cohort_status': 'Dummy status'},
-            )
+            {'cohort_status': 'Dummy status'},
+        )
+        assert response['errors'] is not None
+        assert response['data'] is None
 
-    @run_as_sync
-    async def test_update_cohort_fields(self):
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_update_cohort_fields(self, graphql_query: GraphQLQueryFunction):
         """Test GraphQL mutation for updating cohort fields"""
 
         new_name = 'Updated Llama'
@@ -473,7 +522,7 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
         new_description = 'Updated description'
 
         queried_cohort = (
-            await self.run_graphql_query_async(
+            await graphql_query(
                 """
             query CohortQuery($id: String!) {
                 cohorts(id: {eq: $id}) {
@@ -486,14 +535,14 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
         """,  # noqa: E101
                 {'id': self.cohort_id_formatted},
             )
-        )['cohorts'][0]
+        )['data']['cohorts'][0]
 
-        self.assertNotEqual(queried_cohort['name'], new_name)
-        self.assertNotEqual(queried_cohort['status'], ARCHIVED)
-        self.assertNotEqual(queried_cohort['description'], new_description)
+        assert queried_cohort['name'] != new_name
+        assert queried_cohort['status'] != ARCHIVED
+        assert queried_cohort['description'] != new_description
 
         updated_cohort = (
-            await self.run_graphql_query_async(
+            await graphql_query(
                 """
                 mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!)
                 {
@@ -517,18 +566,20 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                     },
                 },
             )
-        )['cohort']['updateCohort']
+        )['data']['cohort']['updateCohort']
 
-        self.assertEqual(updated_cohort['name'], new_name)
-        self.assertEqual(updated_cohort['status'], ARCHIVED)
-        self.assertEqual(updated_cohort['description'], new_description)
+        assert updated_cohort['name'] == new_name
+        assert updated_cohort['status'] == ARCHIVED
+        assert updated_cohort['description'] == new_description
 
-    @run_as_sync
-    async def test_update_cohort_immutable_fields(self):
+    @pytest.mark.asyncio
+    async def test_update_cohort_immutable_fields(
+        self, graphql_query: GraphQLQueryFunction
+    ):
         """Test GraphQL mutation for updating cohort fields with immutable fields (not allowed to update)"""
 
-        with self.assertRaises(GraphQLError):
-            _ = await self.run_graphql_query_async(
+        with pytest.raises(TypeError):
+            _ = await graphql_query(
                 """
                     mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!)
                     {
@@ -550,13 +601,15 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                 },
             )
 
-    @run_as_sync
-    async def test_update_cohort_fields_with_empty_input_body(self):
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_update_cohort_fields_with_empty_input_body(
+        self, graphql_query: GraphQLQueryFunction
+    ):
         """Test GraphQL mutation for updating with empty body"""
 
-        with self.assertRaises(GraphQLError):
-            _ = await self.run_graphql_query_async(
-                """
+        response = await graphql_query(
+            """
                     mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!)
                     {
                       cohort{
@@ -566,19 +619,23 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                       }
                     }
             """,
-                {
-                    'id': self.cohort_id_formatted,
-                    'cohort': {},
-                },
-            )
+            {
+                'id': self.cohort_id_formatted,
+                'cohort': {},
+            },
+        )
 
-    @run_as_sync
-    async def test_update_non_existent_cohort(self):
+        assert response['errors'] is not None
+        assert response['data'] is None
+
+    @pytest.mark.asyncio
+    async def test_update_non_existent_cohort(
+        self, graphql_query: GraphQLQueryFunction
+    ):
         """Test GraphQL mutation for updating cohort fields of non-existent cohort"""
 
-        with self.assertRaises(GraphQLError):
-            _ = await self.run_graphql_query_async(
-                """
+        response = await graphql_query(
+            """
                     mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!)
                     {
                       cohort{
@@ -588,17 +645,22 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                       }
                     }
             """,
-                {
-                    'id': cohort_id_format(self.cohort.cohort_id + randint(1, 100)),
-                    'cohort': {'name': 'Test name change'},
-                },
-            )
+            {
+                'id': cohort_id_format(self.cohort.cohort_id + randint(1, 100)),
+                'cohort': {'name': 'Test name change'},
+            },
+        )
+        assert response['errors'] is not None
+        assert response['data'] is None
 
-    @run_as_sync
-    async def test_update_status_of_invalid_cohort(self):
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_update_status_of_invalid_cohort(
+        self, graphql_query: GraphQLQueryFunction, connection_with_project: Connection
+    ):
         """Test GraphQL mutation for updating status of an INVALID cohort"""
 
-        await SampleLayer(self.connection).upsert_sample(
+        await SampleLayer(connection_with_project).upsert_sample(
             SampleUpsertInternal(id=self.sample_a.id, active=False)
         )
         cohort = (
@@ -606,10 +668,10 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                 CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
             )
         )[0]
-        self.assertEqual(cohort.status, CohortStatus.invalid)
+        assert cohort.status == CohortStatus.invalid
 
         updated_cohort = (
-            await self.run_graphql_query_async(
+            await graphql_query(
                 """
                     mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!)
                     {
@@ -625,23 +687,22 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                     'cohort': {'status': ACTIVE},
                 },
             )
-        )['cohort']['updateCohort']
+        )['data']['cohort']['updateCohort']
 
-        self.assertEqual(updated_cohort['status'], INVALID)
+        assert updated_cohort['status'] == INVALID
 
-    @run_as_sync
-    async def test_update_status_of_archived_cohort_with_archived_samples(self):
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_update_status_of_archived_cohort_with_archived_samples(
+        self, graphql_query: GraphQLQueryFunction, connection_with_project: Connection
+    ):
         """Test GraphQL mutation for updating status of an archived cohort with archived samples"""
 
         # directly update cohort DB status
-        await self.connection.connection.fetch_one(
-            'UPDATE cohort SET status = :status WHERE id = :cohort_id',
-            {
-                'cohort_id': self.cohort.cohort_id,
-                'status': CohortUpdateStatus.archived.value,
-            },
+        await connection_with_project.pg_connection.execute(
+            t'UPDATE cohort SET status = {CohortUpdateStatus.archived.value} WHERE id = {self.cohort.cohort_id}'
         )
-        await SampleLayer(self.connection).upsert_sample(
+        await SampleLayer(connection_with_project).upsert_sample(
             SampleUpsertInternal(id=self.sample_a.id, active=False)
         )
         cohort = (
@@ -649,11 +710,10 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                 CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
             )
         )[0]
-        self.assertEqual(cohort.status, CohortStatus.archived)
+        assert cohort.status == CohortStatus.archived
 
-        with self.assertRaises(GraphQLError):
-            _ = await self.run_graphql_query_async(
-                """
+        response = await graphql_query(
+            """
                     mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!)
                     {
                       cohort{
@@ -663,27 +723,29 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                       }
                     }
             """,
-                {
-                    'id': cohort_id_format(self.cohort.cohort_id),
-                    'cohort': {'status': ACTIVE},
-                },
-            )
-
-    @run_as_sync
-    async def test_update_status_of_archived_cohort_with_active_samples(self):
-        """Test GraphQL mutation for updating status of an archived cohort with archived samples"""
-
-        # directly update cohort DB status
-        await self.connection.connection.fetch_one(
-            'UPDATE cohort SET status = :status WHERE id = :cohort_id',
             {
-                'cohort_id': self.cohort.cohort_id,
-                'status': CohortUpdateStatus.archived,
+                'id': cohort_id_format(self.cohort.cohort_id),
+                'cohort': {'status': ACTIVE},
             },
         )
 
+        assert response['errors'] is not None
+        assert response['data'] is None
+
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_update_status_of_archived_cohort_with_active_samples(
+        self, graphql_query: GraphQLQueryFunction, connection: Connection
+    ):
+        """Test GraphQL mutation for updating status of an archived cohort with archived samples"""
+
+        # directly update cohort DB status
+        await connection.pg_connection.execute(
+            t'UPDATE cohort SET status = {CohortUpdateStatus.archived} WHERE id = {self.cohort.cohort_id}'
+        )
+
         updated_cohort = (
-            await self.run_graphql_query_async(
+            await graphql_query(
                 """
                     mutation updateCohort($id : String!, $cohort: CohortUpdateBodyInput!)
                     {
@@ -699,6 +761,6 @@ class TestCohortStatusGraphQL(DbIsolatedTest):
                     'cohort': {'status': ACTIVE},
                 },
             )
-        )['cohort']['updateCohort']
+        )['data']['cohort']['updateCohort']
 
-        self.assertEqual(updated_cohort['status'], ACTIVE)
+        assert updated_cohort['status'] == ACTIVE

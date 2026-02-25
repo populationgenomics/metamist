@@ -151,11 +151,11 @@ class CohortMutations:
                 excluded_ineligible_sg_ids_internal=cohort_output.excluded_ineligible_sg_ids_internal,
             )
 
-            created_cohort = (
-                await clayer.query(
-                    CohortFilter(id=GenericFilter(eq=cohort_output.cohort_id))
-                )
-            )[0]
+        created_cohort = (
+            await clayer.query(
+                CohortFilter(id=GenericFilter(eq=cohort_output.cohort_id))
+            )
+        )[0]
 
         return CreatedGraphQLCohort.from_internal(
             created_cohort, cohort_output.excluded_ineligible_sg_ids_internal
