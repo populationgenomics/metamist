@@ -1,6 +1,6 @@
 import datetime
 
-from models.base import SMBase, parse_sql_dict
+from models.base import SMBase
 from models.models.project import ProjectId
 
 
@@ -29,36 +29,6 @@ class AnalysisRunnerInternal(SMBase):
 
     # on insert
     audit_log_id: int | None = None
-
-    @staticmethod
-    def from_db(**kwargs):
-        """Convert from db Record"""
-        meta = parse_sql_dict(kwargs.pop('meta'))
-
-        _timestamp = kwargs.pop('timestamp')
-        # if _timestamp:
-        #     _timestamp = datetime.datetime.fromisoformat(_timestamp)
-
-        return AnalysisRunnerInternal(
-            ar_guid=kwargs.pop('ar_guid'),
-            project=kwargs.pop('project'),
-            timestamp=_timestamp,
-            access_level=kwargs.pop('access_level'),
-            repository=kwargs.pop('repository'),
-            commit=kwargs.pop('commit'),
-            script=kwargs.pop('script'),
-            description=kwargs.pop('description'),
-            driver_image=kwargs.pop('driver_image'),
-            config_path=kwargs.pop('config_path'),
-            cwd=kwargs.pop('cwd'),
-            environment=kwargs.pop('environment'),
-            hail_version=kwargs.pop('hail_version'),
-            batch_url=kwargs.pop('batch_url'),
-            submitting_user=kwargs.pop('submitting_user'),
-            meta=meta,
-            audit_log_id=kwargs.pop('audit_log_id'),
-            output_path=kwargs.pop('output_path'),
-        )
 
     def to_external(self, project_map: dict[ProjectId, str]):
         """Convert to transport model"""
