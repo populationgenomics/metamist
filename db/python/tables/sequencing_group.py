@@ -302,7 +302,7 @@ class SequencingGroupTable(DbBase):
         INNER JOIN sample s ON s.id = sg.sample_id
         LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id
         WHERE asg.analysis_id = ANY({analysis_ids})
-        GROUP BY sg.id, asg.analysis_id
+        GROUP BY sg.id, s.project, asg.analysis_id
         """
         cur = await self.connection.pg_connection.execute(_query)
         rows = await cur.fetchall()
