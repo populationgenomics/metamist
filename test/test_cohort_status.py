@@ -58,6 +58,8 @@ class TestStatusInCohortDBLayer:
         self.cohort_layer = CohortLayer(connection_with_project)
         self.sample_layer = SampleLayer(connection_with_project)
         self.project_id = connection_with_project.project_id
+        self.sg_layer = SequencingGroupLayer(connection_with_project)
+        self.connection = connection_with_project
 
         self.sample_a = await self.sample_layer.upsert_sample(
             get_sample_model('A', 'saliva', 'exome', 'ONT')
@@ -113,12 +115,10 @@ class TestStatusInCohortDBLayer:
 
     @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
-    async def test_query_cohort_with_archived_sg(
-        self, connection_with_project: Connection
-    ):
+    async def test_query_cohort_with_archived_sg(self):
         """Test cohort status when archived sequencing group"""
 
-        await (SequencingGroupLayer(connection_with_project)).archive_sequencing_group(
+        await self.sg_layer.archive_sequencing_group(
             sequencing_group_id=self.sgA_raw[0]
         )
         cohort = (
@@ -137,7 +137,7 @@ class TestStatusInCohortDBLayer:
         queried_sample = await self.sample_layer.get_by_id(sample_id=self.sample_a.id)
         assert queried_sample.active
 
-        queried_sg_list = await (SequencingGroupLayer(connection_with_project)).query(
+        queried_sg_list = await self.sg_layer.query(
             SequencingGroupFilter(
                 id=GenericFilter(in_=[self.sgA_raw[0], self.sgA_raw[1]])
             )
@@ -190,13 +190,11 @@ class TestStatusInCohortDBLayer:
         assert cohort.status == CohortStatus.invalid
 
     @pytest.mark.asyncio
-    async def test_query_cohort_with_archived_db_status(
-        self, connection_with_project: Connection
-    ):
+    async def test_query_cohort_with_archived_db_status(self):
         """Test computed cohort status when cohort is archived in the DB"""
 
         # directly update without using the cohort_db_layer
-        await connection_with_project.pg_connection.execute(
+        await self.connection.pg_connection.execute(
             t'UPDATE cohort SET status = {CohortUpdateStatus.archived.value} WHERE id = {self.cohort.cohort_id}',
         )
 
@@ -239,7 +237,9 @@ class TestCohortStatusGraphQL:
     async def set_up(self, connection_with_project: Connection):
 
         self.cohort_layer = CohortLayer(connection_with_project)
-        self.sample_a = await (SampleLayer(connection_with_project)).upsert_sample(
+        self.sample_layer = SampleLayer(connection_with_project)
+        self.connection = connection_with_project
+        self.sample_a = await self.sample_layer.upsert_sample(
             get_sample_model('A', 'saliva', 'exome', 'ONT')
         )
         self.cohort_name = 'Sample cohort'
@@ -505,7 +505,7 @@ class TestCohortStatusGraphQL:
             """,
             {'cohort_status': 'Dummy status'},
         )
-        assert response['errors'] is not None
+        assert response['errors']
         assert response['data'] is None
 
     @pytest.mark.project_roles(['writer'])
@@ -652,11 +652,11 @@ class TestCohortStatusGraphQL:
     @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
     async def test_update_status_of_invalid_cohort(
-        self, graphql_query: GraphQLQueryFunction, connection_with_project: Connection
+        self, graphql_query: GraphQLQueryFunction
     ):
         """Test GraphQL mutation for updating status of an INVALID cohort"""
 
-        await SampleLayer(connection_with_project).upsert_sample(
+        await self.sample_layer.upsert_sample(
             SampleUpsertInternal(id=self.sample_a.id, active=False)
         )
         cohort = (
@@ -690,15 +690,15 @@ class TestCohortStatusGraphQL:
     @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
     async def test_update_status_of_archived_cohort_with_archived_samples(
-        self, graphql_query: GraphQLQueryFunction, connection_with_project: Connection
+        self, graphql_query: GraphQLQueryFunction
     ):
         """Test GraphQL mutation for updating status of an archived cohort with archived samples"""
 
         # directly update cohort DB status
-        await connection_with_project.pg_connection.execute(
+        await self.connection.pg_connection.execute(
             t'UPDATE cohort SET status = {CohortUpdateStatus.archived.value} WHERE id = {self.cohort.cohort_id}'
         )
-        await SampleLayer(connection_with_project).upsert_sample(
+        await self.sample_layer.upsert_sample(
             SampleUpsertInternal(id=self.sample_a.id, active=False)
         )
         cohort = (
@@ -731,12 +731,12 @@ class TestCohortStatusGraphQL:
     @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
     async def test_update_status_of_archived_cohort_with_active_samples(
-        self, graphql_query: GraphQLQueryFunction, connection: Connection
+        self, graphql_query: GraphQLQueryFunction
     ):
         """Test GraphQL mutation for updating status of an archived cohort with archived samples"""
 
         # directly update cohort DB status
-        await connection.pg_connection.execute(
+        await self.connection.pg_connection.execute(
             t'UPDATE cohort SET status = {CohortUpdateStatus.archived} WHERE id = {self.cohort.cohort_id}'
         )
 
