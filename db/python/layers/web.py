@@ -139,9 +139,9 @@ class WebDb(DbBase):
         )
         seqr_links = self.get_seqr_links_from_project(project)
 
-        atable = AnalysisTable(self._connection)
-        seqtable = AssayTable(self._connection)
-        sgtable = SequencingGroupTable(self._connection)
+        atable = AnalysisTable(self.connection)
+        seqtable = AssayTable(self.connection)
+        sgtable = SequencingGroupTable(self.connection)
 
         [
             total_samples,
@@ -164,7 +164,7 @@ class WebDb(DbBase):
                 project=self.project_id
             ),
             atable.get_seqr_stats_by_sequencing_type(project=self.project_id),
-            SeqrLayer(self._connection).get_synchronisable_types(project_db),
+            SeqrLayer(self.connection).get_synchronisable_types(project_db),
         )
 
         seen_seq_types: set[str] = set(cram_number_by_seq_type.keys()).union(
@@ -212,7 +212,7 @@ class WebDb(DbBase):
         """
         Count participants
         """
-        player = ParticipantLayer(self._connection)
+        player = ParticipantLayer(self.connection)
         return await player.query_count(query)
 
     async def query_participants(
@@ -222,11 +222,11 @@ class WebDb(DbBase):
         skip: int | None = None,
     ) -> list[NestedParticipantInternal]:
         """Use query to build up nested participants"""
-        player = ParticipantLayer(self._connection)
-        slayer = SampleLayer(self._connection)
-        sglayer = SequencingGroupLayer(self._connection)
-        alayer = AssayLayer(self._connection)
-        flayer = FamilyLayer(self._connection)
+        player = ParticipantLayer(self.connection)
+        slayer = SampleLayer(self.connection)
+        sglayer = SequencingGroupLayer(self.connection)
+        alayer = AssayLayer(self.connection)
+        flayer = FamilyLayer(self.connection)
 
         participants = await player.query(query, limit=limit, skip=skip)
         if not participants:

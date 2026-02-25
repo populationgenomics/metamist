@@ -1,11 +1,14 @@
 import unittest
 from typing import Any
 
+import pytest
+
 from api.routes.web import (
     ExportProjectParticipantFields,
     ProjectParticipantGridFilter,
     prepare_participants_for_export,
 )
+from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers import (
     AssayLayer,
@@ -241,8 +244,8 @@ def merge(d1: dict, d2: dict):
     """Merges two dictionaries"""
     return dict(d1, **d2)
 
-
-def get_test_participant():
+@pytest.fixture
+def test_participant() -> ParticipantUpsertInternal:
     """Do it like this to avoid an upsert writing the test value"""
     return ParticipantUpsertInternal(
         external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'},
@@ -290,7 +293,8 @@ def get_test_participant():
     )
 
 
-def get_test_participant_2():
+@pytest.fixture
+def test_participant_2() -> ParticipantUpsertInternal:
     """Do it like this to avoid an upsert writing the test value"""
     return ParticipantUpsertInternal(
         external_ids={PRIMARY_EXTERNAL_ORG: 'Meter'},
@@ -340,7 +344,7 @@ def get_test_participant_2():
 
 
 SINGLE_PARTICIPANT_SUMMARY_RESULT = ProjectSummaryInternal(
-    project=WebProject(id=1, name=TEST_PROJECT_NAME, meta={}, dataset='test'),
+    project=WebProject(id=1, name='test-project', meta={}, dataset='test'),
     total_samples=1,
     total_participants=1,
     total_sequencing_groups=1,
@@ -387,21 +391,20 @@ SINGLE_PARTICIPANT_QUERY_RESULT = ProjectParticipantGridResponse(
 )
 
 
-class TestWeb(DbIsolatedTest):
+class TestWeb:
     """Test web class containing web endpoints"""
 
     maxDiff = None
 
-    @run_as_sync
-    async def setUp(self) -> None:
-        super().setUp()
-        self.webl = WebLayer(self.connection)
-        self.partl = ParticipantLayer(self.connection)
-        self.pil = ProjectInsightsLayer(self.connection)
-        self.sampl = SampleLayer(self.connection)
-        self.seql = AssayLayer(self.connection)
+    @pytest.fixture(autouse=True)
+    async def setUp(self, connection_with_project: Connection) -> None:
+        self.webl = WebLayer(connection_with_project)
+        self.partl = ParticipantLayer(connection_with_project)
+        self.pil = ProjectInsightsLayer(connection_with_project)
+        self.sampl = SampleLayer(connection_with_project)
+        self.seql = AssayLayer(connection_with_project)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_project_summary_empty(self):
         """Test getting the summary for a project"""
         result = await self.webl.get_project_summary()
@@ -419,9 +422,9 @@ class TestWeb(DbIsolatedTest):
             seqr_sync_types=[],
         )
 
-        self.assertEqual(expected, result)
+        assert expected == result
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_project_summary_single_entry(self):
         """Test project summary with a single participant with all fields"""
         # Now add a participant with a sample and sequence
@@ -430,7 +433,7 @@ class TestWeb(DbIsolatedTest):
         result = await self.webl.get_project_summary()
         self.assertDataclassEqual(SINGLE_PARTICIPANT_SUMMARY_RESULT, result)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_project_summary_to_external(self):
         """Test project summary to_external function"""
         # Now add a participant with a sample and sequence
@@ -489,7 +492,7 @@ class TestWeb(DbIsolatedTest):
             ex_result.participants[0].samples[0].sequencing_groups[0].assays[0], Assay
         )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def project_summary_with_filter_with_results(self):
         """Project grid but with test filter, that shows results"""
         await self.partl.upsert_participants(participants=[get_test_participant()])
@@ -512,7 +515,7 @@ class TestWeb(DbIsolatedTest):
         result.participants = []
         self.assertEqual(SINGLE_PARTICIPANT_QUERY_RESULT, result)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def project_summary_with_filter_no_results(self):
         """Project grid but with test filter, that doesn't have results"""
         await self.partl.upsert_participants(participants=[get_test_participant()])
@@ -541,7 +544,7 @@ class TestWeb(DbIsolatedTest):
 
         self.assertEqual(empty_result, result)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_project_summary_multiple_participants(self):
         """Try with multiple participants as some extra security"""
         await self.partl.upsert_participants(
@@ -628,7 +631,7 @@ class TestWeb(DbIsolatedTest):
                 msg=f'Fields for category {k} did not match',
             )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_project_summary_multiple_participants_and_filter(self):
         """Try with multiple participants as some extra security"""
         await self.partl.upsert_participants(
@@ -697,7 +700,7 @@ class TestWeb(DbIsolatedTest):
                 msg=f'Fields for category {k} did not match',
             )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_field_with_space(self):
         """Test filtering on a meta field with spaces"""
         await self.partl.upsert_participants(
@@ -715,7 +718,7 @@ class TestWeb(DbIsolatedTest):
 
         self.assertEqual(1, len(nested_participants))
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_project_summary_inactive_sequencing_group(self):
         """
         Insert a sequencing-group, archive it, then check that the summary
