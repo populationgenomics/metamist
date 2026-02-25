@@ -73,17 +73,17 @@ class ParticipantTable:
         # Join on the participant_external_id table
         # always join, query optimiser can figure it out
         # Start by getting the project name, id, meta and external_id
-        filter_sql = filter_.to_sql(
-            {
-                'project': 'pp.project',
-                'id': 'pp.id',
-                'meta': 'pp.meta',
-                'external_id': 'peid.external_id',
-            },
-            exclude=['family', 'sample', 'sequencing_group', 'assay'],
+        wheres.append(
+            filter_.to_sql(
+                {
+                    'project': 'pp.project',
+                    'id': 'pp.id',
+                    'meta': 'pp.meta',
+                    'external_id': 'peid.external_id',
+                },
+                exclude=['family', 'sample', 'sequencing_group', 'assay'],
+            )
         )
-        if filter_sql is not None:
-            wheres.append(filter_sql)
 
         query_template += (
             t' INNER JOIN participant_external_id peid ON pp.id = peid.participant_id'
@@ -92,18 +92,18 @@ class ParticipantTable:
         # Check filter for the sample table and sample_external_id table
         if filter_.sample or filter_.sequencing_group or filter_.assay:
             if filter_.sample:
-                sample_filter_sql = filter_.sample.to_sql(
-                    {
-                        'id': 's.id',
-                        'type': 's.type',
-                        'meta': 's.meta',
-                        'sample_root_id': 's.sample_root_id',
-                        'sample_parent_id': 's.sample_parent_id',
-                    },
-                    exclude=['external_id'],
+                wheres.append(
+                    filter_.sample.to_sql(
+                        {
+                            'id': 's.id',
+                            'type': 's.type',
+                            'meta': 's.meta',
+                            'sample_root_id': 's.sample_root_id',
+                            'sample_parent_id': 's.sample_parent_id',
+                        },
+                        exclude=['external_id'],
+                    )
                 )
-                if sample_filter_sql:
-                    wheres.append(sample_filter_sql)
 
             query_template += t' INNER JOIN sample s ON s.participant_id = pp.id'
 
@@ -174,7 +174,12 @@ class ParticipantTable:
                 """
 
         # WHERE, ORDER BY, LIMIT, OFFSET
-        query_template += t' WHERE {sql.SQL(" AND ").join(wheres):q}' if wheres else t''
+        wheres_filtered = [w for w in wheres if w is not None]
+        query_template += (
+            t' WHERE {sql.SQL(" AND ").join(wheres_filtered):q}'
+            if wheres_filtered
+            else t''
+        )
         query_template += t' ORDER BY pp.id' if (limit or skip) else t''
         query_template += t' LIMIT {limit}' if limit else t''
         query_template += t' OFFSET {skip}' if skip else t''

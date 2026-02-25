@@ -66,7 +66,9 @@ class WebDb(DbBase):
 
     async def get_total_number_of_samples(self):
         """Get total number of active samples within a project"""
-        _query = t'SELECT COUNT(*) FROM sample WHERE project = {self.project_id} AND active'
+        _query = (
+            t'SELECT COUNT(*) FROM sample WHERE project = {self.project_id} AND active'
+        )
         cur = await self.connection.pg_connection.execute(_query)
         res = await cur.fetchone()
         return res['count']
