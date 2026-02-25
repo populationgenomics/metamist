@@ -493,9 +493,15 @@ class TestWeb:
         )
 
     @pytest.mark.asyncio
-    async def project_summary_with_filter_with_results(self):
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.skip(reason="Querying JSON keys is not implemented at the moment")
+    # TODO Revisit this when querying JSON keys is implemented
+    async def test_project_summary_with_filter_with_results(
+        self,
+        test_participant: ParticipantUpsertInternal
+    ):
         """Project grid but with test filter, that shows results"""
-        await self.partl.upsert_participants(participants=[get_test_participant()])
+        await self.participant_layer.upsert_participants(participants=[test_participant])
 
         pfilter = ProjectParticipantGridFilter(
             assay=ProjectParticipantGridFilter.ParticipantGridAssayFilter(
@@ -503,32 +509,38 @@ class TestWeb:
             )
         )
 
-        nested_participants = await self.webl.query_participants(
-            pfilter.to_internal(project=self.project_id), limit=None
+        nested_participants = await self.web_layer.query_participants(
+            pfilter.to_internal(project=self.connection.project_id), limit=None
         )
         result = ProjectParticipantGridResponse.from_params(
             participants=nested_participants,
             total_results=1,
             filter_fields=pfilter,
         )
-        self.assertEqual(1, len(nested_participants))
+        assert 1 == len(nested_participants)
         result.participants = []
-        self.assertEqual(SINGLE_PARTICIPANT_QUERY_RESULT, result)
+        assert SINGLE_PARTICIPANT_QUERY_RESULT == result
 
     @pytest.mark.asyncio
-    async def project_summary_with_filter_no_results(self):
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.skip(reason="Querying JSON keys is not implemented at the moment")
+    # TODO Revisit this when querying JSON keys is implemented
+    async def test_project_summary_with_filter_no_results(
+        self,
+        test_participant: ParticipantUpsertInternal
+    ):
         """Project grid but with test filter, that doesn't have results"""
-        await self.partl.upsert_participants(participants=[get_test_participant()])
+        await self.participant_layer.upsert_participants(participants=[test_participant])
         pfilter = ProjectParticipantGridFilter(
             assay=ProjectParticipantGridFilter.ParticipantGridAssayFilter(
                 meta={'batch': GenericFilter[Any](startswith='M002')}
             )
         )
 
-        nested_participants = await self.webl.query_participants(
-            pfilter.to_internal(project=self.project_id), limit=None
+        nested_participants = await self.web_layer.query_participants(
+            pfilter.to_internal(project=self.connection.project_id), limit=None
         )
-        self.assertEqual(0, len(nested_participants))
+        assert len(nested_participants) == 0
 
         result = ProjectParticipantGridResponse.from_params(
             participants=nested_participants,
@@ -536,23 +548,28 @@ class TestWeb:
             filter_fields=pfilter,
         )
         result.participants = []
-        self.assertEqual(SINGLE_PARTICIPANT_QUERY_RESULT, result)
+        assert SINGLE_PARTICIPANT_QUERY_RESULT == result
 
         empty_result = ProjectParticipantGridResponse(
             total_results=0, participants=[], fields={}
         )
 
-        self.assertEqual(empty_result, result)
+        assert empty_result == result
 
     @pytest.mark.asyncio
-    async def test_project_summary_multiple_participants(self):
+    @pytest.mark.project_roles(['writer'])
+    async def test_project_summary_multiple_participants(
+        self,
+        test_participant: ParticipantUpsertInternal,
+        test_participant_2: ParticipantUpsertInternal
+    ):
         """Try with multiple participants as some extra security"""
-        await self.partl.upsert_participants(
-            participants=[get_test_participant(), get_test_participant_2()]
+        await self.participant_layer.upsert_participants(
+            participants=[test_participant, test_participant_2]
         )
 
         expected_summary = ProjectSummaryInternal(
-            project=WebProject(id=1, name=self.project_name, meta={}, dataset='test'),
+            project=WebProject(id=1, name='test-project', meta={}, dataset='test-dataset'),
             total_samples=2,
             total_participants=2,
             total_sequencing_groups=2,
@@ -600,14 +617,14 @@ class TestWeb:
             ],
         }
 
-        summary = await self.webl.get_project_summary()
+        summary = await self.web_layer.get_project_summary()
 
-        self.assertEqual(expected_summary, summary)
+        assert expected_summary == summary
 
-        nested_participants = await self.webl.query_participants(
+        nested_participants = await self.web_layer.query_participants(
             ParticipantFilter(), limit=None
         )
-        self.assertEqual(2, len(nested_participants))
+        assert len(nested_participants) == 2
         result = ProjectParticipantGridResponse.from_params(
             participants=nested_participants,
             total_results=2,
@@ -625,11 +642,8 @@ class TestWeb:
             sorted_result_fields = sorted(
                 result.fields[k], key=lambda x: x.key
             )  # sort by key
-            self.assertEqual(
-                sorted_expected_fields,
-                sorted_result_fields,
-                msg=f'Fields for category {k} did not match',
-            )
+            assert sorted_expected_fields == sorted_result_fields, \
+                f'Fields for category {k} did not match'
 
     @pytest.mark.asyncio
     async def test_project_summary_multiple_participants_and_filter(self):
