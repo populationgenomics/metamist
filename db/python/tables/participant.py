@@ -374,6 +374,7 @@ class ParticipantTable:
                     'audit_log_id': audit_log_id,
                 }
                 for name, external_id in external_ids.items()
+                if external_id is not None
             ]
 
             async with self.connection.pg_connection.cursor() as cur:
@@ -442,17 +443,16 @@ class ParticipantTable:
                     ]
 
                     # Batch update
-                    cur = conn.cursor()
                     async with conn.cursor() as cur:
                         await cur.executemany(
                             """
                                 MERGE INTO participant_external_id AS target
                                 USING (VALUES (%(project)s, %(participant_id)s, %(name)s, %(external_id)s, %(audit_log_id)s))
                                     AS source (project, participant_id, name, external_id, audit_log_id)
-                                ON target.project = source.project
+                                ON target.name = source.name
                                     AND target.participant_id = source.participant_id
                                 WHEN MATCHED THEN
-                                    UPDATE SET name = source.name, external_id = source.external_id, audit_log_id = source.audit_log_id
+                                    UPDATE SET external_id = source.external_id, audit_log_id = source.audit_log_id
                                 WHEN NOT MATCHED THEN
                                     INSERT (project, participant_id, name, external_id, audit_log_id)
                                     VALUES (source.project, source.participant_id, source.name, source.external_id, source.audit_log_id)
@@ -551,14 +551,14 @@ class ParticipantTable:
     ) -> tuple[set[ProjectId], dict[int, list[ParticipantInternal]]]:
         """Get list of participants keyed by families, duplicates results"""
 
-        keys_str = sql.SQL(', ').join(self.keys)
         _query = t"""
-            SELECT fp.family_id, {keys_str:q}
+            SELECT fp.family_id, p.id, jsonb_object_agg(peid.name, peid.external_id) as external_ids,
+            p.reported_sex, p.reported_gender, p.karyotype, p.meta, p.project, p.audit_log_id
             FROM participant p
             INNER JOIN family_participant fp ON fp.participant_id = p.id
             INNER JOIN participant_external_id peid ON p.id = peid.participant_id
             WHERE fp.family_id = ANY({family_ids})
-            GROUP BY p.id
+            GROUP BY p.id, fp.family_id
         """
         conn = self.connection.pg_connection
         cur = await conn.execute(_query)
@@ -580,15 +580,20 @@ class ParticipantTable:
         """Update many participant primary external_ids through the {internal: external} map"""
         audit_log_id = await self.connection.audit_log_id()
 
-        _query = t"""
+        _query = """
             UPDATE participant_external_id
-            SET external_id = %(external_id)s, audit_log_id = {audit_log_id}
+            SET external_id = %(external_id)s, audit_log_id = %(audit_log_id)s
             WHERE participant_id = %(participant_id)s
-            AND name = {PRIMARY_EXTERNAL_ORG}
+            AND name = %(name)s
         """
 
         updates = [
-            {'external_id': external_id, 'participant_id': participant_id}
+            {
+                'external_id': external_id,
+                'participant_id': participant_id,
+                'name': PRIMARY_EXTERNAL_ORG,
+                'audit_log_id': audit_log_id,
+            }
             for participant_id, external_id in internal_to_external_id.items()
         ]
 
@@ -630,9 +635,9 @@ class ParticipantTable:
         participants with multiple sequencing groups.
         """
         wheres = [t'p.project = {project}']
-        wheres.append(t'sg.type = {sequencing_type}' if sequencing_type else t'')
+        if sequencing_type:
+            wheres.append(t'sg.type = {sequencing_type}')
 
-        wheres = [w for w in wheres if w]
         where_str = sql.SQL(' AND ').join(wheres) if wheres else t''
 
         _query = t"""

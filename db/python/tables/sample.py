@@ -707,7 +707,7 @@ class SampleTable(DbBase):
                 FROM history.sample_history
                 WHERE id = {id_}
             )
-            ORDER BY lower(sys_period) DESC
+            ORDER BY lower(sys_period)
         """
 
         async with self.connection.pg_connection.cursor(
