@@ -107,9 +107,8 @@ class CohortLayer(BaseLayer):
         Get the cohort template for a given cohort ID.
         """
 
-        cohort = await self.ct.get_cohort_by_id(cohort_id)
+        template_id = await self.ct.get_template_by_cohort_by_id(cohort_id)
 
-        template_id = cohort.template_id
         if not template_id:
             raise ValueError(f'Cohort with ID {cohort_id} does not have a template')
 

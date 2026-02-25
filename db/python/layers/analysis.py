@@ -78,7 +78,7 @@ class AnalysisLayer(BaseLayer):
         self,
         project: ProjectId,
         analysis_type: str,
-        meta: dict[str, Any] = None,
+        meta: dict[str, Any] | None = None,
     ) -> AnalysisInternal:
         """Get SINGLE latest complete analysis for some analysis type"""
         return await self.at.get_latest_complete_analysis_for_type(
@@ -116,7 +116,7 @@ class AnalysisLayer(BaseLayer):
         self,
         project: ProjectId,
         sequencing_types: list[str],
-        participant_ids: list[int] = None,
+        participant_ids: list[int] | None = None,
     ) -> list[dict[str, Any]]:
         """Get (ext_participant_id, cram_path, internal_id) map"""
         return await self.at.get_sample_cram_path_map_for_seqr(
@@ -144,8 +144,8 @@ class AnalysisLayer(BaseLayer):
         projects: list[ProjectId],
         sequencing_types: list[str] | None,
         temporal_methods: list[ProportionalDateTemporalMethod],
-        start_date: datetime.date = None,
-        end_date: datetime.date = None,
+        start_date: datetime.date | None = None,
+        end_date: datetime.date | None = None,
     ) -> dict[ProportionalDateTemporalMethod, list[ProportionalDateModel]]:
         """
         This is a bit more complex, but we want to generate a map of cram size by day,
@@ -163,7 +163,7 @@ class AnalysisLayer(BaseLayer):
                 f'end_date ({end_date}) must be after start_date ({start_date})'
             )
 
-        if start_date < datetime.date(2020, 1, 1):
+        if start_date and start_date < datetime.date(2020, 1, 1):
             raise ValueError(f'start_date ({start_date}) must be after 2020-01-01')
 
         project_objs = self.connection.get_and_check_access_to_projects_for_ids(
@@ -339,7 +339,9 @@ class AnalysisLayer(BaseLayer):
             return None
 
         sg_to_project: dict[SequencingGroupInternalId, ProjectId] = {
-            sg.id: sg.project for sg in sg_by_id.values()
+            sg.id: sg.project
+            for sg in sg_by_id.values()
+            if sg.id is not None and sg.project is not None
         }
 
         sgs_added_by_day = await self.get_sgs_added_by_day_by_es_indices(
