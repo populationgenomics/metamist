@@ -615,7 +615,7 @@ class ParticipantTable:
         _query = t"""
             SELECT participant_id AS id, array_agg(external_id) AS external_ids_list
             FROM participant_external_id
-            WHERE participant_id IN {participant_ids}
+            WHERE participant_id = ANY({participant_ids})
             GROUP BY participant_id
         """
 
@@ -666,7 +666,7 @@ class ParticipantTable:
         _query = t"""
             SELECT project, participant_id AS id, external_id
             FROM participant_external_id
-            WHERE project in {project_ids} AND external_id ILIKE {search_literal}
+            WHERE project = ANY({project_ids}) AND external_id ILIKE {search_literal}
             LIMIT {limit}
         """
         conn = self.connection.pg_connection

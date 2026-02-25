@@ -52,7 +52,7 @@ class TestParticipantFamily:
         )
 
     @pytest.mark.asyncio
-    @pytest.mark.project_roles(['reader', 'writer'])
+    @pytest.mark.project_roles(['writer'])
     async def test_get_remove_add_family_participant_data(self):
         """
         Tests getting, removing, and adding a participants family data
@@ -104,7 +104,7 @@ class TestParticipantFamily:
         )
 
     @pytest.mark.asyncio
-    @pytest.mark.project_roles(['reader', 'writer'])
+    @pytest.mark.project_roles(['writer'])
     async def test_update_participant_family(self):
         """Tests updating a participants family data"""
 
