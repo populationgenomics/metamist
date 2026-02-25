@@ -729,10 +729,10 @@ class TestAssayMetaFiltersGraphQL:
         def get_assay_meta_for_read(read):
             return {
                 '1': 1,
-                'nested': {'nested': 'dict'},
                 'alpha': ['b', 'e', 't'],
-                'reads-double-nested': [[read]],
                 'reads': [read],
+                'nested': [[read]],
+                'nested_dict': {'inner': [read]},
                 **DEFAULT_SEQUENCING_META,
             }
 
@@ -862,3 +862,86 @@ class TestAssayMetaFiltersGraphQL:
                     assert 'size' in read
                     assert 'fastq.gz' in read['basename']
                     assert read['size'] >= 10000
+
+    @pytest.mark.project_roles(['reader', 'writer'])
+    async def test_graphql_assay_meta_filter_nested(
+        self,
+        connection_with_project: Connection,
+        graphql_query: GraphQLQueryFunction,
+    ):
+        """
+        Test that demonstrates how GraphQL assayMeta filtering would work.
+        """
+        assert connection_with_project.project is not None
+        project_name = str(connection_with_project.project.name)
+
+        _query = """
+            query SgByAssayMeta($project: StrGraphQLFilter!, $assayMeta: JSON!) {
+                sequencingGroups(project: $project, assayMeta: $assayMeta) {
+                    id
+                    type
+                    assays {
+                        meta
+                    }
+                }
+            }
+        """
+        variables = {
+            'project': {'eq': project_name},
+            'assayMeta': {
+                'nested[*][*].basename': {'contains': 'fastq.gz'},
+                'nested[*][*].size': {'gte': 10000},
+            },
+        }
+
+        results = await graphql_query(_query, variables=variables)
+
+        assert 'data' in results
+        assert 'sequencingGroups' in results['data']
+        results = results['data']['sequencingGroups']
+
+        # Verify that the filter correctly handles JSON path-like keys
+        def assert_reads_results(results):
+            assert len(results) > 0
+            for r in results:
+                assert r.get('id')
+                assert r.get('type')
+                assert 'assays' in r
+                for assay in r['assays']:
+                    assert 'meta' in assay
+                    assert 'reads' in assay['meta']
+                    for read in assay['meta']['reads']:
+                        assert 'basename' in read
+                        assert 'size' in read
+                        assert 'fastq.gz' in read['basename']
+                        assert read['size'] >= 10000
+
+        assert_reads_results(results)
+
+        # Repeat with the nested dictionary
+        _query = """
+            query SgByAssayMeta($project: StrGraphQLFilter!, $assayMeta: JSON!) {
+                sequencingGroups(project: $project, assayMeta: $assayMeta) {
+                    id
+                    type
+                    assays {
+                        meta
+                    }
+                }
+            }
+        """
+        variables = {
+            'project': {'eq': project_name},
+            'assayMeta': {
+                'nested_dict.inner[*].basename': {'contains': 'fastq.gz'},
+                'nested_dict.inner[*].size': {'gte': 10000},
+            },
+        }
+
+        results = await graphql_query(_query, variables=variables)
+
+        assert 'data' in results
+        assert 'sequencingGroups' in results['data']
+        results = results['data']['sequencingGroups']
+
+        assert_reads_results(results)

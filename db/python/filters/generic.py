@@ -202,7 +202,7 @@ class GenericFilter[T](SMBase):
             isnull=self.isnull,
         )
 
-    def to_jsonpath_exists(self, column_name: str, jsonb_expression: str) -> Template:  # noqa: PLR0912
+    def to_jsonpath_exists(self, column_name: str, jsonb_expression: str) -> Template:
         r"""
         Convert a GenericFilter to a JSONPath exists query for JSONB columns with array filtering.
 
@@ -224,32 +224,32 @@ class GenericFilter[T](SMBase):
             # Returns: jsonb_path_exists(a.meta, '$.reads[*] ? (@.basename like_regex "fastq\.gz")')
         """
 
-        # Parse the jsonb_expression to extract array path and field
+        # Parse the jsonb_expression to extract the final field and
+        # json path expression.
         # e.g., 'reads[*].basename' -> array_path='reads[*]', field='basename'
-        match = re.match(r'^(.+\[\*\])\.(.+)$', jsonb_expression)
+        match = re.match(r'^(.+[\[*"\]]*)\.(.+)$', jsonb_expression)
         if not match:
-            raise ValueError(
-                f'Invalid JSONB expression: {jsonb_expression}. '
-                f'Expected format: "array[*].field"'
-            )
+            raise ValueError(f'Invalid JSONB expression: {jsonb_expression}. ')
 
         array_path = match.group(1)  # 'reads[*]'
         field = match.group(2)  # 'basename'
 
         # Build JSONPath predicates
         predicates = []
+        inferred_type = infer_type_from_filter(self)
+
+        # Quote values in JSONPath if they are strings
+        q = '"' if inferred_type == 'string' else ''
+
+        # String processer
+        def escape_jsonpath_string(value: str) -> str:
+            return re.escape(str(value)).replace('\\', '\\\\')
 
         if self.eq is not None:
-            if isinstance(self.eq, str):
-                predicates.append(f'@.{field} == "{self.eq}"')
-            else:
-                predicates.append(f'@.{field} == {self.eq}')
+            predicates.append(f'@.{field} == {q}{self.eq}{q}')
 
         if self.neq is not None:
-            if isinstance(self.neq, str):
-                predicates.append(f'@.{field} != "{self.neq}"')
-            else:
-                predicates.append(f'@.{field} != {self.neq}')
+            predicates.append(f'@.{field} != {q}{self.neq}{q}')
 
         if self.gt is not None:
             predicates.append(f'@.{field} > {self.gt}')
@@ -266,35 +266,29 @@ class GenericFilter[T](SMBase):
         if self.contains is not None:
             # Escape special regex characters for JSONPath like_regex
             # Double backslashes for PostgreSQL JSONPath parser
-            escaped = re.escape(str(self.contains)).replace('\\', '\\\\')
+            escaped = escape_jsonpath_string(str(self.contains))
             predicates.append(f'@.{field} like_regex "{escaped}"')
 
         if self.icontains is not None:
-            escaped = re.escape(str(self.icontains)).replace('\\', '\\\\')
+            escaped = escape_jsonpath_string(str(self.icontains))
             predicates.append(f'@.{field} like_regex "{escaped}" flag "i"')
 
         if self.startswith is not None:
-            escaped = re.escape(str(self.startswith)).replace('\\', '\\\\')
+            escaped = escape_jsonpath_string(str(self.startswith))
             predicates.append(f'@.{field} like_regex "^{escaped}"')
 
         if self.in_ is not None and len(self.in_) > 0:
             # (@.field == val1 || @.field == val2 || ...)
             in_conditions = []
             for val in self.in_:
-                if isinstance(val, str):
-                    in_conditions.append(f'@.{field} == "{val}"')
-                else:
-                    in_conditions.append(f'@.{field} == {val}')
+                in_conditions.append(f'@.{field} == {q}{val}{q}')
             predicates.append(f'({" || ".join(in_conditions)})')
 
         if self.nin is not None and len(self.nin) > 0:
             # !(@.field == val1 || @.field == val2 || ...)
             nin_conditions = []
             for val in self.nin:
-                if isinstance(val, str):
-                    nin_conditions.append(f'@.{field} == "{val}"')
-                else:
-                    nin_conditions.append(f'@.{field} == {val}')
+                nin_conditions.append(f'@.{field} == {q}{val}{q}')
             predicates.append(f'!({" || ".join(nin_conditions)})')
 
         if self.isnull is not None:
@@ -484,11 +478,8 @@ def prepare_query_from_dict_field(
     wheres: list[Template | None] = []
 
     for key, field_filter in filter_.items():
-        if '"' in key:
-            raise ValueError('Meta key contains " character, which is not allowed')
-
         # Check if this is array filtering (contains '[*]')
-        if '[*]' in key:
+        if any(sub in key for sub in ('"', '[*]', '.')):
             # Use JSONPath exists for array filtering
             where_filter = field_filter.to_jsonpath_exists(column_name, key)
         else:
