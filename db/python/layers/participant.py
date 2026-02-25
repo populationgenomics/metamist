@@ -662,7 +662,10 @@ class ParticipantLayer(BaseLayer):
                 for s in participant.samples:
                     s.update_participant_id(participant.id)
 
-                await slayer.upsert_samples(participant.samples, project=project)
+                await slayer.upsert_samples(
+                    participant.samples,
+                    project=project,
+                )
 
             if participant.phenotypes:
                 await self.insert_participant_phenotypes(
