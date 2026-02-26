@@ -476,15 +476,15 @@ class TestOutputFiles:
             return rows
 
         # Get all the output files in the database
-        before_analysis_outputs = await all_rows('analysis_outputs')
+        baseline_outputs = await all_rows('analysis_outputs')
 
         # Add the same files to the analysis to test that duplicates are ignored (not inserted)
         await output_file_table.create_or_update_analysis_output_files_from_output(
             analysis_id=analysis_id, json_dict=outputs
         )
 
-        after_analysis_outputs = await all_rows('analysis_outputs')
-        assert before_analysis_outputs == after_analysis_outputs
+        outputs_after_dupe = await all_rows('analysis_outputs')
+        assert baseline_outputs == outputs_after_dupe
 
         # Add a different file to the analysis to test that a new file appears in the database
         outputs['basename'] = 'gs://fakegcs/file2.cram'
@@ -492,5 +492,5 @@ class TestOutputFiles:
             analysis_id=analysis_id, json_dict=outputs
         )
 
-        after_analysis_outputs = await all_rows('analysis_outputs')
-        assert len(before_analysis_outputs) != len(after_analysis_outputs)
+        outputs_after_new_file = await all_rows('analysis_outputs')
+        assert len(baseline_outputs) != len(outputs_after_new_file)
