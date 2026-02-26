@@ -120,9 +120,6 @@ class OutputFileTable(DbBase):
     ):
         """Add file to an analysis (through the join table)"""
 
-        # The IGNORE is to avoid duplicate entries if the same file is added multiple times
-        # and we used this over ON DUPLICATE because there are reported deadlocks with that
-        # syntax in high concurrency situations?
         add_analysis_output = t"""
             INSERT INTO analysis_outputs
                 (analysis_id, file_id, json_structure, output)
