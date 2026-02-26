@@ -3,7 +3,6 @@ from urllib.parse import urlparse
 
 from fastapi.concurrency import run_in_threadpool
 from google.cloud.storage import Blob
-from psycopg import sql
 
 from db.python.tables.base import DbBase
 from models.models.output_file import OutputFileInternal, RecursiveDict
