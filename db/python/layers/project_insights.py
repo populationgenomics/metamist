@@ -1,7 +1,6 @@
 # mypy: disable-error-code="attr-defined,arg-type,index,call-overload"
 import asyncio
 import itertools
-import json
 from datetime import datetime
 from typing import Any, NamedTuple
 
@@ -253,9 +252,7 @@ class ProjectInsightsDb(DbBase):
                 ),
                 'outliers_detected': stripy_report.outliers_detected,
                 'outlier_loci': (
-                    json.loads(stripy_report.outlier_loci)
-                    if stripy_report.outlier_loci
-                    else None
+                    stripy_report.outlier_loci if stripy_report.outlier_loci else None
                 ),
                 'timestamp_completed': stripy_report.timestamp_completed.isoformat()
                 if stripy_report.timestamp_completed
