@@ -197,6 +197,7 @@ query MyQuery($project: String!) {
         assert len(participants[0]['samples'][0]['sequencingGroups'][0]['assays']) == 1
         assert p.samples[0].sequencing_groups[0].assays[0].id, assays[0]['id']
 
+    # TODO: adding marker to revisit this test case
     @pytest.mark.skip(reason='Querying JSON keys is not implemented')
     @pytest.mark.asyncio
     async def test_query_sample_by_meta(self, graphql_query: GraphQLQueryFunction):
@@ -239,7 +240,8 @@ query MyQuery($project: String!) {
         assert values2
         assert len(values2['project']['participants'][0]['samples']) == 0
 
-    @pytest.mark.skip(reason='Analysis not yet migrated to postgres')
+    # TODO: adding marker to revisit this test case
+    @pytest.mark.skip(reason='Output file migration yet to merge')
     @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
     async def test_sg_analyses_query(self, graphql_query: GraphQLQueryFunction):
@@ -281,7 +283,8 @@ query MyQuery($sg_id: String!, $project: String!) {
         assert 'meta' in analyses[0]
         assert 'output' in analyses[0]
 
-    @pytest.mark.skip(reason='Analysis not yet migrated to postgres')
+    # TODO: adding marker to revisit this test case
+    @pytest.mark.skip(reason='Querying JSON keys is not implemented at the moment')
     @pytest.mark.asyncio
     async def test_project_analyses_query_with_meta(
         self, graphql_query: GraphQLQueryFunction
@@ -446,6 +449,7 @@ query MyQuery($project: String!) {
             },
         ]
 
+    # TODO: adding marker to revisit this test case
     @pytest.mark.skip(reason='Querying JSON keys is not implemented at the moment')
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
@@ -508,7 +512,8 @@ query MyQuery($project: String!) {
 
         assert len(values3['project']['families']) == 0
 
-    @pytest.mark.skip(reason='Analysis not yet migrated to postgres')
+    # TODO: adding marker to revisit this test case
+    @pytest.mark.skip(reason='Output file migration yet to merge')
     @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
     async def test_get_project_name_from_analysis(
