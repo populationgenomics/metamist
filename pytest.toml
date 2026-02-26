@@ -19,7 +19,13 @@ python_files = [
     "test_enum_tables.py",
     "test_analysis_runner.py",
     "test_cohort.py",
-    "test_cohort_status.py"
+    "test_cohort_status.py",
+    "test_web.py",
+    "test_project_insights.py",
+    "test_update_participant_family.py",
+    "test_pedigree.py",
+    "test_search.py",
+    "test_graphql.py"
 ]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

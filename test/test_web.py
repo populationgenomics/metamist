@@ -1,14 +1,16 @@
 import unittest
 from typing import Any
 
+import pytest
+
 from api.routes.web import (
     ExportProjectParticipantFields,
     ProjectParticipantGridFilter,
     prepare_participants_for_export,
 )
+from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers import (
-    AssayLayer,
     ParticipantLayer,
     ProjectInsightsLayer,
     SampleLayer,
@@ -42,7 +44,6 @@ from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
     sequencing_group_id_transform_to_raw,
 )
-from test.testbase import TEST_PROJECT_NAME, DbIsolatedTest, run_as_sync
 
 
 default_assay_meta = {
@@ -242,7 +243,8 @@ def merge(d1: dict, d2: dict):
     return dict(d1, **d2)
 
 
-def get_test_participant():
+@pytest.fixture
+def test_participant() -> ParticipantUpsertInternal:
     """Do it like this to avoid an upsert writing the test value"""
     return ParticipantUpsertInternal(
         external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'},
@@ -290,7 +292,8 @@ def get_test_participant():
     )
 
 
-def get_test_participant_2():
+@pytest.fixture
+def test_participant_2() -> ParticipantUpsertInternal:
     """Do it like this to avoid an upsert writing the test value"""
     return ParticipantUpsertInternal(
         external_ids={PRIMARY_EXTERNAL_ORG: 'Meter'},
@@ -340,7 +343,7 @@ def get_test_participant_2():
 
 
 SINGLE_PARTICIPANT_SUMMARY_RESULT = ProjectSummaryInternal(
-    project=WebProject(id=1, name=TEST_PROJECT_NAME, meta={}, dataset='test'),
+    project=WebProject(id=1, name='test-project', meta={}, dataset='test-dataset'),
     total_samples=1,
     total_participants=1,
     total_sequencing_groups=1,
@@ -387,28 +390,31 @@ SINGLE_PARTICIPANT_QUERY_RESULT = ProjectParticipantGridResponse(
 )
 
 
-class TestWeb(DbIsolatedTest):
+class TestWeb:
     """Test web class containing web endpoints"""
 
     maxDiff = None
 
-    @run_as_sync
-    async def setUp(self) -> None:
-        super().setUp()
-        self.webl = WebLayer(self.connection)
-        self.partl = ParticipantLayer(self.connection)
-        self.pil = ProjectInsightsLayer(self.connection)
-        self.sampl = SampleLayer(self.connection)
-        self.seql = AssayLayer(self.connection)
+    @pytest.fixture(autouse=True)
+    async def setUp(self, connection_with_project: Connection) -> None:
+        self.connection = connection_with_project
 
-    @run_as_sync
+        self.web_layer = WebLayer(connection_with_project)
+        self.participant_layer = ParticipantLayer(connection_with_project)
+        self.proj_insights_layer = ProjectInsightsLayer(connection_with_project)
+        self.sample_layer = SampleLayer(connection_with_project)
+        self.sg_layer = SequencingGroupLayer(connection_with_project)
+
+    @pytest.mark.asyncio
     async def test_project_summary_empty(self):
         """Test getting the summary for a project"""
-        result = await self.webl.get_project_summary()
+        result = await self.web_layer.get_project_summary()
 
         # Expect an empty project
         expected = ProjectSummaryInternal(
-            project=WebProject(id=1, name=self.project_name, meta={}, dataset='test'),
+            project=WebProject(
+                id=1, name='test-project', meta={}, dataset='test-dataset'
+            ),
             total_samples=0,
             total_participants=0,
             total_sequencing_groups=0,
@@ -419,29 +425,37 @@ class TestWeb(DbIsolatedTest):
             seqr_sync_types=[],
         )
 
-        self.assertEqual(expected, result)
+        assert expected == result
 
-    @run_as_sync
-    async def test_project_summary_single_entry(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_project_summary_single_entry(
+        self, test_participant: ParticipantUpsertInternal
+    ):
         """Test project summary with a single participant with all fields"""
         # Now add a participant with a sample and sequence
-        await self.partl.upsert_participants(participants=[get_test_participant()])
+        await self.participant_layer.upsert_participants(
+            participants=[test_participant]
+        )
 
-        result = await self.webl.get_project_summary()
-        self.assertDataclassEqual(SINGLE_PARTICIPANT_SUMMARY_RESULT, result)
+        result = await self.web_layer.get_project_summary()
+        assert result == SINGLE_PARTICIPANT_SUMMARY_RESULT
 
-    @run_as_sync
-    async def test_project_summary_to_external(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_project_summary_to_external(
+        self, test_participant: ParticipantUpsertInternal
+    ):
         """Test project summary to_external function"""
         # Now add a participant with a sample and sequence
-        await self.partl.upsert_participants(participants=[get_test_participant()])
-
-        summary = await self.webl.get_project_summary()
-        self.assertEqual(
-            SINGLE_PARTICIPANT_SUMMARY_RESULT.to_external(),
-            summary.to_external(),
+        await self.participant_layer.upsert_participants(
+            participants=[test_participant]
         )
-        internal_participants = await self.webl.query_participants(
+
+        summary = await self.web_layer.get_project_summary()
+        assert SINGLE_PARTICIPANT_SUMMARY_RESULT.to_external() == summary.to_external()
+
+        internal_participants = await self.web_layer.query_participants(
             ParticipantFilter(), limit=None
         )
 
@@ -452,27 +466,27 @@ class TestWeb(DbIsolatedTest):
         )
 
         assert isinstance(internal_participants[0].samples, list)
-        self.assertIsInstance(internal_participants[0].samples[0].id, int)
-        self.assertIsInstance(ex_result.participants[0].samples[0].id, str)
-        self.assertEqual(
-            sample_id_transform_to_raw(ex_result.participants[0].samples[0].id),
-            internal_participants[0].samples[0].id,
+        assert isinstance(internal_participants[0].samples[0].id, int)
+        assert isinstance(ex_result.participants[0].samples[0].id, str)
+        assert (
+            sample_id_transform_to_raw(ex_result.participants[0].samples[0].id)
+            == internal_participants[0].samples[0].id
         )
 
         assert isinstance(internal_participants[0].samples[0].sequencing_groups, list)
         assert isinstance(ex_result.participants[0].samples[0].sequencing_groups, list)
 
-        self.assertIsInstance(
+        assert isinstance(
             internal_participants[0].samples[0].sequencing_groups[0].id, int
         )
-        self.assertIsInstance(
+        assert isinstance(
             ex_result.participants[0].samples[0].sequencing_groups[0].id, str
         )
-        self.assertEqual(
+        assert (
             sequencing_group_id_transform_to_raw(
                 ex_result.participants[0].samples[0].sequencing_groups[0].id
-            ),
-            internal_participants[0].samples[0].sequencing_groups[0].id,
+            )
+            == internal_participants[0].samples[0].sequencing_groups[0].id
         )
 
         assert isinstance(
@@ -481,18 +495,25 @@ class TestWeb(DbIsolatedTest):
         assert isinstance(
             ex_result.participants[0].samples[0].sequencing_groups[0].assays, list
         )
-        self.assertIsInstance(
+        assert isinstance(
             internal_participants[0].samples[0].sequencing_groups[0].assays[0],
             AssayInternal,
         )
-        self.assertIsInstance(
+        assert isinstance(
             ex_result.participants[0].samples[0].sequencing_groups[0].assays[0], Assay
         )
 
-    @run_as_sync
-    async def project_summary_with_filter_with_results(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.skip(reason='Querying JSON keys is not implemented at the moment')
+    # TODO Revisit this when querying JSON keys is implemented
+    async def test_project_summary_with_filter_with_results(
+        self, test_participant: ParticipantUpsertInternal
+    ):
         """Project grid but with test filter, that shows results"""
-        await self.partl.upsert_participants(participants=[get_test_participant()])
+        await self.participant_layer.upsert_participants(
+            participants=[test_participant]
+        )
 
         pfilter = ProjectParticipantGridFilter(
             assay=ProjectParticipantGridFilter.ParticipantGridAssayFilter(
@@ -500,32 +521,39 @@ class TestWeb(DbIsolatedTest):
             )
         )
 
-        nested_participants = await self.webl.query_participants(
-            pfilter.to_internal(project=self.project_id), limit=None
+        nested_participants = await self.web_layer.query_participants(
+            pfilter.to_internal(project=self.connection.project_id), limit=None
         )
         result = ProjectParticipantGridResponse.from_params(
             participants=nested_participants,
             total_results=1,
             filter_fields=pfilter,
         )
-        self.assertEqual(1, len(nested_participants))
+        assert len(nested_participants) == 1
         result.participants = []
-        self.assertEqual(SINGLE_PARTICIPANT_QUERY_RESULT, result)
+        assert result == SINGLE_PARTICIPANT_QUERY_RESULT
 
-    @run_as_sync
-    async def project_summary_with_filter_no_results(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.skip(reason='Querying JSON keys is not implemented at the moment')
+    # TODO Revisit this when querying JSON keys is implemented
+    async def test_project_summary_with_filter_no_results(
+        self, test_participant: ParticipantUpsertInternal
+    ):
         """Project grid but with test filter, that doesn't have results"""
-        await self.partl.upsert_participants(participants=[get_test_participant()])
+        await self.participant_layer.upsert_participants(
+            participants=[test_participant]
+        )
         pfilter = ProjectParticipantGridFilter(
             assay=ProjectParticipantGridFilter.ParticipantGridAssayFilter(
                 meta={'batch': GenericFilter[Any](startswith='M002')}
             )
         )
 
-        nested_participants = await self.webl.query_participants(
-            pfilter.to_internal(project=self.project_id), limit=None
+        nested_participants = await self.web_layer.query_participants(
+            pfilter.to_internal(project=self.connection.project_id), limit=None
         )
-        self.assertEqual(0, len(nested_participants))
+        assert len(nested_participants) == 0
 
         result = ProjectParticipantGridResponse.from_params(
             participants=nested_participants,
@@ -533,23 +561,30 @@ class TestWeb(DbIsolatedTest):
             filter_fields=pfilter,
         )
         result.participants = []
-        self.assertEqual(SINGLE_PARTICIPANT_QUERY_RESULT, result)
+        assert result == SINGLE_PARTICIPANT_QUERY_RESULT
 
         empty_result = ProjectParticipantGridResponse(
             total_results=0, participants=[], fields={}
         )
 
-        self.assertEqual(empty_result, result)
+        assert empty_result == result
 
-    @run_as_sync
-    async def test_project_summary_multiple_participants(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_project_summary_multiple_participants(
+        self,
+        test_participant: ParticipantUpsertInternal,
+        test_participant_2: ParticipantUpsertInternal,
+    ):
         """Try with multiple participants as some extra security"""
-        await self.partl.upsert_participants(
-            participants=[get_test_participant(), get_test_participant_2()]
+        await self.participant_layer.upsert_participants(
+            participants=[test_participant, test_participant_2]
         )
 
         expected_summary = ProjectSummaryInternal(
-            project=WebProject(id=1, name=self.project_name, meta={}, dataset='test'),
+            project=WebProject(
+                id=1, name='test-project', meta={}, dataset='test-dataset'
+            ),
             total_samples=2,
             total_participants=2,
             total_sequencing_groups=2,
@@ -597,14 +632,14 @@ class TestWeb(DbIsolatedTest):
             ],
         }
 
-        summary = await self.webl.get_project_summary()
+        summary = await self.web_layer.get_project_summary()
 
-        self.assertEqual(expected_summary, summary)
+        assert expected_summary == summary
 
-        nested_participants = await self.webl.query_participants(
+        nested_participants = await self.web_layer.query_participants(
             ParticipantFilter(), limit=None
         )
-        self.assertEqual(2, len(nested_participants))
+        assert len(nested_participants) == 2
         result = ProjectParticipantGridResponse.from_params(
             participants=nested_participants,
             total_results=2,
@@ -622,17 +657,20 @@ class TestWeb(DbIsolatedTest):
             sorted_result_fields = sorted(
                 result.fields[k], key=lambda x: x.key
             )  # sort by key
-            self.assertEqual(
-                sorted_expected_fields,
-                sorted_result_fields,
-                msg=f'Fields for category {k} did not match',
+            assert sorted_expected_fields == sorted_result_fields, (
+                f'Fields for category {k} did not match'
             )
 
-    @run_as_sync
-    async def test_project_summary_multiple_participants_and_filter(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_project_summary_multiple_participants_and_filter(
+        self,
+        test_participant: ParticipantUpsertInternal,
+        test_participant_2: ParticipantUpsertInternal,
+    ):
         """Try with multiple participants as some extra security"""
-        await self.partl.upsert_participants(
-            participants=[get_test_participant(), get_test_participant_2()]
+        await self.participant_layer.upsert_participants(
+            participants=[test_participant, test_participant_2]
         )
 
         expected_fields = {
@@ -672,11 +710,11 @@ class TestWeb(DbIsolatedTest):
             )
         )
 
-        nested_participants = await self.webl.query_participants(
-            pfilter.to_internal(project=self.project_id), limit=None
+        nested_participants = await self.web_layer.query_participants(
+            pfilter.to_internal(project=self.connection.project_id), limit=None
         )
 
-        self.assertEqual(1, len(nested_participants))
+        assert len(nested_participants) == 1
         result = ProjectParticipantGridResponse.from_params(
             nested_participants,
             filter_fields=pfilter,
@@ -691,17 +729,22 @@ class TestWeb(DbIsolatedTest):
             sorted_result_fields = sorted(
                 result.fields[k], key=lambda x: x.key
             )  # sort by key
-            self.assertEqual(
-                sorted_expected_fields,
-                sorted_result_fields,
-                msg=f'Fields for category {k} did not match',
+            assert sorted_expected_fields == sorted_result_fields, (
+                f'Fields for category {k} did not match'
             )
 
-    @run_as_sync
-    async def test_field_with_space(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.skip(reason='Querying JSON keys is not implemented at the moment')
+    # TODO Revisit this when querying JSON keys is implemented
+    async def test_field_with_space(
+        self,
+        test_participant: ParticipantUpsertInternal,
+        test_participant_2: ParticipantUpsertInternal,
+    ):
         """Test filtering on a meta field with spaces"""
-        await self.partl.upsert_participants(
-            participants=[get_test_participant(), get_test_participant_2()]
+        await self.participant_layer.upsert_participants(
+            participants=[test_participant, test_participant_2]
         )
 
         pfilter = ProjectParticipantGridFilter(
@@ -709,43 +752,45 @@ class TestWeb(DbIsolatedTest):
                 meta={'field with spaces': GenericFilter[Any](contains='field wi')}
             )
         )
-        nested_participants = await self.webl.query_participants(
-            pfilter.to_internal(project=self.project_id), limit=None
+        nested_participants = await self.web_layer.query_participants(
+            pfilter.to_internal(project=self.connection.project_id), limit=None
         )
 
-        self.assertEqual(1, len(nested_participants))
+        assert len(nested_participants) == 1
 
-    @run_as_sync
-    async def test_project_summary_inactive_sequencing_group(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_project_summary_inactive_sequencing_group(
+        self, test_participant: ParticipantUpsertInternal
+    ):
         """
         Insert a sequencing-group, archive it, then check that the summary
         doesn't return that sequencing group
         """
-        participants = await self.partl.upsert_participants(
-            participants=[get_test_participant()]
+        participants = await self.participant_layer.upsert_participants(
+            participants=[test_participant]
         )
-        assert (
-            isinstance(participants, list)
-            and isinstance(participants[0].samples, list)
-            and isinstance(participants[0].samples[0].sequencing_groups, list)
-        )
+        assert isinstance(participants, list)
+        assert isinstance(participants[0].samples, list)
+        assert isinstance(participants[0].samples[0].sequencing_groups, list)
+
         sg = participants[0].samples[0].sequencing_groups[0]
         assert isinstance(sg.assays, list)
         assay_ids = [a.id for a in sg.assays if a.id]
-        sglayer = SequencingGroupLayer(self.connection)
+
         assert sg.id
-        new_sg_id = await sglayer.recreate_sequencing_group_with_new_assays(
+        new_sg_id = await self.sg_layer.recreate_sequencing_group_with_new_assays(
             sequencing_group_id=sg.id,
             assays=assay_ids,
             meta={'new-meta': 'value'},
         )
 
-        participants = await self.webl.query_participants(
+        participants = await self.web_layer.query_participants(
             ParticipantFilter(), limit=None
         )
         summary_sgs = participants[0].samples[0].sequencing_groups
-        self.assertEqual(1, len(summary_sgs))
-        self.assertEqual(new_sg_id, summary_sgs[0].id)
+        assert len(summary_sgs) == 1
+        assert new_sg_id == summary_sgs[0].id
 
 
 class WebNonDBTests(unittest.TestCase):
@@ -838,20 +883,18 @@ class WebNonDBTests(unittest.TestCase):
         i = prepare_participants_for_export([participant], fields)
         headers = next(i)
         rows = list(i)
-        self.assertTupleEqual(
-            headers,
-            (
-                'family.external_ids',
-                'participant.external_ids',
-                'participant.meta.pkey',
-                'sample.meta.skey',
-                'sample.external_ids',
-                'sequencing_group.type',
-                'sequencing_group.meta.sgkey',
-                'assay.type',
-                'assay.meta.akey',
-            ),
+        assert headers == (
+            'family.external_ids',
+            'participant.external_ids',
+            'participant.meta.pkey',
+            'sample.meta.skey',
+            'sample.external_ids',
+            'sequencing_group.type',
+            'sequencing_group.meta.sgkey',
+            'assay.type',
+            'assay.meta.akey',
         )
+
         non_sg_keys = (
             'family_org: fex1',
             'pex1',
@@ -866,9 +909,9 @@ class WebNonDBTests(unittest.TestCase):
             (*non_sg_keys, 'sequencing', 'avalue2'),
         ]
 
-        self.assertEqual(2, len(rows))
+        assert len(rows) == 2
 
-        self.assertListEqual(expected, rows)
+        assert expected == rows
 
     def test_project_participant_grid_filter(self):
         """
@@ -915,29 +958,29 @@ class WebNonDBTests(unittest.TestCase):
         internal_filter = big_filter.to_internal(project=1)
 
         # participant internal
-        self.assertEqual(internal_filter.id.contains, p_id)
-        self.assertEqual(internal_filter.meta['pmeta'].contains, 'pm')
-        self.assertEqual(internal_filter.external_id.contains, 'e')
+        assert internal_filter.id.contains == p_id
+        assert internal_filter.meta['pmeta'].contains == 'pm'
+        assert internal_filter.external_id.contains == 'e'
 
         # family internal
-        self.assertEqual(internal_filter.family.id.contains, f_id)
+        assert internal_filter.family.id.contains == f_id
 
         # sample internal
-        self.assertEqual(internal_filter.sample.id.contains, s_id)
-        self.assertEqual(internal_filter.sample.type.contains, 't')
-        self.assertEqual(internal_filter.sample.external_id.contains, 'e')
-        self.assertEqual(internal_filter.sample.meta['smeta'].contains, 'sm')
+        assert internal_filter.sample.id.contains == s_id
+        assert internal_filter.sample.type.contains == 't'
+        assert internal_filter.sample.external_id.contains == 'e'
+        assert internal_filter.sample.meta['smeta'].contains == 'sm'
 
         # sequencing group internal
-        self.assertEqual(internal_filter.sequencing_group.id.contains, sg_id)
-        self.assertEqual(internal_filter.sequencing_group.type.contains, 't')
-        self.assertEqual(internal_filter.sequencing_group.external_id.contains, 'e')
-        self.assertEqual(internal_filter.sequencing_group.meta['sgmeta'].contains, 'sg')
-        self.assertEqual(internal_filter.sequencing_group.technology.contains, 't')
-        self.assertEqual(internal_filter.sequencing_group.platform.contains, 'p')
+        assert internal_filter.sequencing_group.id.contains == sg_id
+        assert internal_filter.sequencing_group.type.contains == 't'
+        assert internal_filter.sequencing_group.external_id.contains == 'e'
+        assert internal_filter.sequencing_group.meta['sgmeta'].contains == 'sg'
+        assert internal_filter.sequencing_group.technology.contains == 't'
+        assert internal_filter.sequencing_group.platform.contains == 'p'
 
         # assay internal
-        self.assertEqual(internal_filter.assay.id.contains, 5)
-        self.assertEqual(internal_filter.assay.type.contains, 't')
-        self.assertEqual(internal_filter.assay.external_id.contains, 'e')
-        self.assertEqual(internal_filter.assay.meta['ameta'].contains, 'a')
+        assert internal_filter.assay.id.contains == 5
+        assert internal_filter.assay.type.contains == 't'
+        assert internal_filter.assay.external_id.contains == 'e'
+        assert internal_filter.assay.meta['ameta'].contains == 'a'

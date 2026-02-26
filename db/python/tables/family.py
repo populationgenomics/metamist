@@ -148,7 +148,7 @@ class FamilyTable(DbBase):
         """
         Search by some term, return [ProjectId, FamilyId, ExternalId]
         """
-        search_pattern = (escape_like_term(query) + '%',)
+        search_pattern = escape_like_term(query) + '%'
         rows = await (
             await self.connection.pg_connection.execute(t"""
             SELECT project, family_id, external_id FROM family_external_id

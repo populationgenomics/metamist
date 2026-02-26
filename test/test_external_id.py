@@ -1,5 +1,6 @@
 import pytest
 from psycopg import IntegrityError
+from psycopg.errors import UniqueViolation
 
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
@@ -14,7 +15,6 @@ from models.models import (
 )
 
 
-@pytest.mark.skip(reason='Skipped until dependent entities migrated to PostgreSQL')
 class TestParticipant:
     """Test participant external ids"""
 
@@ -22,6 +22,7 @@ class TestParticipant:
     async def set_up(self, connection_with_project: Connection):
         self.player = ParticipantLayer(connection_with_project)
         self.project_id = connection_with_project.project_id
+        self.connection = connection_with_project
 
         self.p1 = await self.player.upsert_participant(
             ParticipantUpsertInternal(
@@ -40,47 +41,38 @@ class TestParticipant:
             )
         )
 
-    async def insert(
-        self, participant_id, org, external_id, connection_with_project: Connection
-    ):
+    async def insert(self, participant_id, org, external_id):
         """Directly insert into participant_external_id table"""
-        query = """
-        INSERT INTO participant_external_id (project, participant_id, name, external_id, audit_log_id)
-        VALUES (%(project)s, %(id)s, %(org)s, %(external_id)s, %(audit_log_id)s)
+        audit_log_id = await self.connection.audit_log_id()
+
+        query = t"""
+            INSERT INTO participant_external_id (project, participant_id, name, external_id, audit_log_id)
+            VALUES ({self.project_id}, {participant_id}, {org}, {external_id}, {audit_log_id})
         """
-        values = {
-            'project': self.project_id,
-            'id': participant_id,
-            'org': org,
-            'external_id': external_id,
-            'audit_log_id': await connection_with_project.audit_log_id(),
-        }
-        await connection_with_project.pg_connection.execute(query, values)
+        await self.connection.pg_connection.execute(query)
 
     @pytest.mark.asyncio
-    async def test_constraints(self, connection_with_project: Connection):
+    async def test_constraints(self):
         """Verify that database constraints prevent duplicate external_ids"""
         # Can't have two primary eids
-        with pytest.raises(IntegrityError):
-            await self.insert(
-                self.p1.id, PRIMARY_EXTERNAL_ORG, 'P86', connection_with_project
-            )
+        with pytest.raises(UniqueViolation):
+            await self.insert(self.p1.id, PRIMARY_EXTERNAL_ORG, 'P86')
 
         # Can't have two eids in the same external organisation
         with pytest.raises(IntegrityError):
-            await self.insert(self.p1.id, 'CONTROL', 'Maxwell', connection_with_project)
+            await self.insert(self.p1.id, 'control', 'Maxwell')
 
         # Can have eids in lots of organisations, but not if the eid duplicates one in a different org
-        await self.insert(self.p1.id, 'OTHER1', 'Maxwell', connection_with_project)
+        await self.insert(self.p1.id, 'OTHER1', 'Maxwell')
         with pytest.raises(IntegrityError):
-            await self.insert(self.p1.id, 'OTHER2', '86', connection_with_project)
+            await self.insert(self.p1.id, 'OTHER2', '86')
 
         # Another participant can't have the same eid
         with pytest.raises(IntegrityError):
-            await self.insert(self.p2.id, 'CONTROL', '86', connection_with_project)
+            await self.insert(self.p2.id, 'CONTROL', '86')
 
         # But it can have its own eid
-        await self.insert(self.p2.id, 'CONTROL', '99', connection_with_project)
+        await self.insert(self.p2.id, 'CONTROL', '99')
 
     @pytest.mark.asyncio
     async def test_insert(self):
@@ -114,6 +106,7 @@ class TestParticipant:
             'c': 'C1',
         }
 
+    @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
     async def test_update(self):
         """Test updating existing participants with various external_id combinations"""
@@ -176,9 +169,9 @@ class TestParticipant:
             assert p_map[s.participant_id].external_ids == expected_eids
 
     @pytest.mark.asyncio
-    async def test_get_by_families(self, connection: Connection):
+    async def test_get_by_families(self):
         """Exercise get_participants_by_families() method"""
-        flayer = FamilyLayer(connection)
+        flayer = FamilyLayer(self.connection)
         fid = await flayer.create_family(external_ids={'org': 'Jones'})
 
         child = await self.player.upsert_participant(
@@ -201,11 +194,9 @@ class TestParticipant:
         assert result[fid][0].external_ids == {PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'}
 
     @pytest.mark.asyncio
-    async def test_get_families_by_participants(
-        self, connection_with_project: Connection
-    ):
+    async def test_get_families_by_participants(self):
         """Exercise FamilyLayer's get_families_by_participants() method"""
-        flayer = FamilyLayer(connection_with_project)
+        flayer = FamilyLayer(self.connection)
         fid = await flayer.create_family(
             external_ids={PRIMARY_EXTERNAL_ORG: 'Smith'},
             description='Blacksmiths',
@@ -231,6 +222,7 @@ class TestParticipant:
         assert len(result[child.id]) == 1
         assert result[child.id][0].description == 'Blacksmiths'
 
+    @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
     async def test_update_many(self):
         """Exercise update_many_participant_external_ids() method"""
@@ -252,10 +244,11 @@ class TestParticipant:
         }
         assert outp2.external_ids == {PRIMARY_EXTERNAL_ORG: 'P2B'}
 
+    @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
-    async def test_get_etoi_map(self, connection: Connection):
+    async def test_get_etoi_map(self):
         """Exercise get_external_participant_id_to_internal_sequencing_group_id_map() method"""
-        slayer = SampleLayer(connection)
+        slayer = SampleLayer(self.connection)
 
         _ = await slayer.upsert_sample(
             SampleUpsertInternal(
@@ -283,11 +276,10 @@ class TestParticipant:
         )
         assert len(result) == 3
         for eid, sgid in result:
-            assert eid == self.p1.external_ids.values()
+            assert eid in self.p1.external_ids.values()
             assert sgid == s2.sequencing_groups[0].id
 
 
-@pytest.mark.skip(reason='Skipped until dependent entities migrated to PostgreSQL')
 class TestSample:
     """Test sample external ids"""
 
@@ -295,6 +287,7 @@ class TestSample:
     async def set_up(self, connection_with_project: Connection):
         self.slayer = SampleLayer(connection_with_project)
         self.project_id = connection_with_project.project_id
+        self.connection = connection_with_project
 
         self.s1 = await self.slayer.upsert_sample(
             SampleUpsertInternal(
@@ -312,24 +305,17 @@ class TestSample:
             )
         )
 
-    @pytest.mark.asyncio
-    async def insert(
-        self, sample_id, org, external_id, connection_with_project: Connection
-    ):
+    async def insert(self, sample_id, org, external_id):
         """Directly insert into sample_external_id table"""
-        query = """
-        INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
-        VALUES (%(project)s, %(id)s, %(org)s, %(external_id)s, %(audit_log_id))
-        """
-        values = {
-            'project': connection_with_project.project_id,
-            'id': sample_id,
-            'org': org,
-            'external_id': external_id,
-            'audit_log_id': await connection_with_project.audit_log_id(),
-        }
 
-        await connection_with_project.pg_connection.execute(query, values)
+        project_id = self.connection.project_id
+        audit_log_id = await self.connection.audit_log_id()
+
+        query = t"""
+        INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
+        VALUES ({project_id}, {sample_id}, {org}, {external_id}, {audit_log_id})
+        """
+        await self.connection.pg_connection.execute(query)
 
     @pytest.mark.asyncio
     async def test_constraints(self):
@@ -340,7 +326,7 @@ class TestSample:
 
         # Can't have two eids in the same external organisation
         with pytest.raises(IntegrityError):
-            await self.insert(self.s1.id, 'CONTROL', 'Maxwell')
+            await self.insert(self.s1.id, 'control', 'Maxwell')
 
         # Can have eids in lots of organisations, but not if the eid duplicates one in a different org
         await self.insert(self.s1.id, 'OTHER1', 'Maxwell')
@@ -386,6 +372,7 @@ class TestSample:
             'c': 'C1',
         }
 
+    @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
     async def test_update(self):
         """Test updating existing samples with various external_id combinations"""
@@ -446,6 +433,7 @@ class TestSample:
         )
         assert result == {self.s1.id: 'S1', self.s2.id: 'S2'}
 
+    @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
     async def test_get_history(self):
         """Exercise get_history_of_sample() method"""
@@ -482,8 +470,9 @@ class TestFamily:
     ):
         self.flayer = FamilyLayer(connection_with_project)
         self.project_id = connection_with_project.project_id
+        self.connection = connection_with_project
 
-    @pytest.mark.project_roles(['reader', 'writer'])
+    @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
     async def test_create_update(self) -> None:
         """Exercise create_family() and update_family() methods"""
@@ -579,9 +568,9 @@ class TestFamily:
         assert family['Taylor'].coded_phenotype == 'sews'
 
     @pytest.mark.asyncio
-    async def test_direct_get_id_map(self, connection: Connection):
+    async def test_direct_get_id_map(self):
         """Exercise the table's get_id_map_by_internal_ids() method"""
-        ftable = FamilyTable(connection)
+        ftable = FamilyTable(self.connection)
 
         result = await ftable.get_id_map_by_internal_ids([])
         assert result == {}

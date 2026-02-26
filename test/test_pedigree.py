@@ -6,12 +6,11 @@ from db.python.layers.participant import ParticipantLayer
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantUpsertInternal
 
 
-@pytest.mark.skip(reason='Skipped until dependent entities migrated to PostgreSQL')
 class TestPedigree:
     """Pedigree testing methods"""
 
     @pytest.mark.asyncio
-    @pytest.mark.project_roles(['reader', 'writer'])
+    @pytest.mark.project_roles(['writer'])
     async def test_import_get_pedigree(self, connection_with_project: Connection):
         """Test import + get pedigree"""
         fl = FamilyLayer(connection_with_project)
@@ -65,7 +64,7 @@ class TestPedigree:
         )
 
         rows = await fl.get_pedigree(
-            project=self.connection.project_id,
+            project=connection_with_project.project_id,
             include_participants_not_in_families=True,
             replace_with_participant_external_ids=True,
         )

@@ -35,6 +35,8 @@ class TestSample:
         self.player = ParticipantLayer(connection_with_project)
         self.flayer = FamilyLayer(connection_with_project)
         self.sglayer = SequencingGroupLayer(connection_with_project)
+        self.project_id = connection_with_project.project_id
+        self.fptable = FamilyParticipantTable(connection_with_project)
 
     @pytest.mark.asyncio
     async def test_search_non_existent_sample_by_internal_id(self):
@@ -43,7 +45,7 @@ class TestSample:
         """
         cpg_id = sample_id_format(9_999_999_999)
         results = await self.schlay.search(query=cpg_id, project_ids=[self.project_id])
-        self.assertEqual(0, len(results))
+        assert len(results) == 0
 
     @pytest.mark.asyncio
     async def test_search_unavailable_sample_by_internal_id(self):
@@ -61,7 +63,7 @@ class TestSample:
         results = await self.schlay.search(
             query=cpg_id, project_ids=[self.project_id + 1]
         )
-        self.assertEqual(1, len(results))
+        assert len(results) == 1
 
     @pytest.mark.asyncio
     async def test_search_isolated_sample_by_id(self):
@@ -76,15 +78,15 @@ class TestSample:
         cpg_id = sample_id_format(sample.id)
         results = await self.schlay.search(query=cpg_id, project_ids=[self.project_id])
 
-        self.assertEqual(1, len(results))
-        self.assertEqual(cpg_id, results[0].title)
-        self.assertEqual(cpg_id, results[0].data.id)
+        assert len(results) == 1
+        assert cpg_id == results[0].title
+        assert cpg_id == results[0].data.id
 
         result_data = results[0].data
-        self.assertIsInstance(result_data, SampleSearchResponseData)
         assert isinstance(result_data, SampleSearchResponseData)
-        self.assertListEqual(['EX001'], result_data.sample_external_ids)
+        assert result_data.sample_external_ids == ['EX001']
 
+    @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
     async def test_search_isolated_sequencing_group_by_id(self):
         """
@@ -125,13 +127,12 @@ class TestSample:
             query=cpg_sg_id, project_ids=[self.project_id]
         )
 
-        self.assertEqual(1, len(results))
-        self.assertEqual(cpg_sg_id, results[0].title)
+        assert len(results) == 1
+        assert cpg_sg_id == results[0].title
         result_data = results[0].data
         assert isinstance(result_data, SequencingGroupSearchResponseData)
-        self.assertIsInstance(result_data, SequencingGroupSearchResponseData)
-        self.assertEqual(cpg_sg_id, result_data.id)
-        self.assertEqual(cpg_sg_id, result_data.sg_external_id)
+        assert cpg_sg_id == result_data.id
+        assert cpg_sg_id == result_data.sg_external_id
 
     @pytest.mark.asyncio
     async def test_search_isolated_sample_by_external_id(self):
@@ -148,17 +149,16 @@ class TestSample:
 
         cpg_id = sample_id_format(sample.id)
 
-        self.assertEqual(1, len(results))
+        assert len(results) == 1
 
-        self.assertEqual(cpg_id, results[0].title)
+        assert cpg_id == results[0].title
         result_data = results[0].data
 
-        self.assertIsInstance(result_data, SampleSearchResponseData)
         assert isinstance(result_data, SampleSearchResponseData)
-        self.assertEqual(cpg_id, result_data.id)
-        self.assertListEqual(['EX001'], result_data.sample_external_ids)
-        self.assertListEqual([], result_data.participant_external_ids)
-        self.assertListEqual([], result_data.family_external_ids)
+        assert cpg_id == result_data.id
+        assert result_data.sample_external_ids == ['EX001']
+        assert result_data.participant_external_ids == []
+        assert result_data.family_external_ids == []
 
     @pytest.mark.asyncio
     async def test_search_participant_isolated(self):
@@ -172,18 +172,17 @@ class TestSample:
         results = await self.schlay.search(
             query='PART01', project_ids=[self.project_id]
         )
-        self.assertEqual(1, len(results))
 
-        self.assertEqual('PART01', results[0].title)
+        assert len(results) == 1
+        assert results[0].title == 'PART01'
         result_data = results[0].data
         assert isinstance(result_data, ParticipantSearchResponseData)
-        self.assertEqual(p.id, result_data.id)
-        self.assertListEqual(['PART01'], result_data.participant_external_ids)
-        self.assertListEqual([], result_data.family_external_ids)
+        assert p.id == result_data.id
+        assert result_data.participant_external_ids == ['PART01']
+        assert result_data.family_external_ids == []
 
     @pytest.mark.asyncio
-    @pytest.mark.project_roles(['reader', 'writer'])
-    @pytest.mark.skip(reason='Skipped until dependent entities migrated to PostgreSQL')
+    @pytest.mark.project_roles(['writer'])
     async def test_search_family(self, connection_with_project: Connection):
         """
         Search family by External ID
@@ -204,13 +203,12 @@ class TestSample:
     @pytest.mark.asyncio
     async def test_search_mixed(self):
         """Create a number of resources, and search for all of them"""
-        fptable = FamilyParticipantTable(self.connection)
 
         p = await self.player.upsert_participant(
             ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'X:PART01'})
         )
         f_id = await self.flayer.create_family(external_ids={'famxorg': 'X:FAM01'})
-        await fptable.create_rows(
+        await self.fptable.create_rows(
             [
                 PedRowInternal(
                     family_id=f_id,
@@ -233,9 +231,9 @@ class TestSample:
         )
 
         all_results = await self.schlay.search(
-            query='X:', project_ids=[self.connection.project_id]
+            query='X:', project_ids=[self.project_id]
         )
-        self.assertEqual(3, len(all_results))
+        assert len(all_results) == 3
 
         family_result = next(
             r for r in all_results if r.type == SearchResponseType.FAMILY
@@ -255,17 +253,15 @@ class TestSample:
         assert isinstance(sample_result_data, SampleSearchResponseData)
 
         # linked family matches
-        self.assertEqual('X:FAM01', family_result.title)
+        assert family_result.title == 'X:FAM01'
 
         # linked participant matches
-        self.assertEqual('X:PART01', participant_result.title)
-        self.assertListEqual(['X:FAM01'], participant_result_data.family_external_ids)
+        assert participant_result.title == 'X:PART01'
+        assert participant_result_data.family_external_ids == ['X:FAM01']
 
         # linked sample matches
         cpg_id = sample_id_format(sample.id)
-        self.assertEqual(cpg_id, sample_result_data.id)
-        self.assertListEqual(['X:SAM001'], sample_result_data.sample_external_ids)
-        self.assertListEqual(['X:FAM01'], participant_result_data.family_external_ids)
-        self.assertListEqual(
-            ['X:PART01'], participant_result_data.participant_external_ids
-        )
+        assert cpg_id == sample_result_data.id
+        assert sample_result_data.sample_external_ids == ['X:SAM001']
+        assert participant_result_data.family_external_ids == ['X:FAM01']
+        assert participant_result_data.participant_external_ids == ['X:PART01']

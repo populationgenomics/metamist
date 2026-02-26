@@ -66,31 +66,41 @@ class WebDb(DbBase):
 
     async def get_total_number_of_samples(self):
         """Get total number of active samples within a project"""
-        _query = 'SELECT COUNT(*) FROM sample WHERE project = :project AND active'
-        return await self.connection.fetch_val(_query, {'project': self.project_id})
+        _query = (
+            t'SELECT COUNT(*) FROM sample WHERE project = {self.project_id} AND active'
+        )
+        cur = await self.connection.pg_connection.execute(_query)
+        res = await cur.fetchone()
+        return res['count']
 
     async def get_total_number_of_participants(self):
         """Get total number of participants within a project"""
-        _query = 'SELECT COUNT(*) FROM participant WHERE project = :project'
-        return await self.connection.fetch_val(_query, {'project': self.project_id})
+        _query = t'SELECT COUNT(*) FROM participant WHERE project = {self.project_id}'
+        cur = await self.connection.pg_connection.execute(_query)
+        res = await cur.fetchone()
+        return res['count']
 
     async def get_total_number_of_sequencing_groups(self):
         """Get total number of sequencing groups within a project"""
-        _query = """
+        _query = t"""
         SELECT COUNT(*)
         FROM sequencing_group sg
         INNER JOIN sample s ON s.id = sg.sample_id
-        WHERE project = :project AND NOT sg.archived"""
-        return await self.connection.fetch_val(_query, {'project': self.project_id})
+        WHERE project = {self.project_id} AND NOT sg.archived"""
+        cur = await self.connection.pg_connection.execute(_query)
+        res = await cur.fetchone()
+        return res['count']
 
     async def get_total_number_of_assays(self):
         """Get total number of sequences within a project"""
-        _query = """
+        _query = t"""
         SELECT COUNT(*)
         FROM assay sq
         INNER JOIN sample s ON s.id = sq.sample_id
-        WHERE s.project = :project"""
-        return await self.connection.fetch_val(_query, {'project': self.project_id})
+        WHERE s.project = {self.project_id}"""
+        cur = await self.connection.pg_connection.execute(_query)
+        res = await cur.fetchone()
+        return res['count']
 
     def get_seqr_links_from_project(self, project: WebProject) -> dict[str, str]:
         """
@@ -131,9 +141,9 @@ class WebDb(DbBase):
         )
         seqr_links = self.get_seqr_links_from_project(project)
 
-        atable = AnalysisTable(self._connection)
-        seqtable = AssayTable(self._connection)
-        sgtable = SequencingGroupTable(self._connection)
+        atable = AnalysisTable(self.connection)
+        seqtable = AssayTable(self.connection)
+        sgtable = SequencingGroupTable(self.connection)
 
         [
             total_samples,
@@ -156,7 +166,7 @@ class WebDb(DbBase):
                 project=self.project_id
             ),
             atable.get_seqr_stats_by_sequencing_type(project=self.project_id),
-            SeqrLayer(self._connection).get_synchronisable_types(project_db),
+            SeqrLayer(self.connection).get_synchronisable_types(project_db),
         )
 
         seen_seq_types: set[str] = set(cram_number_by_seq_type.keys()).union(
@@ -204,7 +214,7 @@ class WebDb(DbBase):
         """
         Count participants
         """
-        player = ParticipantLayer(self._connection)
+        player = ParticipantLayer(self.connection)
         return await player.query_count(query)
 
     async def query_participants(
@@ -214,11 +224,11 @@ class WebDb(DbBase):
         skip: int | None = None,
     ) -> list[NestedParticipantInternal]:
         """Use query to build up nested participants"""
-        player = ParticipantLayer(self._connection)
-        slayer = SampleLayer(self._connection)
-        sglayer = SequencingGroupLayer(self._connection)
-        alayer = AssayLayer(self._connection)
-        flayer = FamilyLayer(self._connection)
+        player = ParticipantLayer(self.connection)
+        slayer = SampleLayer(self.connection)
+        sglayer = SequencingGroupLayer(self.connection)
+        alayer = AssayLayer(self.connection)
+        flayer = FamilyLayer(self.connection)
 
         participants = await player.query(query, limit=limit, skip=skip)
         if not participants:
