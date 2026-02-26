@@ -20,6 +20,7 @@ python_files = [
     "test_analysis_runner.py",
     "test_cohort.py",
     "test_cohort_status.py",
+    "test_project_insights.py",
     "test_update_participant_family.py",
     "test_pedigree.py",
     "test_search.py",
