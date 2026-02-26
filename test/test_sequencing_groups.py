@@ -7,6 +7,7 @@ import pytest
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers import SampleLayer, SequencingGroupLayer
+from db.python.tables.audit_log import AuditLogTable
 from db.python.tables.sequencing_group import (
     SequencingGroupFilter,
     SequencingGroupTable,
@@ -30,41 +31,21 @@ DEFAULT_SEQUENCING_META = {
 @pytest.fixture
 async def test_sample(connection_with_project: Connection) -> int:
     """
-    Create a sample directly in the database for testing sequencing groups.
-    This is a temporary fixture until sample layer is migrated.
-    @TODO replace this when ready
+    Create a sample in the database that test sequencing groups can be attached to.
     """
     project_id = connection_with_project.project_id
 
-    conn = connection_with_project.pg_connection
-    # Create audit_log entry first
-    create_audit_log = t"""
-        INSERT INTO audit_log (author, auth_project)
-        VALUES ('test', {project_id})
-        RETURNING id"""
-    cur = await conn.execute(create_audit_log)
-    row = await cur.fetchone()
-    assert row is not None
-    audit_log_id = row['id']
+    sample = SampleUpsertInternal(
+        project=project_id,
+        external_ids={PRIMARY_EXTERNAL_ORG: 'EX_ID'},
+        meta={'meta_key': 'meta_value'},
+        type='blood',
+        active=True,
+    )
 
-    insert_sample = t"""
-        INSERT INTO sample
-            (project, meta, type, active, author, audit_log_id)
-        VALUES ({project_id}, '{{"meta_key": "meta_value"}}', 'blood', true, 'test_aurthor', {audit_log_id})
-        RETURNING id;"""
+    await SampleLayer(connection_with_project).upsert_sample(sample)
 
-    cur = await conn.execute(insert_sample)
-    row = await cur.fetchone()
-    assert row is not None
-    sample_id = row['id']
-
-    insert_external_id = t"""
-        INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
-        VALUES ({project_id}, {sample_id}, 'default', 'TESTING001', {audit_log_id})
-        """
-    await conn.execute(insert_external_id)
-
-    return sample_id
+    return sample.id
 
 
 @pytest.fixture
