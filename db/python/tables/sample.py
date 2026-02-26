@@ -659,13 +659,12 @@ class SampleTable(DbBase):
         if len(sample_ids) == 0:
             return {}
         _query = t"""
-            SELECT id, MIN(lower(s.sys_period)) as date_created
-            FROM sample
-            INNER JOIN (
+            SELECT id, MIN(lower(sys_period)) as date_created
+            FROM (
                 SELECT id, sys_period FROM sample
                 UNION ALL
                 SELECT id, sys_period FROM sample_history
-            ) sample_hist ON sample.id = sample_hist.id
+            ) AS sample_hist
             WHERE id = ANY({sample_ids})
             GROUP BY id
         """
