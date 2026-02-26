@@ -67,12 +67,14 @@ class SequencingGroupTable(DbBase):
                     'external_id': 'sexid.external_id',
                 }
             )
-            if sg_filter.sample.external_id:
-                base_query_components.append(
-                    t'LEFT JOIN sample_external_id sexid ON s.id = sexid.sample_id'
-                )
+            # Ensure that only non-empty sample filters are used
+            if sample_where_condition:
+                if sg_filter.sample.external_id:
+                    base_query_components.append(
+                        t'LEFT JOIN sample_external_id sexid ON s.id = sexid.sample_id'
+                    )
 
-            where_templates.append(sample_where_condition)
+                where_templates.append(sample_where_condition)
 
         if sg_filter.assay is not None:
             a_overrides = {
@@ -82,13 +84,15 @@ class SequencingGroupTable(DbBase):
                 'external_id': 'aexid.external_id',
             }
             assay_where_condition = sg_filter.assay.to_sql(a_overrides)
-            base_query_components.append(
-                t"""
-                INNER JOIN sequencing_group_assay sga ON sg.id = sga.sequencing_group_id'
-                INNER JOIN assay a ON sga.assay_id = a.id"""
-            )
+            # Ensure that only non-empty assay filters are used
+            if assay_where_condition:
+                base_query_components.append(
+                    t"""
+                    INNER JOIN sequencing_group_assay sga ON sg.id = sga.sequencing_group_id
+                    INNER JOIN assay a ON sga.assay_id = a.id"""
+                )
 
-            where_templates.append(assay_where_condition)
+                where_templates.append(assay_where_condition)
 
         if sg_filter.created_on is not None:
             created_on_condition = sg_filter.to_sql(
@@ -141,7 +145,7 @@ class SequencingGroupTable(DbBase):
         )
         where_templates.append(remaining_filters)
 
-        where = t'WHERE ' + sql.SQL(' AND ').join(where_templates)
+        where = t'WHERE {sql.SQL(" AND ").join(where_templates):q}'
 
         base_query_components.append(where)
 
@@ -298,7 +302,7 @@ class SequencingGroupTable(DbBase):
         INNER JOIN sample s ON s.id = sg.sample_id
         LEFT JOIN sequencing_group_external_id sgexid ON sg.id = sgexid.sequencing_group_id
         WHERE asg.analysis_id = ANY({analysis_ids})
-        GROUP BY sg.id, asg.analysis_id
+        GROUP BY sg.id, s.project, asg.analysis_id
         """
         cur = await self.connection.pg_connection.execute(_query)
         rows = await cur.fetchall()

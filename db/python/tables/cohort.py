@@ -1,10 +1,13 @@
 import dataclasses
 import datetime
-from typing import Any
+
+from psycopg import sql
+from psycopg.rows import class_row, scalar_row
+from psycopg.types.json import Jsonb
 
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
-from db.python.utils import NotFoundError, to_db_json
+from db.python.utils import NotFoundError
 from models.base import parse_sql_bool
 from models.enums.cohort import CohortStatus, CohortUpdateStatus
 from models.models.cohort import (
@@ -49,19 +52,6 @@ class CohortTable(DbBase):
     Capture Cohort table operations and queries
     """
 
-    table_name = 'cohort'
-    cohort_get_keys = [
-        'c.id as c_id',
-        'c.name as c_name',
-        'c.template_id as c_template_id',
-        'c.description as c_description',
-        'c.author as c_author',
-        'c.project as c_project',
-        'c.status as c_status',
-    ]
-
-    template_keys = ['id', 'name', 'description', 'criteria', 'project']
-
     async def query(
         self, filter_: CohortFilter
     ) -> tuple[list[CohortInternal], set[ProjectId]]:
@@ -70,7 +60,7 @@ class CohortTable(DbBase):
         filter_status = filter_.status
         filter_.status = None  # reset filter and use to filter on the rows fetched
 
-        wheres, values = filter_.to_sql(
+        where_params = filter_.to_sql(
             field_overrides={
                 'id': 'c.id',
                 'name': 'c.name',
@@ -79,13 +69,16 @@ class CohortTable(DbBase):
                 'project': 'c.project',
             }
         )
-        if not wheres:
+        if where_params is None and filter_status is None:
             raise ValueError(f'Invalid filter: {filter_}')
 
-        cohort_get_keys_str = ','.join(self.cohort_get_keys)
+        where_sub_query = (
+            t'WHERE {where_params:q}' if where_params is not None else t''
+        )  # allow query based on derived status values
 
-        _query = f"""
-        SELECT {cohort_get_keys_str},
+        _query = t"""
+        SELECT
+        id, name, template_id, description, author, project, status,
         exists (
             select 1
             from cohort_sequencing_group csg
@@ -96,16 +89,14 @@ class CohortTable(DbBase):
             where csg.cohort_id = c.id
             and (sg.archived or not s.active)
         ) as is_invalid
-        FROM cohort c
-        WHERE {wheres}
+        FROM cohort c {where_sub_query:q}
         """
 
-        rows = await self.connection.fetch_all(_query, values)
+        rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
         cohorts_list = []
-        for row in rows:
-            row_dict = dict(row)
-            is_active = row_dict['c_status'] == CohortStatus.active.value
-            is_invalid = parse_sql_bool(row_dict['is_invalid'])
+        for cohort_row in rows:
+            is_active = cohort_row['status'] == CohortStatus.active.value
+            is_invalid = cohort_row.pop('is_invalid')
 
             if is_active:
                 cohort_status = (
@@ -115,7 +106,8 @@ class CohortTable(DbBase):
                 cohort_status = CohortStatus.archived
 
             if _custom_matches_filter(cohort_status, filter_status):
-                cohorts_list.append(CohortInternal.from_db(row_dict, cohort_status))
+                cohort_row['status'] = cohort_status
+                cohorts_list.append(CohortInternal(**cohort_row))
 
         projects = {c.project for c in cohorts_list}
         return cohorts_list, projects
@@ -124,30 +116,28 @@ class CohortTable(DbBase):
         """
         Return all sequencing group IDs for the given cohort.
         """
+        _query = t'SELECT sequencing_group_id FROM cohort_sequencing_group WHERE cohort_id = {cohort_id}'
 
-        _query = """
-        SELECT sequencing_group_id FROM cohort_sequencing_group WHERE cohort_id = :cohort_id
-        """
-        rows = await self.connection.fetch_all(_query, {'cohort_id': cohort_id})
+        rows = await (await self.connection.pg_connection.execute(_query)).fetchall()
         return [row['sequencing_group_id'] for row in rows]
 
     async def query_cohort_templates(
         self, filter_: CohortTemplateFilter
     ) -> tuple[set[ProjectId], list[CohortTemplateInternal]]:
         """Query CohortTemplates"""
-        wheres, values = filter_.to_sql(field_overrides={})
-        if not wheres:
+
+        wheres_params = filter_.to_sql(field_overrides={})
+
+        if wheres_params is None:
             raise ValueError(f'Invalid filter: {filter_}')
 
-        common_get_keys_str = ','.join(self.template_keys)
-        _query = f"""
-        SELECT {common_get_keys_str}
-        FROM cohort_template
-        WHERE {wheres}
-        """
+        _query = t'SELECT id, name, description, criteria, project FROM cohort_template WHERE {wheres_params:q}'
 
-        rows = await self.connection.fetch_all(_query, values)
-        cohort_templates = [CohortTemplateInternal.from_db(dict(row)) for row in rows]
+        async with self.connection.pg_connection.cursor(
+            row_factory=class_row(CohortTemplateInternal)
+        ) as cur:
+            cohort_templates = await (await cur.execute(_query)).fetchall()
+
         projects = {c.project for c in cohort_templates}
         return projects, cohort_templates
 
@@ -155,17 +145,13 @@ class CohortTable(DbBase):
         """
         Get a cohort template by ID
         """
-        _query = """
-        SELECT id as id, name, description, criteria, project FROM cohort_template WHERE id = :template_id
-        """
-        template = await self.connection.fetch_one(_query, {'template_id': template_id})
-
-        if not template:
+        _query = t'SELECT id, name, description, criteria, project FROM cohort_template WHERE id = {template_id}'
+        row = await (await self.connection.pg_connection.execute(_query)).fetchone()
+        if not row:
             raise NotFoundError(f'Cohort template with ID {template_id} not found')
 
-        cohort_template = CohortTemplateInternal.from_db(dict(template))
-
-        return cohort_template
+        row['criteria'] = row.get('criteria') or {}
+        return CohortTemplateInternal(**row)
 
     async def create_cohort_template(
         self,
@@ -173,24 +159,21 @@ class CohortTable(DbBase):
         description: str,
         criteria: CohortCriteriaInternal,
         project: ProjectId,
-    ):
+    ) -> int:
         """
         Create new cohort template
         """
-        _query = """
+
+        audit_log_id = await self.audit_log_id()
+        criteria_param = Jsonb(dict(criteria))
+
+        _query = t"""
         INSERT INTO cohort_template (name, description, criteria, project, audit_log_id)
-        VALUES (:name, :description, :criteria, :project, :audit_log_id) RETURNING id;
+        VALUES ({name}, {description}, {criteria_param}, {project}, {audit_log_id}) RETURNING id;
         """
-        cohort_template_id = await self.connection.fetch_val(
-            _query,
-            {
-                'name': name,
-                'description': description,
-                'criteria': to_db_json(dict(criteria)),
-                'project': project,
-                'audit_log_id': await self.audit_log_id(),
-            },
-        )
+
+        async with self.connection.pg_connection.cursor(row_factory=scalar_row) as cur:
+            cohort_template_id = await (await cur.execute(_query)).fetchone()
 
         return cohort_template_id
 
@@ -205,39 +188,28 @@ class CohortTable(DbBase):
         """
         Create a new cohort
         """
+        audit_log_id = await self.audit_log_id()
+
+        _query = t"""
+        INSERT INTO cohort (name, template_id, author, description, project, timestamp, status, audit_log_id)
+        VALUES ({cohort_name}, {template_id}, {self.author}, {description}, {project}, {datetime.datetime.now()},
+        {CohortStatus.active.value}, {audit_log_id})
+        RETURNING id
+        """
+
+        _query_insert_many = """
+        INSERT INTO cohort_sequencing_group (cohort_id, sequencing_group_id, audit_log_id)
+        VALUES (%(cohort_id)s, %(sequencing_group_id)s, %(audit_log_id)s)
+        """
 
         # Use an atomic transaction for a multi-part insert query to prevent the database being
         # left in an incomplete state if the query fails part way through.
-        async with self.connection.transaction():
-            audit_log_id = await self.audit_log_id()
+        conn = self.connection.pg_connection
+        async with conn.transaction(), conn.cursor(row_factory=scalar_row) as cur:
+            cohort_id = await (await cur.execute(_query)).fetchone()
 
-            _query = """
-            INSERT INTO cohort (name, template_id, author, description, project, timestamp, status, audit_log_id)
-            VALUES (:name, :template_id, :author, :description, :project, :timestamp, :status, :audit_log_id)
-            RETURNING id
-            """
-
-            cohort_id = await self.connection.fetch_val(
-                _query,
-                {
-                    'template_id': template_id,
-                    'author': self.author,
-                    'description': description,
-                    'project': project,
-                    'name': cohort_name,
-                    'timestamp': datetime.datetime.now(),
-                    'status': CohortStatus.active.value,
-                    'audit_log_id': audit_log_id,
-                },
-            )
-
-            _query = """
-            INSERT INTO cohort_sequencing_group (cohort_id, sequencing_group_id, audit_log_id)
-            VALUES (:cohort_id, :sequencing_group_id, :audit_log_id)
-            """
-
-            await self.connection.execute_many(
-                _query,
+            await cur.executemany(
+                _query_insert_many,
                 [
                     {
                         'cohort_id': cohort_id,
@@ -248,29 +220,23 @@ class CohortTable(DbBase):
                 ],
             )
 
-            return NewCohortInternal(
-                dry_run=False,
-                cohort_id=cohort_id,
-                sequencing_group_ids=sequencing_group_ids,
-            )
+        return NewCohortInternal(
+            dry_run=False,
+            cohort_id=cohort_id,
+            sequencing_group_ids=sequencing_group_ids,
+        )
 
-    async def get_cohort_by_id(self, cohort_id: int) -> CohortInternal:
+    async def get_template_by_cohort_by_id(self, cohort_id: int) -> int:
         """
-        Get the cohort by its ID
+        Get the cohort template_id given its ID
         """
+        _query = t'SELECT template_id FROM cohort WHERE id = {cohort_id}'
 
-        _query = """
-        SELECT id as c_id, name as c_name, template_id as c_template_id, author as c_author,
-        description as c_description, project as c_project, timestamp as c_timestamp
-        FROM cohort WHERE id = :cohort_id
-        """
-
-        cohort = await self.connection.fetch_one(_query, {'cohort_id': cohort_id})
-        if not cohort:
+        async with self.connection.pg_connection.cursor(row_factory=scalar_row) as cur:
+            template_id = await (await cur.execute(_query)).fetchone()
+        if not template_id:
             raise ValueError(f'Cohort with ID {cohort_id} not found')
-
-        # status criteria not computed in this function as current usage only consume template id
-        return CohortInternal.from_db(dict(cohort))
+        return template_id
 
     async def update_cohort(
         self,
@@ -282,35 +248,34 @@ class CohortTable(DbBase):
         """
         Update the cohort given its ID
         """
+        update_columns = []
 
         # The following fields are allowed to update
-        cohort_fields = {
-            'name': name,
-            'description': description,
-            'status': status.value if status else None,
-        }
+        if name is not None:
+            update_columns.append(t'name={name}')
+        if description is not None:
+            update_columns.append(t'description={description}')
+        if status is not None:
+            update_columns.append(t'status={status.value}')
 
-        query_params: dict[str, Any] = {
-            k: v for k, v in cohort_fields.items() if v is not None
-        }
-
-        if not query_params:
+        if not update_columns:
             raise ValueError(f'No field to update')
 
-        query_params['audit_log_id'] = await self.audit_log_id()
+        audit_log_id = await self.audit_log_id()
+        update_columns.append(t'audit_log_id={audit_log_id}')
 
-        query = f"""
+        joined_query = sql.SQL(',').join(update_columns)
+        query = t"""
             UPDATE cohort
-            SET {', '.join(f'{k} = :{k}' for k, v in query_params.items() if v is not None)}
-            WHERE id = :cohort_id
+            SET {joined_query:q}
+            WHERE id = {cohort_id}
         """
-        query_params['cohort_id'] = cohort_id
-        await self.connection.execute(query, values=query_params)
+        await self.connection.pg_connection.execute(query)
 
     async def is_cohort_sample_sg_invalid(self, cohort_id: int) -> bool:
         """Query sample and sequencing group status for cohort"""
 
-        _query = f"""
+        _query = t"""
             SELECT
             exists (
                 select 1
@@ -323,10 +288,10 @@ class CohortTable(DbBase):
                 and (sg.archived or not s.active)
             ) as is_invalid
             FROM cohort c
-            WHERE c.id = :cohort_id
+            WHERE c.id = {cohort_id}
             """
 
-        row = await self.connection.fetch_one(_query, values={'cohort_id': cohort_id})
+        row = await (await self.connection.pg_connection.execute(_query)).fetchone()
         if row:
             return parse_sql_bool(row['is_invalid'])
         return False
