@@ -266,11 +266,11 @@ class TestSample:
         history = await slayer.get_history_of_sample(s.id)
 
         assert len(history) == 2
-        assert history[0].active is False
-        assert history[1].active is True
-        assert history[0].meta.get('updated') == 'yes'
+        assert history[0].active is True
+        assert history[1].active is False
+        assert history[0].meta.get('updated') is None
         assert history[0].meta.get('meta') == 'meta ;)'
-        assert history[1].meta.get('updated') is None
+        assert history[1].meta.get('updated') == 'yes'
         assert history[1].meta.get('meta') == 'meta ;)'
 
         assert history[0].external_ids == {}
