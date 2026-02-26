@@ -985,7 +985,6 @@ class TestComment:
     async def test_sample_discussion_related_comments(self):
         """Test getting related comments."""
 
-        # Import from here as importing raises an error at the moment
         family_id = await self.flayer.create_family(
             external_ids={PRIMARY_EXTERNAL_ORG: 'f_external_id'},
         )
