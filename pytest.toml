@@ -20,7 +20,8 @@ python_files = [
     "test_analysis_runner.py",
     "test_cohort.py",
     "test_cohort_status.py",
-    "test_web.py"
+    "test_web.py",
+    "test_project_insights.py"
 ]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
