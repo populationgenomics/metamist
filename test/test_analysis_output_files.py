@@ -10,6 +10,7 @@ from testcontainers.core.container import DockerContainer
 from db.python.connect import Connection
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.sample import SampleLayer
+from db.python.tables.output_file import OutputFileTable
 from db.python.tables.project import ProjectPermissionsTable
 from models.enums import AnalysisStatus
 from models.models import (
@@ -434,3 +435,62 @@ class TestOutputFiles:
 
         assert (await row_count('analysis_outputs')) == 0
         assert (await row_count('output_file')) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.project_name('project-test')
+    async def test_ignore_duplicate_files(
+        self, connection_with_project: Connection, fake_sequencing_group: int
+    ):
+        """Test that duplicate output files are ignored (not inserterd) when adding to an analysis"""
+        analysis_layer = AnalysisLayer(connection_with_project)
+        output_file_table = OutputFileTable(connection_with_project)
+
+        outputs = {
+            'cram': {
+                'basename': 'gs://fakegcs/file3.cram',
+                'secondary_files': {
+                    'meta': {'basename': 'gs://fakegcs/file3.cram.meta'},
+                    'ext': {'basename': 'gs://fakegcs/file3.cram.ext'},
+                },
+            },
+        }
+
+        # Create an analysis to add the baseline output files to the dictionary
+        analysis_id = await analysis_layer.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[fake_sequencing_group],
+                meta={'sequencing_type': 'genome', 'size': 1024},
+                outputs=outputs,
+            )
+        )
+
+        # Helper to view rows in a table
+        async def all_rows(table: str) -> int:
+            cur = await connection_with_project.pg_connection.execute(
+                t'SELECT * FROM {table:i}'
+            )
+            rows = await cur.fetchall()
+            return rows
+
+        # Get all the output files in the database
+        before_analysis_outputs = await all_rows('analysis_outputs')
+
+        # Add the same files to the analysis to test that duplicates are ignored (not inserted)
+        await output_file_table.create_or_update_analysis_output_files_from_output(
+            analysis_id=analysis_id, json_dict=outputs
+        )
+
+        after_analysis_outputs = await all_rows('analysis_outputs')
+        assert before_analysis_outputs == after_analysis_outputs
+
+        # Add a different file to the analysis to test that a new file appears in the database
+        outputs['basename'] = 'gs://fakegcs/file2.cram'
+        await output_file_table.create_or_update_analysis_output_files_from_output(
+            analysis_id=analysis_id, json_dict=outputs
+        )
+
+        after_analysis_outputs = await all_rows('analysis_outputs')
+        assert len(before_analysis_outputs) != len(after_analysis_outputs)
