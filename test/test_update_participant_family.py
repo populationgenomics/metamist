@@ -7,12 +7,11 @@ from db.python.layers.participant import ParticipantLayer
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantUpsertInternal
 
 
-@pytest.mark.skip(reason='Skipped until dependent entities migrated to PostgreSQL')
 class TestParticipantFamily:
     """Test moving a participant from one family to another and then back"""
 
     @pytest.fixture(autouse=True)
-    @pytest.mark.project_roles(['reader', 'writer'])
+    @pytest.mark.project_roles(['writer'])
     async def set_up(self, connection_with_project: Connection) -> None:
         fl = FamilyLayer(connection_with_project)
 
@@ -21,30 +20,30 @@ class TestParticipantFamily:
         # Also exercise update_family()
         await fl.update_family(self.fid_2, external_ids={'otherorg': 'OFAM02'})
 
-        pl = ParticipantLayer(connection_with_project)
+        self.pl = ParticipantLayer(connection_with_project)
         self.pid = (
-            await pl.upsert_participant(
+            await self.pl.upsert_participant(
                 ParticipantUpsertInternal(
                     external_ids={PRIMARY_EXTERNAL_ORG: 'EX01'}, reported_sex=2
                 )
             )
         ).id
         self.pat_pid = (
-            await pl.upsert_participant(
+            await self.pl.upsert_participant(
                 ParticipantUpsertInternal(
                     external_ids={PRIMARY_EXTERNAL_ORG: 'EX01_pat'}, reported_sex=1
                 )
             )
         ).id
         self.mat_pid = (
-            await pl.upsert_participant(
+            await self.pl.upsert_participant(
                 ParticipantUpsertInternal(
                     external_ids={PRIMARY_EXTERNAL_ORG: 'EX01_mat'}, reported_sex=2
                 )
             )
         ).id
 
-        await pl.add_participant_to_family(
+        await self.pl.add_participant_to_family(
             family_id=self.fid_1,
             participant_id=self.pid,
             paternal_id=self.pat_pid,
@@ -53,16 +52,12 @@ class TestParticipantFamily:
         )
 
     @pytest.mark.asyncio
-    @pytest.mark.project_roles(['reader', 'writer'])
-    async def test_get_remove_add_family_participant_data(
-        self, connection_with_project: Connection
-    ):
+    @pytest.mark.project_roles(['writer'])
+    async def test_get_remove_add_family_participant_data(self):
         """
         Tests getting, removing, and adding a participants family data
         """
-        pl = ParticipantLayer(connection_with_project)
-
-        fp_row = await pl.get_family_participant_data(
+        fp_row = await self.pl.get_family_participant_data(
             family_id=self.fid_1, participant_id=self.pid
         )
 
@@ -77,11 +72,11 @@ class TestParticipantFamily:
         }
         assert expected_fp_row == fp_row.to_dict()
 
-        await pl.remove_participant_from_family(
+        await self.pl.remove_participant_from_family(
             family_id=self.fid_1, participant_id=self.pid
         )
 
-        await pl.add_participant_to_family(
+        await self.pl.add_participant_to_family(
             family_id=self.fid_2,
             participant_id=self.pid,
             paternal_id=fp_row.paternal_id,
@@ -89,7 +84,7 @@ class TestParticipantFamily:
             affected=fp_row.affected,
         )
 
-        updated_fp_row = await pl.get_family_participant_data(
+        updated_fp_row = await self.pl.get_family_participant_data(
             family_id=self.fid_2, participant_id=self.pid
         )
 
@@ -104,20 +99,20 @@ class TestParticipantFamily:
         }
         assert expected_updated_fp_row == updated_fp_row.to_dict()
 
-        await pl.remove_participant_from_family(
+        await self.pl.remove_participant_from_family(
             family_id=self.fid_2, participant_id=self.pid
         )
 
     @pytest.mark.asyncio
-    @pytest.mark.project_roles(['reader', 'writer'])
-    async def test_update_participant_family(self, connection_with_project: Connection):
+    @pytest.mark.project_roles(['writer'])
+    async def test_update_participant_family(self):
         """Tests updating a participants family data"""
-        pl = ParticipantLayer(connection_with_project)
-        await pl.update_participant_family(
+
+        await self.pl.update_participant_family(
             participant_id=self.pid, old_family_id=self.fid_1, new_family_id=self.fid_2
         )
 
-        updated_fp_row = await pl.get_family_participant_data(
+        updated_fp_row = await self.pl.get_family_participant_data(
             family_id=self.fid_2, participant_id=self.pid
         )
 
@@ -132,19 +127,15 @@ class TestParticipantFamily:
         }
         assert expected_updated_fp_row == updated_fp_row.to_dict()
 
-        await pl.remove_participant_from_family(
+        await self.pl.remove_participant_from_family(
             family_id=self.fid_2, participant_id=self.pid
         )
 
     @pytest.mark.asyncio
-    @pytest.mark.project_roles(['reader', 'writer'])
-    async def test_update_participant_to_nonexistent_family(
-        self, connection_with_project: Connection
-    ):
+    @pytest.mark.project_roles(['writer'])
+    async def test_update_participant_to_nonexistent_family(self):
         """Tests if error is raised and transaction rolled back for nonexistent new_family_id"""
-        pl = ParticipantLayer(connection_with_project)
-
-        fp_row = await pl.get_family_participant_data(
+        fp_row = await self.pl.get_family_participant_data(
             family_id=self.fid_1, participant_id=self.pid
         )
         expected_fp_row = {
@@ -159,11 +150,11 @@ class TestParticipantFamily:
         assert expected_fp_row == fp_row.to_dict()
 
         with pytest.raises(IntegrityError):
-            await pl.update_participant_family(
+            await self.pl.update_participant_family(
                 participant_id=self.pid, old_family_id=self.fid_1, new_family_id=-99
             )
 
-        rollback_fp_row = await pl.get_family_participant_data(
+        rollback_fp_row = await self.pl.get_family_participant_data(
             family_id=self.fid_1, participant_id=self.pid
         )
 

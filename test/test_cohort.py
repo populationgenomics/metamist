@@ -326,6 +326,7 @@ class TestCohortData:
         assert self.sgA_raw in result.sequencing_group_ids
         assert self.sgB_raw in result.sequencing_group_ids
 
+    # TODO: adding marker to revisit this test case
     @pytest.mark.skip(
         reason='Skipped as the test fails due to PostgreSQL case sensitive string matching'
     )
