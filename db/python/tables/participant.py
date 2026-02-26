@@ -174,7 +174,12 @@ class ParticipantTable:
                 """
 
         # WHERE, ORDER BY, LIMIT, OFFSET
-        query_template += t' WHERE ' + sql.SQL(' AND ').join(wheres) if wheres else t''
+        wheres_filtered = [w for w in wheres if w is not None]
+        query_template += (
+            t' WHERE {sql.SQL(" AND ").join(wheres_filtered):q}'
+            if wheres_filtered
+            else t''
+        )
         query_template += t' ORDER BY pp.id' if (limit or skip) else t''
         query_template += t' LIMIT {limit}' if limit else t''
         query_template += t' OFFSET {skip}' if skip else t''
