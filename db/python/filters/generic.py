@@ -100,7 +100,7 @@ class GenericFilter[T](SMBase):
         """Override to ensure we can hash this object"""
         return hash(self.get_hashable_value())
 
-    def to_sql(self, column: str | Template) -> Template:
+    def to_sql(self, column: str | Template) -> Template | None:
         """
         Convert to SQL, and avoid SQL injection.
 
@@ -125,7 +125,7 @@ class GenericFilter[T](SMBase):
         if self.eq is not None:
             filters.append(t'{column_query:q} = {self.eq}')
         if self.neq is not None:
-            filters.append(t'{column_query:q} != {self.neq}')
+            filters.append(t'{column_query:q} IS DISTINCT FROM {self.neq}')
         if self.in_ is not None:
             if not isinstance(self.in_, list):
                 raise ValueError('IN filter must be a list')
@@ -279,7 +279,7 @@ class GenericFilterModel:
                 if isinstance(filter_, dict):
                     filters.append(
                         prepare_query_from_dict_field(
-                            filter_=filter_, field_name=field.name, column_name=fcolumn
+                            filter_=filter_, column_name=fcolumn
                         )
                     )
                 elif isinstance(filter_, GenericFilter):
@@ -290,23 +290,91 @@ class GenericFilterModel:
                     )
 
         filters_rm_none: list[Template] = [f for f in filters if f is not None]
+
         if len(filters_rm_none) == 0:
             return None
 
         return sql.SQL(' AND ').join(filters_rm_none)
 
 
+def infer_pg_type_from_filter(value: GenericFilter[Any]) -> str:
+    """
+    Infer the SQL cast type from actual values in the filter
+
+    In order for these values to work you could just check the
+    type of the first non-None value, but to be thorough we will enforce
+    that all values in the filter (excluding isnull) are of the same type.
+
+    This does require trust in the user to apply an appropriate filter
+    for the column key value type e.g. for the json column "meta" and a row value {'favnum': int}
+    We hope that a filter would be appropriately applied like
+    meta={'favnum': GenericFilter(eq=5)} <- we'll infer the type as integer from the value 5
+    and not
+    meta={'favnum': GenericFilter(eq='five')} <- we'll infer the type as text
+
+    If the casting of any value fails, the database will raise an error.
+    """
+    # Collect all non-None comparison values
+    sample_values: list[Any] = []
+    for k, v in value.__dict__.items():
+        if k == 'isnull' or v is None:
+            continue
+        if isinstance(v, list):
+            sample_values.extend(v)
+        else:
+            sample_values.append(v)
+
+    # Infer type non-None values
+    cast_types: set[str] = set()
+    for v in sample_values:
+        if isinstance(v, bool):
+            cast_types.add('bool')
+        elif isinstance(v, (int, float)):
+            cast_types.add('numeric')
+        else:
+            cast_types.add('text')
+
+    if len(cast_types) > 1:
+        raise ValueError(
+            f'Mixed types in filter values: {cast_types}. All values in a filter must be of the same type.'
+        )
+
+    return cast_types.pop() if cast_types else 'text'
+
+
 def prepare_query_from_dict_field(
-    filter_: dict[str, Any],  # noqa: ARG001
-    field_name: str,  # noqa: ARG001
-    column_name: str,  # noqa: ARG001
-) -> Template:
+    filter_: dict[str, Any],
+    column_name: str | Template,
+) -> Template | None:
     """
     Prepare a SQL query from a dict field, which is a dict of GenericFilters.
     Usually this is a JSON field in the database that we want to query on.
 
     """
-    # @TODO implement this, it's a bit tricky as postgres is much more strict with JSON
-    # types.
-    raise NotImplementedError('Querying JSON keys is not implemented at the moment')
-    return t'FALSE'
+
+    column_query = (
+        column_name
+        if isinstance(column_name, Template)
+        else t'{sql.Identifier(*column_name.split(".")):i}'
+    )
+
+    conditionals: list[Template] = []
+    for key, value in filter_.items():
+        if not isinstance(value, GenericFilter):
+            raise ValueError(f'Filter {column_name} must be a GenericFilter')
+
+        pg_type = infer_pg_type_from_filter(value)
+
+        _inner_query = value.to_sql(t"json_value(a, '$' returning {pg_type:i})")
+
+        if _inner_query:
+            conditionals.append(t"""
+            exists (
+                select 1 FROM (SELECT 1) AS dummy_row -- need at least one row for negation comparisons to work
+                LEFT JOIN LATERAL jsonb_path_query({column_query:q}, ('$.' || {key})::jsonpath) a ON TRUE
+                where {_inner_query:q}
+            )""")
+    if not conditionals:
+        return None
+
+    return sql.SQL(' AND ').join(conditionals)
