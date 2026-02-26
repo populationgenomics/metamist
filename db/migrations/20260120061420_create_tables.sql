@@ -52,14 +52,6 @@ CREATE TABLE analysis_outputs (
     )
 );
 
-CREATE UNIQUE INDEX uq_analysis_outputs_file
-    ON analysis_outputs (analysis_id, file_id)
-    WHERE file_id IS NOT NULL;
-
-CREATE UNIQUE INDEX uq_analysis_outputs_output
-    ON analysis_outputs (analysis_id, output)
-    WHERE output IS NOT NULL;
-
 
 
 -- analysis_runner table
