@@ -1,3 +1,6 @@
+import pytest
+
+from db.python.connect import Connection
 from db.python.layers import (
     AssayLayer,
     ParticipantLayer,
@@ -12,7 +15,6 @@ from models.models import (
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
-from test.testbase import DbIsolatedTest, run_as_sync
 
 
 default_assay_meta = {
@@ -70,20 +72,22 @@ def get_test_participant():
     )
 
 
-class TestProjectInsights(DbIsolatedTest):
+class TestProjectInsights:
     """Test project insights class containing project insights endpoints"""
 
     maxDiff = None
 
-    @run_as_sync
-    async def setUp(self) -> None:
-        super().setUp()
-        self.partl = ParticipantLayer(self.connection)
-        self.pil = ProjectInsightsLayer(self.connection)
-        self.sampl = SampleLayer(self.connection)
-        self.seql = AssayLayer(self.connection)
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection_with_project: Connection) -> None:
+        self.partl = ParticipantLayer(connection_with_project)
+        self.pil = ProjectInsightsLayer(connection_with_project)
+        self.sampl = SampleLayer(connection_with_project)
+        self.seql = AssayLayer(connection_with_project)
+        self.project_name = connection_with_project.project.name
+        self.project_id = connection_with_project.project_id
 
-    @run_as_sync
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
     async def test_project_insights_summary(self):
         """Test getting the summaries for all available projects"""
 
@@ -110,9 +114,10 @@ class TestProjectInsights(DbIsolatedTest):
             ),
         ]
 
-        self.assertEqual(result, expected)
+        assert result == expected
 
-    @run_as_sync
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
     async def test_project_insights_details(self):
         """Test getting the details for all available projects"""
 
