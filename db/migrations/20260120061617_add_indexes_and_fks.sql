@@ -21,8 +21,8 @@ ALTER TABLE analysis_cohort ADD CONSTRAINT fk_analysis_cohort_analysis_id FOREIG
 ALTER TABLE analysis_cohort ADD CONSTRAINT fk_analysis_cohort_audit_log_id FOREIGN KEY (audit_log_id) REFERENCES audit_log(id);
 
 
-CREATE UNIQUE INDEX idx_analysis_outputs_analysis_file ON analysis_outputs(analysis_id, file_id, json_structure);
-CREATE UNIQUE INDEX idx_analysis_outputs_analysis_output ON analysis_outputs(analysis_id, output, json_structure);
+CREATE UNIQUE INDEX idx_analysis_outputs_analysis_file ON analysis_outputs(analysis_id, file_id, COALESCE(json_structure, ''));
+CREATE UNIQUE INDEX idx_analysis_outputs_analysis_output ON analysis_outputs(analysis_id, output, COALESCE(json_structure, ''));
 CREATE INDEX idx_analysis_outputs_file_id ON analysis_outputs(file_id);
 CREATE INDEX idx_analysis_outputs_audit_log_id ON analysis_outputs(audit_log_id);
 
