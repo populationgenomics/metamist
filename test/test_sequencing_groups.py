@@ -7,7 +7,6 @@ import pytest
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers import SampleLayer, SequencingGroupLayer
-from db.python.tables.audit_log import AuditLogTable
 from db.python.tables.sequencing_group import (
     SequencingGroupFilter,
     SequencingGroupTable,
@@ -18,7 +17,7 @@ from models.models import (
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
-from test.conftest import GraphQLQueryFunction, TEST_USER
+from test.conftest import GraphQLQueryFunction
 
 
 DEFAULT_SEQUENCING_META = {
@@ -609,10 +608,7 @@ class TestSequencingGroup:
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
     async def test_history_sum_multiple_projects(
-        self,
-        connection_with_project: Connection,
-        test_sample: int,
-        mock_date
+        self, connection_with_project: Connection, test_sample: int, mock_date
     ):
         """Test the case where type:technology combinations are summed and held for the same project."""
         # Mock today's date.
@@ -768,7 +764,9 @@ class TestSequencingGroup:
             await cur.executemany(test_data_query, test_data)
 
         sg_table = SequencingGroupTable(connection_with_project)
-        result = await sg_table.get_sequencing_group_counts_by_month([connection_with_project.project_id])
+        result = await sg_table.get_sequencing_group_counts_by_month(
+            [connection_with_project.project_id]
+        )
 
         expected_output = {
             connection_with_project.project_id: {
