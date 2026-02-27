@@ -1,7 +1,6 @@
 import dataclasses
 import datetime
 from collections.abc import Callable, Sequence
-from datetime import date, datetime
 from enum import Enum
 from string.templatelib import Template
 from typing import Any, TypeVar
@@ -102,7 +101,7 @@ class GenericFilter[T](SMBase):
         """Override to ensure we can hash this object"""
         return hash(self.get_hashable_value())
 
-    def to_sql(self, column: str | Template) -> Template | None:
+    def to_sql(self, column: str | Template) -> Template | None:  # noqa: PLR0912
         """
         Convert to SQL, and avoid SQL injection.
 
@@ -232,7 +231,7 @@ class GenericFilter[T](SMBase):
             isnull=self.isnull,
         )
 
-    def copy_with_casefolded_strings(self) -> 'GenericFilter[T]':
+    def copy_with_casefolded_strings(self) -> GenericFilter[T]:
         # Use transform to apply casefold to all string values in the filter
         def casefold_if_str(value: Any) -> Any:
             # StrEnum return True to isinstance(value, str) but we don't
@@ -385,7 +384,7 @@ def infer_pg_type_from_filter(value: GenericFilter[Any]) -> str | None:
             cast_types.add('numeric')
         elif isinstance(v, Enum):
             cast_types.add('enum')
-        elif isinstance(v, (datetime, date)):
+        elif isinstance(v, (datetime.datetime, datetime.date)):
             cast_types.add('timestamp')
         elif isinstance(v, str):
             cast_types.add('text')
