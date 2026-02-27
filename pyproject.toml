@@ -164,6 +164,9 @@ dev = [
     "strawberry-graphql[debug-server]~=0.291.0",
     "metamist",
     "ruff>=0.15.0",
+    "pulumi>=3.223.0",
+    "pulumi-gcp>=9.13.0",
+    "pulumi-docker>=4.11.0",
 ]
 
 [tool.uv]

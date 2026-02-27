@@ -1,0 +1,10 @@
+secretsprovider: gcpkms://projects/metamist-dev/locations/australia-southeast1/keyRings/metamist_pulumi_secrets_keyring/cryptoKeys/metamist_pulumi_secrets
+encryptedkey: CiQAYMrX9/0gDYN33Ijlocyd+XEtAaFSVxfgDJEWnE++0fM3hwASSQBfR/wcjUSSghYwXdskYgOYyfZ/u346/Ft/tDbc2StapcFaUS6IAuTurEftYvyWi0EHMWxoPM6mF79sS1fJyrle8LXhG/C4Z4U=
+config:
+  gcp:project: metamist-dev
+  gcp:billing_project: metamist-dev
+  gcp:user_project_override: 'true'
+  gcp:region: australia-southeast1
+  app:web-domain: metamist-dev.populationgenomics.org.au
+  app:api-domain: metamist-api-dev.populationgenomics.org.au
+  app:iap_audience: /projects/890472361088/global/backendServices/1657741685801176969

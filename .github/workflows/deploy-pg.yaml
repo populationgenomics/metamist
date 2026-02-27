@@ -1,0 +1,134 @@
+name: Deploy
+on:
+  # Building on manual dispatch, and pushes to dev / main.
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - SET-1017-set-up-metamist-postgres-deployment
+      - dev
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/SET-1017-set-up-metamist-postgres-deployment' && 'pg-production' || 'pg-development' }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  unittests:
+    uses: './.github/workflows/test.yaml'
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: unittests
+    permissions:
+      id-token: write
+      contents: read
+    environment: ${{ github.ref == 'refs/heads/SET-1017-set-up-metamist-postgres-deployment' && 'pg-production' || 'pg-development' }}
+    env:
+      CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+      SM_ENVIRONMENT: ${{ vars.SM_ENVIRONMENT }}
+    defaults:
+      run:
+        shell: bash -eo pipefail -l {0}
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          persist-credentials: false
+
+      - id: 'google-cloud-auth'
+        name: 'Authenticate to Google Cloud'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.WORKLOAD_IDENTITY_SA }}
+
+      - id: 'google-cloud-sdk-setup'
+        name: 'Set up Cloud SDK'
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - name: 'gcloud docker auth'
+        run: |
+          gcloud auth configure-docker australia-southeast1-docker.pkg.dev
+
+      - name: "Set up Python"
+        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+        with:
+          enable-cache: true
+          version: 0.9.13
+
+      - name: Install the project
+        run: uv sync --locked
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Bump version for development
+        if: vars.SM_ENVIRONMENT == 'development'
+        run: |
+          uv run bump-my-version bump patch \
+            --no-commit --allow-dirty \
+            --new-version $(cat deploy/python/version.txt).dev0+$(echo $(git rev-parse HEAD) | cut -c1-7)
+
+      - name: "build deployable API"
+        run: |
+          uv run regenerate_api.py
+          ls -lGh packages/metamist/src/metamist/
+
+      - name: "build web front-end"
+        run: |
+          set -eo pipefail
+          pushd web
+          npm ci
+          npm run build
+          popd
+
+
+
+      - name: Build python package
+        run: |
+          pushd packages/metamist
+          uv build --sdist --out-dir dist
+          popd
+
+      - name: Smoke test python package
+        run: |
+          # There should only be one tarball here but a loop means
+          # we don't need to work out what the filename ended up being
+          for tarball in packages/metamist/dist/*.tar.gz; do
+            echo "Testing package dist $tarball"
+            uv run \
+              --with "$tarball" \
+              --no-project \
+              --isolated \
+              -- python -c "import metamist;"
+          done
+
+      # - name: Publish package
+      #   if: github.ref == 'refs/heads/main'
+      #   uses: pypa/gh-action-pypi-publish@release/v1
+      #   with:
+      #     packages-dir: packages/metamist/dist
+      #     skip-existing: true
+
+      - uses: pulumi/actions@8582a9e8cc630786854029b4e09281acd6794b58 # v6.6.1
+        with:
+          command: up
+          work-dir: ./deploy/api
+          stack-name: ${{ vars.PULUMI_STACK_NAME }}
+          cloud-url: ${{ vars.PULUMI_STATE_BUCKET }}
+          parallel: 20 # Otherwise requests might time out.
+        env:
+          # skip checkpointing to speed-up the workflow, and avoid lots of saved state jsons
+          PULUMI_SKIP_CHECKPOINTS: true
