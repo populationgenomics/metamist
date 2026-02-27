@@ -103,9 +103,11 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        assert len(results) == 1
+        assert len(results) == 2
         assert results[0]['test_string'] == 'test'
         assert results[0]['test_int'] == 100
+        assert results[1]['test_string'] == 'Test'
+        assert results[1]['test_int'] == 200
 
     async def test_override_with_expression(
         self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
@@ -132,12 +134,14 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        # Should match 'test', 'contains_test', 'testprefix'
-        assert len(results) == 3
+        # Should match 'test', 'contains_test', 'testprefix', 'Test', 'TestPrefix' but not 'Test' and 'TestPrefix' because of case sensitivity
+        assert len(results) == 5
         assert {r['test_string'] for r in results} == {
             'test',
             'contains_test',
             'testprefix',
+            'Test',
+            'TestPrefix',
         }
 
     async def test_malicious_contains(
@@ -185,8 +189,11 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        assert len(results) == 1
+        assert len(results) == 2
         assert results[0]['test_string'] == 'test'
+        assert results[0]['test_int'] == 100
+        assert results[1]['test_string'] == 'Test'
+        assert results[1]['test_int'] == 200
 
     async def test_in_multiple(
         self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
@@ -297,9 +304,9 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        # Should exclude only 'test'
-        assert len(results) == 8
-        assert all(r['test_string'] != 'test' for r in results)
+        # Should exclude only 'test' and 'Test'
+        assert len(results) == 7
+        assert all(r['test_string'] not in ('test', 'Test') for r in results)
 
     async def test_startswith(
         self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
@@ -310,9 +317,9 @@ class TestGenericFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        # Should match 'test', 'testprefix'
-        assert len(results) == 2
-        assert {r['test_string'] for r in results} == {'test', 'testprefix'}
+        # Should match 'test', 'testprefix', 'Test', 'TestPrefix'
+        assert len(results) == 4
+        assert {r['test_string'].casefold() for r in results} == {'test', 'testprefix'}
 
     async def test_isnull_true(
         self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
@@ -644,9 +651,11 @@ class TestGenericFilters:
             query = t'select * from test_generic_filters tgf where {where_clause:q} order by id'
             results = await (await conn.execute(query)).fetchall()
 
-        assert len(results) == 1
+        assert len(results) == 2
         assert results[0]['test_string'] == 'test'
         assert results[0]['test_int'] == 100
+        assert results[1]['test_string'] == 'Test'
+        assert results[1]['test_int'] == 200
 
 
 @pytest.mark.asyncio
@@ -662,8 +671,9 @@ class TestGenericDictFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        assert len(results) == 1
+        assert len(results) == 2
         assert results[0]['test_dict']['metastr'] == 'test'
+        assert results[1]['test_dict']['metastr'] == 'Test'
 
     async def test_dict_field_neq(
         self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
@@ -674,7 +684,7 @@ class TestGenericDictFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        assert len(results) == 8
+        assert len(results) == 7
 
         # Find the result with NULL test_dict and check that it is included in the results
         assert sum(r['test_dict'] is None for r in results) == 1
@@ -686,7 +696,7 @@ class TestGenericDictFilters:
         meta_vals = [
             r['test_dict'].get('metastr') for r in results if r['test_dict'] is not None
         ]
-        assert all(val != 'test' for val in meta_vals)
+        assert all(val not in ('test', 'Test') for val in meta_vals)
 
     async def test_dict_field_contains(
         self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
@@ -699,11 +709,13 @@ class TestGenericDictFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        assert len(results) == 3
+        assert len(results) == 5
         assert {r['test_dict']['metastr'] for r in results} == {
             'test',
             'contains_test',
             'testprefix',
+            'Test',
+            'TestPrefix',
         }
 
     async def test_dict_field_icontains(
@@ -730,8 +742,13 @@ class TestGenericDictFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        assert len(results) == 2
-        assert {r['test_dict']['metastr'] for r in results} == {'test', 'testprefix'}
+        assert len(results) == 4
+        assert {r['test_dict']['metastr'] for r in results} == {
+            'test',
+            'testprefix',
+            'Test',
+            'TestPrefix',
+        }
 
     async def test_dict_field_in(
         self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
@@ -744,8 +761,12 @@ class TestGenericDictFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        assert len(results) == 2
-        assert {r['test_dict']['metastr'] for r in results} == {'test', 'another'}
+        assert len(results) == 3
+        assert {r['test_dict']['metastr'] for r in results} == {
+            'test',
+            'another',
+            'Test',
+        }
 
     async def test_dict_field_nin(
         self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
@@ -758,7 +779,7 @@ class TestGenericDictFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        assert len(results) == 7
+        assert len(results) == 6
 
         # Check that the result with NULL test_dict is included in the results
         assert sum(r['test_dict'] is None for r in results) == 1
@@ -770,7 +791,7 @@ class TestGenericDictFilters:
         meta_vals = [
             r['test_dict'].get('metastr') for r in results if r['test_dict'] is not None
         ]
-        assert all(val not in ['test', 'another'] for val in meta_vals)
+        assert all(val not in ('test', 'another', 'Test') for val in meta_vals)
 
     async def test_dict_field_nin_isnull_false(
         self, test_data: AsyncConnectionPool[AsyncConnection[DictRow]]
@@ -783,9 +804,10 @@ class TestGenericDictFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        assert len(results) == 5
+        assert len(results) == 4
         assert all(
-            r['test_dict'].get('metastr') not in ['test', 'another'] for r in results
+            r['test_dict'].get('metastr') not in ('test', 'another', 'Test')
+            for r in results
         )
 
     async def test_dict_field_int_eq(
@@ -1025,9 +1047,9 @@ class TestGenericDictFilters:
         async with test_data.connection() as conn:
             results = await execute_filter(conn, filter_)
 
-        assert len(results) == 1
+        assert len(results) == 2
         for r in results:
-            assert r['test_dict']['metastr'].startswith('test')
+            assert r['test_dict']['metastr'].lower().startswith('test')
             assert 100 <= r['test_dict']['metaint'] < 300
 
     async def test_dict_field_with_enum_and_regular_filters(

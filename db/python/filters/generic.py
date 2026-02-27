@@ -1,5 +1,7 @@
 import dataclasses
+import datetime
 from collections.abc import Callable, Sequence
+from datetime import date, datetime
 from enum import Enum
 from string.templatelib import Template
 from typing import Any, TypeVar
@@ -116,54 +118,83 @@ class GenericFilter[T](SMBase):
         """
         filters: list[Template | None] = []
 
-        column_query = (
+        # MARIADB BACKWARDS COMPATIBILITY:
+        # Goal: Make all string comparisions case insensitive
+        # We are going to do a check on all of the filter fields
+        # if their type is str, make sure that the value is set to
+        # CASEFOLD(value) and the column query is also wrapped in CASEFOLD
+        original_gf: GenericFilter[T] = self
+        gf: GenericFilter[T] = self.copy_with_casefolded_strings()
+        value_type = infer_pg_type_from_filter(self)
+
+        original_column_query = (
             column
             if isinstance(column, Template)
             else t'{sql.Identifier(*column.split(".")):i}'
         )
 
-        if self.eq is not None:
-            filters.append(t'{column_query:q} = {self.eq}')
-        if self.neq is not None:
-            filters.append(t'{column_query:q} IS DISTINCT FROM {self.neq}')
-        if self.in_ is not None:
-            if not isinstance(self.in_, list):
+        # Add CASEFOLD to the column query if any of the fields are strings
+        column_query = original_column_query
+        if value_type == 'text':
+            column_query = t'CASEFOLD({original_column_query:q})'
+
+        if gf.eq is not None:
+            if isinstance(gf.eq, sql.Composable):
+                filters.append(t'{column_query:q} = {gf.eq:q}')
+            else:
+                filters.append(t'{column_query:q} = {gf.eq}')
+        if gf.neq is not None:
+            if isinstance(gf.neq, sql.Composable):
+                filters.append(t'{column_query:q} IS DISTINCT FROM {gf.neq:q}')
+            else:
+                filters.append(t'{column_query:q} IS DISTINCT FROM {gf.neq}')
+        if gf.in_ is not None:
+            if not isinstance(gf.in_, list):
                 raise ValueError('IN filter must be a list')
 
             # in an empty list is always false
-            if len(self.in_) == 0:
+            if len(gf.in_) == 0:
                 return t'FALSE'
 
-            filters.append(t'{column_query:q} = ANY({self.in_})')
+            # Converting the list a query string will work for Any type
+            # in GenericFilter.in_ including a sql.Composed value
+            in_value = sql.SQL('ARRAY[') + sql.SQL(',').join(gf.in_) + sql.SQL(']')
+            filters.append(t'{column_query:q} = ANY({in_value:q})')
 
-        if self.nin is not None and len(self.nin) > 0:
-            if not isinstance(self.nin, list):
+        if gf.nin is not None and len(gf.nin) > 0:
+            if not isinstance(gf.nin, list):
                 raise ValueError('NIN filter must be a list')
+
+            # Converting the list to a query string will work for Any type
+            # in GenericFilter.nin including a sql.Composed value
+            nin_value = sql.SQL('ARRAY[') + sql.SQL(',').join(gf.nin) + sql.SQL(']')
 
             # Include NULLs here as the user would expect to recieve nulls in the
             # results when they are trying to exclude certain values
             filters.append(
-                t'({column_query:q} IS NULL OR NOT ({column_query:q} = ANY({self.nin})))'
+                t'({column_query:q} IS NULL OR NOT ({column_query:q} = ANY({nin_value:q})))'
             )
-        if self.gt is not None:
-            filters.append(t'{column_query:q} > {self.gt}')
-        if self.gte is not None:
-            filters.append(t'{column_query:q} >= {self.gte}')
-        if self.lt is not None:
-            filters.append(t'{column_query:q} < {self.lt}')
-        if self.lte is not None:
-            filters.append(t'{column_query:q} <= {self.lte}')
-        if self.contains is not None:
-            search_term = escape_like_term(str(self.contains))
-            filters.append(t"{column_query:q} LIKE '%' || {search_term} || '%'")
-        if self.icontains is not None:
-            search_term = escape_like_term(str(self.icontains))
+        if gf.gt is not None:
+            filters.append(t'{column_query:q} > {gf.gt}')
+        if gf.gte is not None:
+            filters.append(t'{column_query:q} >= {gf.gte}')
+        if gf.lt is not None:
+            filters.append(t'{column_query:q} < {gf.lt}')
+        if gf.lte is not None:
+            filters.append(t'{column_query:q} <= {gf.lte}')
+        if gf.contains is not None:
+            search_term = escape_like_term(str(original_gf.contains))
+            filters.append(
+                t"{original_column_query:q} ILIKE '%' || {search_term} || '%'"
+            )
+        if gf.icontains is not None:
+            search_term = escape_like_term(str(original_gf.icontains))
             filters.append(t"{column_query:q} ILIKE '%' || {search_term} || '%'")
-        if self.startswith is not None:
-            search_term = escape_like_term(str(self.startswith))
-            filters.append(t"{column_query:q} LIKE {search_term} || '%'")
-        if self.isnull is not None:
-            if self.isnull:
+        if gf.startswith is not None:
+            search_term = escape_like_term(str(original_gf.startswith))
+            filters.append(t"{column_query:q} ILIKE {search_term} || '%'")
+        if gf.isnull is not None:
+            if gf.isnull:
                 filters.append(t'{column_query:q} IS NULL')
             else:
                 filters.append(t'{column_query:q} IS NOT NULL')
@@ -174,24 +205,43 @@ class GenericFilter[T](SMBase):
 
         return sql.SQL(' AND ').join(filters_rm_none)
 
-    def transform(self, func: Callable[[T], X]) -> GenericFilter[X]:
+    def transform(
+        self, func: Callable[[T], X], map_array_values: bool = False
+    ) -> GenericFilter[X]:
         """
         Apply a function to each value in the filter
         """
+
+        def list_transform(lst: Sequence[T]) -> Sequence[X]:
+            if map_array_values:
+                return list(map(func, lst))
+            return func(lst)  # type: ignore
+
         return GenericFilter(
-            eq=func(self.eq) if self.eq else None,
-            neq=func(self.neq) if self.neq else None,
-            in_=list(map(func, self.in_)) if self.in_ else None,
-            nin=list(map(func, self.nin)) if self.nin else None,
-            gt=func(self.gt) if self.gt else None,
-            gte=func(self.gte) if self.gte else None,
-            lt=func(self.lt) if self.lt else None,
-            lte=func(self.lte) if self.lte else None,
-            contains=func(self.contains) if self.contains else None,
-            icontains=func(self.icontains) if self.icontains else None,
-            startswith=func(self.startswith) if self.startswith else None,
+            eq=func(self.eq) if self.eq is not None else None,
+            neq=func(self.neq) if self.neq is not None else None,
+            in_=list_transform(self.in_) if self.in_ is not None else None,
+            nin=list_transform(self.nin) if self.nin is not None else None,
+            gt=func(self.gt) if self.gt is not None else None,
+            gte=func(self.gte) if self.gte is not None else None,
+            lt=func(self.lt) if self.lt is not None else None,
+            lte=func(self.lte) if self.lte is not None else None,
+            contains=func(self.contains) if self.contains is not None else None,
+            icontains=func(self.icontains) if self.icontains is not None else None,
+            startswith=func(self.startswith) if self.startswith is not None else None,
             isnull=self.isnull,
         )
+
+    def copy_with_casefolded_strings(self) -> 'GenericFilter[T]':
+        # Use transform to apply casefold to all string values in the filter
+        def casefold_if_str(value: Any) -> Any:
+            # StrEnum return True to isinstance(value, str) but we don't
+            # want to casefold them, so we check for Enum first
+            if not isinstance(value, Enum) and isinstance(value, str):
+                return sql.SQL(f'CASEFOLD(') + sql.Literal(str(value)) + sql.SQL(')')
+            return value
+
+        return self.transform(casefold_if_str, map_array_values=True)
 
 
 GenericMetaFilter = dict[str, GenericFilter[Any]]
@@ -297,7 +347,7 @@ class GenericFilterModel:
         return sql.SQL(' AND ').join(filters_rm_none)
 
 
-def infer_pg_type_from_filter(value: GenericFilter[Any]) -> str:
+def infer_pg_type_from_filter(value: GenericFilter[Any]) -> str | None:
     """
     Infer the SQL cast type from actual values in the filter
 
@@ -313,6 +363,8 @@ def infer_pg_type_from_filter(value: GenericFilter[Any]) -> str:
     meta={'favnum': GenericFilter(eq='five')} <- we'll infer the type as text
 
     If the casting of any value fails, the database will raise an error.
+
+    If the type cannot be inferred, None is returned
     """
     # Collect all non-None comparison values
     sample_values: list[Any] = []
@@ -331,7 +383,11 @@ def infer_pg_type_from_filter(value: GenericFilter[Any]) -> str:
             cast_types.add('bool')
         elif isinstance(v, (int, float)):
             cast_types.add('numeric')
-        else:
+        elif isinstance(v, Enum):
+            cast_types.add('enum')
+        elif isinstance(v, (datetime, date)):
+            cast_types.add('timestamp')
+        elif isinstance(v, str):
             cast_types.add('text')
 
     if len(cast_types) > 1:
@@ -339,7 +395,7 @@ def infer_pg_type_from_filter(value: GenericFilter[Any]) -> str:
             f'Mixed types in filter values: {cast_types}. All values in a filter must be of the same type.'
         )
 
-    return cast_types.pop() if cast_types else 'text'
+    return cast_types.pop() if cast_types else None
 
 
 def prepare_query_from_dict_field(
@@ -363,7 +419,9 @@ def prepare_query_from_dict_field(
         if not isinstance(value, GenericFilter):
             raise ValueError(f'Filter {column_name} must be a GenericFilter')
 
-        pg_type = infer_pg_type_from_filter(value)
+        # In the case where an 'isnull' filter is applied and the type
+        # cannot be inferred, we will default to text
+        pg_type = infer_pg_type_from_filter(value) or 'text'
 
         _inner_query = value.to_sql(t"json_value(a, '$' returning {pg_type:i})")
 
