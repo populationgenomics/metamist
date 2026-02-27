@@ -619,7 +619,7 @@ class TestSequencingGroup:
         today = date(year=2025, month=12, day=31)
         mock_date('db.python.tables.sequencing_group.date', today)
 
-        # Create a second project to attach a sample to
+        # Create a second project and sample to attach sequencing groups to
         async with connection_with_project.pg_connection.cursor() as cur:
             await cur.execute("""
                 INSERT INTO project (name, dataset, meta)
@@ -632,20 +632,14 @@ class TestSequencingGroup:
 
             await cur.execute(
                 t"""
-                INSERT INTO project_member (project_id, member, role)
-                VALUES ({project_2}, {TEST_USER}, 'writer')
-                """
-            )
-
-            await cur.execute(
-                t"""
                 INSERT INTO sample (project, type, active)
                 VALUES ({project_2}, 'blood', true)
                 RETURNING id
                 """
             )
-
-            test_sample_2 = (await cur.fetchone())['id']
+            row = await cur.fetchone()
+            assert row is not None
+            test_sample_2 = row['id']
 
         # Add some test data to the database
         test_data = [
@@ -688,14 +682,7 @@ class TestSequencingGroup:
         # Insert the test data to the DB
         conn = connection_with_project.pg_connection
         async with conn.transaction(), conn.cursor() as cur:
-            # Disable the trigger so that the sys_period isn't overwritten
-            await cur.execute(
-                'ALTER TABLE main.sequencing_group DISABLE TRIGGER versioning_trigger'
-            )
             await cur.executemany(test_data_query, test_data)
-            await cur.execute(
-                'ALTER TABLE main.sequencing_group ENABLE TRIGGER versioning_trigger'
-            )
 
         sg_table = SequencingGroupTable(connection_with_project)
         result = await sg_table.get_sequencing_group_counts_by_month(
