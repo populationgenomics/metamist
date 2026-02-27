@@ -616,9 +616,9 @@ class TestSequencingGroup:
     )  # TODO Revisit when ready
     async def test_history_sum_multiple_projects(
         self,
-        connection: Connection,  # noqa: ARG002 TODO: remove noqa when test is reinstated
-        test_sample: int,  # noqa: ARG002 TODO: remove noqa when test is reinstated
-        mock_date,
+        connection_with_project: Connection,
+        test_sample: int,
+        mock_date
     ):
         """Test the case where type:technology combinations are summed and held for the same project."""
         # Mock today's date.
