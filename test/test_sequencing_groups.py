@@ -215,9 +215,6 @@ class TestSequencingGroup:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(
-        reason='Querying JSON keys is not yet implemented'
-    )  # TODO: Implement this test when querying JSON keys is implemented
     async def test_query_with_assay_metadata(
         self,
         connection_with_project: Connection,
