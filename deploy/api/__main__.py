@@ -66,6 +66,19 @@ cloud_run = gcp.cloudrunv2.Service(
             min_instance_count=0,
             max_instance_count=10,
         ),
+        vpc_access=(
+            gcp.cloudrunv2.ServiceTemplateVpcAccessArgs(
+                network_interfaces=[
+                    gcp.cloudrunv2.ServiceTemplateVpcAccessNetworkInterfaceArgs(
+                        network='metamist-db',
+                        subnetwork='cloud-run-access',
+                    )
+                ],
+                egress='PRIVATE_RANGES_ONLY',
+            )
+            if stack == 'production'
+            else None
+        ),
         containers=[
             gcp.cloudrunv2.ServiceTemplateContainerArgs(
                 image=image.repo_digest,
