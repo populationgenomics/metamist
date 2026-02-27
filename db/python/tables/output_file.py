@@ -3,7 +3,6 @@ from urllib.parse import urlparse
 
 from fastapi.concurrency import run_in_threadpool
 from google.cloud.storage import Blob
-from psycopg import sql
 
 from db.python.tables.base import DbBase
 from models.models.output_file import OutputFileInternal, RecursiveDict
@@ -139,10 +138,15 @@ class OutputFileTable(DbBase):
         Create analysis files from JSON
         """
         files = await self.find_files_from_dict(json_dict=json_dict)  # type: ignore [arg-type]
-        file_ids: list[int] = []
-        outputs: list[str] = []
 
         async with self.connection.transaction():
+            # Delete all existing analysis_outputs for this analysis
+            # before re-inserting the current set. This ensures idempotency
+            # and correctly handles key renames, primary/secondary moves, etc.
+            await self.connection.pg_connection.execute(
+                t'DELETE FROM analysis_outputs WHERE analysis_id = {analysis_id}'
+            )
+
             if 'main_files' in files:
                 for primary_file in files['main_files']:
                     parent_file_id = await self.create_or_update_output_file(
@@ -180,46 +184,6 @@ class OutputFileTable(DbBase):
                                         else secondary_file['basename']
                                     ),
                                 )
-                                if secondary_file_id:
-                                    file_ids.append(secondary_file_id)
-                                else:
-                                    outputs.append(secondary_file['basename'])
-                    if parent_file_id:
-                        file_ids.append(parent_file_id)
-                    else:
-                        outputs.append(primary_file['basename'])
-
-            # check that only the files in this json_dict should be in the analysis. Remove what isn't in this dict.
-            if not file_ids and not outputs:
-                # If both file_ids and outputs are empty, don't execute the query
-                pass
-
-            # Delete analysis outputs not in the current set of file_ids or outputs
-            update_analysis_outputs = t"""
-                DELETE FROM analysis_outputs
-                WHERE analysis_id = {analysis_id}"""
-
-            # Add the OR condition to include file_ids or outputs
-            conditions = []
-
-            # Add file_id condition if file_ids is not empty
-            if file_ids:
-                # Add file_ids to query parameters
-                conditions.append(t'file_id IS NOT NULL AND file_id <> ALL({file_ids})')
-
-            # Add output condition if outputs is not empty
-            if outputs:
-                # Add outputs to query parameters
-                conditions.append(t'output IS NOT NULL AND output <> ALL({outputs})')
-
-            # Join the conditions with OR since either can be valid
-            if conditions:
-                update_analysis_outputs += (
-                    t' AND ({sql.SQL(" OR ").join(conditions):q})'
-                )
-
-            # Execute the query only if either file_ids or outputs were provided
-            await self.connection.pg_connection.execute(update_analysis_outputs)
 
     async def find_files_from_dict(
         self,
