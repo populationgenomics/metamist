@@ -477,6 +477,9 @@ class TestOutputFiles:
 
         # Get all the output files in the database
         baseline_outputs = await all_rows('analysis_outputs')
+        # The sys_period will have changed, but we aren't concerned with that
+        for row in baseline_outputs:
+            del row['sys_period']
 
         # Add the same files to the analysis to test that duplicates are ignored (not inserted)
         await output_file_table.create_or_update_analysis_output_files_from_output(
@@ -484,6 +487,10 @@ class TestOutputFiles:
         )
 
         outputs_after_dupe = await all_rows('analysis_outputs')
+        # The sys_period will have changed, but we aren't concerned with that
+        for row in outputs_after_dupe:
+            del row['sys_period']
+            
         assert baseline_outputs == outputs_after_dupe
 
         # Add a different file to the analysis to test that a new file appears in the database
@@ -493,4 +500,8 @@ class TestOutputFiles:
         )
 
         outputs_after_new_file = await all_rows('analysis_outputs')
+        # The sys_period will have changed, but we aren't concerned with that
+        for row in outputs_after_new_file:
+            del row['sys_period']
+
         assert len(baseline_outputs) != len(outputs_after_new_file)
