@@ -490,7 +490,7 @@ class TestOutputFiles:
         # The sys_period will have changed, but we aren't concerned with that
         for row in outputs_after_dupe:
             del row['sys_period']
-            
+
         assert baseline_outputs == outputs_after_dupe
 
         # Add a different file to the analysis to test that a new file appears in the database
