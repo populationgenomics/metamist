@@ -36,7 +36,7 @@ image = docker.Image(
     'metamist-image',
     image_name=f'{gcp_config.require("region")}-docker.pkg.dev/{gcp_config.require("project")}/metamist-repository-{stack}/metamist-image:latest',
     build=docker.DockerBuildArgs(
-        context='../',
+        context='../../',
         dockerfile='Dockerfile',
         args={
             'BUILDKIT_INLINE_CACHE': '1',
