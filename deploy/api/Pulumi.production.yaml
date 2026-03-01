@@ -8,3 +8,5 @@ config:
   app:web-domain: metamist.populationgenomics.org.au
   app:api-domain: metamist-api.populationgenomics.org.au
   app:iap_audience: /projects/890472361088/global/backendServices/1657741685801176969
+  app:vpc_network: metamist-db
+  app:vpc_subnetwork: cloud-run-access

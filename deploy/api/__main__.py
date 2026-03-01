@@ -61,7 +61,7 @@ cloud_run = gcp.cloudrunv2.Service(
     default_uri_disabled=True,
     template=gcp.cloudrunv2.ServiceTemplateArgs(
         service_account=service_account.email,
-        timeout='3600s',  # Max cloudrun timeout is 1 hour, set to this to allow for large uploads
+        timeout='300s',
         scaling=gcp.cloudrunv2.ServiceTemplateScalingArgs(
             min_instance_count=0,
             max_instance_count=10,
@@ -70,8 +70,8 @@ cloud_run = gcp.cloudrunv2.Service(
             gcp.cloudrunv2.ServiceTemplateVpcAccessArgs(
                 network_interfaces=[
                     gcp.cloudrunv2.ServiceTemplateVpcAccessNetworkInterfaceArgs(
-                        network='metamist-db',
-                        subnetwork='cloud-run-access',
+                        network=app_config.require('vpc_network'),
+                        subnetwork=app_config.require('vpc_subnetwork'),
                     )
                 ],
                 egress='PRIVATE_RANGES_ONLY',
