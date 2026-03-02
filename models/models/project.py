@@ -43,7 +43,7 @@ class Project(SMBase):
     @property
     def is_test_project(self):
         """Returns whether this is a main or a test project"""
-        return self.name.startswith('test-')
+        return self.name.endswith('-test')
 
 
 class ProjectMemberUpdate(SMBase):

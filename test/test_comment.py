@@ -15,6 +15,7 @@ from models.models.assay import AssayUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 from test.conftest import GraphQLQueryFunction
+from test.test_participant import get_participant_to_insert
 
 
 # @TODO would be good to add permissions testing to this, but first need a better
@@ -510,45 +511,6 @@ class CommentHelpers:
             restore_comment_query, variables=restore_comment_variables
         )
         return restore_comment_result['data']['comment']['restoreComment']
-
-
-def get_participant_to_insert(id_suffix='1'):
-    """Helper function to create a participant object for insertion into the database"""
-    return ParticipantUpsertInternal(
-        external_ids={PRIMARY_EXTERNAL_ORG: 'P0' + id_suffix},
-        meta={'pmeta': 'pvalue'},
-        reported_sex=2,
-        reported_gender='FEMALE',
-        karyotype='XX',
-        samples=[
-            SampleUpsertInternal(
-                external_ids={PRIMARY_EXTERNAL_ORG: 'S0' + id_suffix},
-                type='blood',
-                meta={'smeta': 'svalue'},
-                sequencing_groups=[
-                    SequencingGroupUpsertInternal(
-                        external_ids={'default': 'SG0' + id_suffix},
-                        type='genome',
-                        technology='short-read',
-                        platform='illumina',
-                        meta={'sgmeta': 'sgvalue'},
-                        assays=[
-                            AssayUpsertInternal(
-                                type='sequencing',
-                                external_ids={'default': 'A0' + id_suffix},
-                                meta={
-                                    'ameta': 'avalue',
-                                    'sequencing_type': 'genome',
-                                    'sequencing_platform': 'illumina',
-                                    'sequencing_technology': 'short-read',
-                                },
-                            )
-                        ],
-                    )
-                ],
-            )
-        ],
-    )
 
 
 @pytest.mark.asyncio
@@ -1165,6 +1127,7 @@ class TestComment:
         assert comment_uniq(participant_comment) in sequencing_group_related_ids
         assert comment_uniq(project_comment) not in sequencing_group_related_ids
 
+    @pytest.mark.project_name('delete-project-data-test')
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_project_deletion(self, connection_with_project: Connection):
         """Test ProjectPermissionsTable.delete_project_data's effect on comments."""
