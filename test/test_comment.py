@@ -15,6 +15,7 @@ from models.models.assay import AssayUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 from test.conftest import GraphQLQueryFunction
+from test.test_participant import get_participant_to_insert
 
 
 # @TODO would be good to add permissions testing to this, but first need a better
@@ -517,12 +518,14 @@ class TestComment:
     """Test commenting functionality."""
 
     @pytest.fixture(autouse=True)
-    async def set_up(self, connection: Connection, graphql_query: GraphQLQueryFunction):
-        self.slayer = SampleLayer(connection)
-        self.assaylayer = AssayLayer(connection)
-        self.player = ParticipantLayer(connection)
-        self.flayer = FamilyLayer(connection)
-        self.sglayer = SequencingGroupLayer(connection)
+    async def set_up(
+        self, connection_with_project: Connection, graphql_query: GraphQLQueryFunction
+    ):
+        self.slayer = SampleLayer(connection_with_project)
+        self.assaylayer = AssayLayer(connection_with_project)
+        self.player = ParticipantLayer(connection_with_project)
+        self.flayer = FamilyLayer(connection_with_project)
+        self.sglayer = SequencingGroupLayer(connection_with_project)
 
         self.comment_helpers = CommentHelpers(graphql_query=graphql_query)
 
@@ -631,7 +634,6 @@ class TestComment:
         assert restored_comment['status'] == 'active'
         assert len(restored_comment['versions']) == 2
 
-    @pytest.mark.skip(reason='Samples not yet migrated to postgres')
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_add_comment_to_sample(self):
         """Test adding a comment to a sample."""
@@ -664,7 +666,6 @@ class TestComment:
         # Ensure that comment can be requested after creating it, and that it is the same
         assert created_comment == discussion['directComments'][0]
 
-    @pytest.mark.skip(reason='Assays require samples which are not yet migrated')
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_add_comment_to_assay(self):
         """Test adding a comment to an assay."""
@@ -700,7 +701,6 @@ class TestComment:
         # Ensure that comment can be requested after creating it, and that it is the same
         assert created_comment == requested_comment['directComments'][0]
 
-    @pytest.mark.skip(reason='Participants not yet migrated to postgres')
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_add_comment_to_participant(self):
         """Test adding a comment to a participant."""
@@ -733,7 +733,6 @@ class TestComment:
         # Ensure that comment can be requested after creating it, and that it is the same
         assert created_comment == requested_comment['directComments'][0]
 
-    @pytest.mark.skip(reason='Families not yet migrated to postgres')
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_add_comment_to_family(self):
         """Test adding a comment to a family."""
@@ -756,9 +755,6 @@ class TestComment:
         # Ensure that comment can be requested after creating it, and that it is the same
         assert created_comment == requested_comment['directComments'][0]
 
-    @pytest.mark.skip(
-        reason='Sequencing groups require samples which are not yet migrated'
-    )
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_add_comment_to_sequencing_group(self):
         """Test adding a comment to a sequencing group."""
@@ -812,7 +808,6 @@ class TestComment:
         # Ensure that comment can be requested after creating it, and that it is the same
         assert created_comment == requested_comment['directComments'][0]
 
-    @pytest.mark.skip(reason='Samples not yet migrated to postgres')
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_add_comment_to_thread(self):
         """Test adding a comment to a thread."""
@@ -849,7 +844,6 @@ class TestComment:
         assert len(parent_comment_with_thread['thread']) == 1
         assert parent_comment_with_thread['thread'][0] == child_comment
 
-    @pytest.mark.skip(reason='Samples not yet migrated to postgres')
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_updating_comment(self):
         """Test updating an existing parent comment."""
@@ -914,7 +908,6 @@ class TestComment:
         )
         assert sample_discussion['directComments'][0] == updated_parent_comment
 
-    @pytest.mark.skip(reason='Samples not yet migrated to postgres')
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_deleting_and_restoring_comment(self):
         """Test deleting a comment and then restoring it."""
@@ -950,14 +943,9 @@ class TestComment:
         assert restored_comment['status'] == 'active'
         assert len(restored_comment['versions']) == 2
 
-    @pytest.mark.skip(reason='Samples not yet migrated to postgres')
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_sample_discussion_related_comments(self):
         """Test getting related comments."""
-
-        # Import from here as importing raises an error at the moment
-        # @TODO move back to the top
-        from test.test_participant import get_participant_to_insert  # noqa: PLC0415
 
         family_id = await self.flayer.create_family(
             external_ids={PRIMARY_EXTERNAL_ORG: 'f_external_id'},
@@ -1139,7 +1127,7 @@ class TestComment:
         assert comment_uniq(participant_comment) in sequencing_group_related_ids
         assert comment_uniq(project_comment) not in sequencing_group_related_ids
 
-    @pytest.mark.skip(reason='Samples not yet migrated to postgres')
+    @pytest.mark.project_name('delete-project-data-test')
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_project_deletion(self, connection_with_project: Connection):
         """Test ProjectPermissionsTable.delete_project_data's effect on comments."""

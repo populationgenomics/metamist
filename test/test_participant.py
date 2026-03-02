@@ -7,6 +7,11 @@ from db.python.filters import GenericFilter
 from db.python.layers.participant import ParticipantLayer
 from db.python.tables.participant import ParticipantFilter
 from models.base import PRIMARY_EXTERNAL_ORG
+from models.models import (
+    AssayUpsertInternal,
+    SampleUpsertInternal,
+    SequencingGroupUpsertInternal,
+)
 from models.models.participant import ParticipantUpsertInternal
 from test.conftest import GraphQLQueryFunction
 
@@ -20,32 +25,32 @@ def get_participant_to_insert(id_suffix='1'):
         reported_gender='FEMALE',
         karyotype='XX',
         samples=[
-            # SampleUpsertInternal(
-            #     external_ids={PRIMARY_EXTERNAL_ORG: 'S0' + id_suffix},
-            #     type='blood',
-            #     meta={'smeta': 'svalue'},
-            #     sequencing_groups=[
-            #         SequencingGroupUpsertInternal(
-            #             external_ids={'default': 'SG0' + id_suffix},
-            #             type='genome',
-            #             technology='short-read',
-            #             platform='illumina',
-            #             meta={'sgmeta': 'sgvalue'},
-            #             assays=[
-            #                 AssayUpsertInternal(
-            #                     type='sequencing',
-            #                     external_ids={'default': 'A0' + id_suffix},
-            #                     meta={
-            #                         'ameta': 'avalue',
-            #                         'sequencing_type': 'genome',
-            #                         'sequencing_platform': 'illumina',
-            #                         'sequencing_technology': 'short-read',
-            #                     },
-            #                 )
-            #             ],
-            #         )
-            #     ],
-            # )
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'S0' + id_suffix},
+                type='blood',
+                meta={'smeta': 'svalue'},
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        external_ids={'default': 'SG0' + id_suffix},
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={'sgmeta': 'sgvalue'},
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                external_ids={'default': 'A0' + id_suffix},
+                                meta={
+                                    'ameta': 'avalue',
+                                    'sequencing_type': 'genome',
+                                    'sequencing_platform': 'illumina',
+                                    'sequencing_technology': 'short-read',
+                                },
+                            )
+                        ],
+                    )
+                ],
+            )
         ],
     )
 
@@ -142,9 +147,6 @@ class TestParticipant:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['reader', 'writer'])
-    @pytest.mark.skip(
-        reason='This test is currently failing until the sample queries are migrated'
-    )
     async def test_query_by_sample(self, connection_with_project: Connection):
         """Test query"""
 
