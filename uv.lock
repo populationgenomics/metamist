@@ -1565,7 +1565,6 @@ dependencies = [
     { name = "strawberry-graphql", extra = ["fastapi"] },
     { name = "tabulate" },
     { name = "urllib3" },
-    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
@@ -1620,7 +1619,6 @@ requires-dist = [
     { name = "strawberry-graphql", extras = ["fastapi"], specifier = "~=0.291.0" },
     { name = "tabulate", specifier = "~=0.9.0" },
     { name = "urllib3", specifier = "~=2.6" },
-    { name = "uvicorn", specifier = "~=0.40.0" },
 ]
 
 [package.metadata.requires-dev]

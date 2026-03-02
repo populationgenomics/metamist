@@ -26,7 +26,6 @@ dependencies = [
     "pyarrow~=23.0",
     "slack-sdk~=3.39",
     "strawberry-graphql[fastapi]~=0.291.0",
-    "uvicorn~=0.40.0",
     "psycopg[binary]~=3.3",
     "psycopg-pool~=3.3",
     "pytest~=9.0",
