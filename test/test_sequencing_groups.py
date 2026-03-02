@@ -30,41 +30,20 @@ DEFAULT_SEQUENCING_META = {
 @pytest.fixture
 async def test_sample(connection_with_project: Connection) -> int:
     """
-    Create a sample directly in the database for testing sequencing groups.
-    This is a temporary fixture until sample layer is migrated.
-    @TODO replace this when ready
+    Create a sample in the database that test sequencing groups can be attached to.
     """
     project_id = connection_with_project.project_id
 
-    conn = connection_with_project.pg_connection
-    # Create audit_log entry first
-    create_audit_log = t"""
-        INSERT INTO audit_log (author, auth_project)
-        VALUES ('test', {project_id})
-        RETURNING id"""
-    cur = await conn.execute(create_audit_log)
-    row = await cur.fetchone()
-    assert row is not None
-    audit_log_id = row['id']
+    sample = SampleUpsertInternal(
+        external_ids={PRIMARY_EXTERNAL_ORG: 'EX_ID'},
+        meta={'meta_key': 'meta_value'},
+        type='blood',
+        active=True,
+    )
 
-    insert_sample = t"""
-        INSERT INTO sample
-            (project, meta, type, active, author, audit_log_id)
-        VALUES ({project_id}, '{{"meta_key": "meta_value"}}', 'blood', true, 'test_aurthor', {audit_log_id})
-        RETURNING id;"""
+    await SampleLayer(connection_with_project).upsert_sample(sample, project=project_id)
 
-    cur = await conn.execute(insert_sample)
-    row = await cur.fetchone()
-    assert row is not None
-    sample_id = row['id']
-
-    insert_external_id = t"""
-        INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
-        VALUES ({project_id}, {sample_id}, 'default', 'TESTING001', {audit_log_id})
-        """
-    await conn.execute(insert_external_id)
-
-    return sample_id
+    return sample.id
 
 
 @pytest.fixture
@@ -234,9 +213,6 @@ class TestSequencingGroup:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(
-        reason='Querying JSON keys is not yet implemented'
-    )  # TODO: Implement this test when querying JSON keys is implemented
     async def test_query_with_assay_metadata(
         self,
         connection_with_project: Connection,
@@ -630,86 +606,112 @@ class TestSequencingGroup:
         assert result == {}
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(
-        reason='Currently requires more complex testing fixtures that may be easier to achieve one more functionality is migrated'
-    )  # TODO Revisit when ready
+    @pytest.mark.project_roles(['writer'])
     async def test_history_sum_multiple_projects(
-        self,
-        connection: Connection,  # noqa: ARG002 TODO: remove noqa when test is reinstated
-        test_sample: int,  # noqa: ARG002 TODO: remove noqa when test is reinstated
-        mock_date,
+        self, connection_with_project: Connection, test_sample: int, mock_date
     ):
         """Test the case where type:technology combinations are summed and held for the same project."""
         # Mock today's date.
         today = date(year=2025, month=12, day=31)
         mock_date('db.python.tables.sequencing_group.date', today)
 
-        # Set up mocking for rows returned from the table query.
-        rows_mock = [
+        # Create a second project and sample to attach sequencing groups to
+        async with connection_with_project.pg_connection.cursor() as cur:
+            await cur.execute("""
+                INSERT INTO project (name, dataset, meta)
+                VALUES ('test-project-2', 'test-dataset-2', '{}')
+                RETURNING id
+            """)
+            row = await cur.fetchone()
+            assert row is not None
+            project_2: int = row['id']
+
+            await cur.execute(
+                t"""
+                INSERT INTO sample (project, type, active)
+                VALUES ({project_2}, 'blood', true)
+                RETURNING id
+                """
+            )
+            row = await cur.fetchone()
+            assert row is not None
+            test_sample_2 = row['id']
+
+        # Add some test data to the database
+        test_data = [
             {
-                'project': 0,
+                'id': 1,
+                'sample_id': test_sample,
                 'type': 'genome',
                 'technology': 'short-read',
-                'sg_date': date(2025, 10, 1),
-                'num_sg': 2,
+                'sg_date': date(2025, 10, 1).isoformat(),
             },
             {
-                'project': 0,
+                'id': 2,
+                'sample_id': test_sample,
                 'type': 'genome',
                 'technology': 'short-read',
-                'sg_date': date(2025, 11, 1),
-                'num_sg': 4,
+                'sg_date': date(2025, 11, 1).isoformat(),
             },
             {
-                'project': 1,
+                'id': 3,
+                'sample_id': test_sample_2,
                 'type': 'genome',
                 'technology': 'short-read',
-                'sg_date': date(2025, 10, 1),
-                'num_sg': 3,
+                'sg_date': date(2025, 10, 1).isoformat(),
             },
             {
-                'project': 1,
+                'id': 4,
+                'sample_id': test_sample_2,
                 'type': 'genome',
                 'technology': 'short-read',
-                'sg_date': date(2025, 11, 1),
-                'num_sg': 5,
+                'sg_date': date(2025, 11, 1).isoformat(),
             },
         ]
-        with mock.patch(
-            'db.python.connect.databases.Database.fetch_all', return_value=rows_mock
-        ):
-            sg_table = self.sglayer.seqgt
-            result = await sg_table.get_sequencing_group_counts_by_month([0])
 
-        self.assertDictEqual(
-            result,
-            {
-                0: {
-                    date(2025, 10, 1): {
-                        'genome|||short-read': 2,
-                    },
-                    date(2025, 11, 1): {
-                        'genome|||short-read': 6,
-                    },
-                    date(2025, 12, 1): {
-                        'genome|||short-read': 6,
-                    },
-                },
-                1: {
-                    date(2025, 10, 1): {
-                        'genome|||short-read': 3,
-                    },
-                    date(2025, 11, 1): {
-                        'genome|||short-read': 8,
-                    },
-                    date(2025, 12, 1): {
-                        'genome|||short-read': 8,
-                    },
-                },
-            },
+        test_data_query = f"""
+            INSERT INTO sequencing_group_history
+                (id, sample_id, type, technology, archived, sys_period)
+            VALUES
+                (%(id)s, %(sample_id)s, %(type)s, %(technology)s, false, tstzrange(%(sg_date)s, '{today.isoformat()}'))"""
+
+        # Insert the test data to the DB
+        conn = connection_with_project.pg_connection
+        async with conn.transaction(), conn.cursor() as cur:
+            await cur.executemany(test_data_query, test_data)
+
+        sg_table = SequencingGroupTable(connection_with_project)
+        result = await sg_table.get_sequencing_group_counts_by_month(
+            [connection_with_project.project_id, project_2]
         )
 
+        assert result == {
+            connection_with_project.project_id: {
+                date(2025, 10, 1): {
+                    'genome|||short-read': 1,
+                },
+                date(2025, 11, 1): {
+                    'genome|||short-read': 2,
+                },
+                date(2025, 12, 1): {
+                    'genome|||short-read': 2,
+                },
+            },
+            project_2: {
+                date(2025, 10, 1): {
+                    'genome|||short-read': 1,
+                },
+                date(2025, 11, 1): {
+                    'genome|||short-read': 2,
+                },
+                date(2025, 12, 1): {
+                    'genome|||short-read': 2,
+                },
+            },
+        }
+
     @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
     async def test_history_partial_sum(
         self, connection_with_project: Connection, test_sample: int, mock_date
     ):
@@ -728,21 +730,21 @@ class TestSequencingGroup:
                 'sg_date': date(2025, 10, 1).isoformat(),
             },
             {
-                'id': 1,
+                'id': 2,
                 'sample_id': test_sample,
                 'type': 'genome',
                 'technology': 'long-read',
                 'sg_date': date(2025, 11, 1).isoformat(),
             },
             {
-                'id': 1,
+                'id': 3,
                 'sample_id': test_sample,
                 'type': 'chip',
                 'technology': 'short-read',
                 'sg_date': date(2025, 10, 1).isoformat(),
             },
             {
-                'id': 1,
+                'id': 4,
                 'sample_id': test_sample,
                 'type': 'chip',
                 'technology': 'long-read',
@@ -759,20 +761,15 @@ class TestSequencingGroup:
         # Insert the test data to the DB
         conn = connection_with_project.pg_connection
         async with conn.transaction(), conn.cursor() as cur:
-            # Disable the trigger so that the sys_period isn't overwritten
-            await cur.execute(
-                'ALTER TABLE main.sequencing_group DISABLE TRIGGER versioning_trigger'
-            )
             await cur.executemany(test_data_query, test_data)
-            await cur.execute(
-                'ALTER TABLE main.sequencing_group ENABLE TRIGGER versioning_trigger'
-            )
 
         sg_table = SequencingGroupTable(connection_with_project)
-        result = await sg_table.get_sequencing_group_counts_by_month([test_sample])
+        result = await sg_table.get_sequencing_group_counts_by_month(
+            [connection_with_project.project_id]
+        )
 
         expected_output = {
-            test_sample: {
+            connection_with_project.project_id: {
                 date(2025, 10, 1): {
                     'genome|||short-read': 1,
                     'chip|||short-read': 1,
