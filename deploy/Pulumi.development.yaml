@@ -5,6 +5,14 @@ config:
   gcp:billing_project: metamist-dev
   gcp:user_project_override: 'true'
   gcp:region: australia-southeast1
-  app:web-domain: metamist-dev.populationgenomics.org.au
-  app:api-domain: metamist-api-dev.populationgenomics.org.au
-  app:iap_audience: /projects/890472361088/global/backendServices/1657741685801176969
+
+  metamist:server:
+    web_domain: metamist-dev.populationgenomics.org.au
+    oauth_client_config_secret_name: metamist-dev-oauth-client-config
+    db_credentials_secret_name: metamist-dev-server-db-credentials
+    iap_audience: /projects/890472361088/global/backendServices/1657741685801176969
+    
+  metamist:migrations:
+    db_credentials_secret_name: metamist-dev-migration-db-credentials
+    github_token_secret_name: metamist-dev-github-token
+

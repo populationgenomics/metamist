@@ -167,6 +167,7 @@ dev = [
     "pulumi>=3.223.0",
     "pulumi-gcp>=9.13.0",
     "pulumi-docker>=4.11.0",
+    "pygithub>=2.8.1",
 ]
 
 [tool.uv]
