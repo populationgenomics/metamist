@@ -8,12 +8,12 @@ COPY --from=ghcr.io/astral-sh/uv:0.10.6 /uv /usr/local/bin/uv
 # Create migrations directory
 RUN mkdir -p /db/migrations
 
-# Copy the entrypoint script and its lockfile
-COPY deploy/migrations/entrypoint.py /entrypoint.py
-COPY deploy/migrations/entrypoint.py.lock /entrypoint.py.lock
+# Copy the migrate script and its lockfile
+COPY deploy/migrations/migrate.py /migrate.py
+COPY deploy/migrations/migrate.py.lock /migrate.py.lock
 
 # Sync script dependencies (uses the lockfile)
-RUN uv sync --script /entrypoint.py
+RUN uv sync --script /migrate.py
 
 # Default environment variables
 ENV DBMATE_NO_DUMP_SCHEMA=true
@@ -28,4 +28,4 @@ ENV GITHUB_REPOSITORY=""
 ENV GITHUB_REF=""
 
 # Run script offline (dependencies already synced)
-ENTRYPOINT ["uv", "run", "--offline", "/entrypoint.py"]
+ENTRYPOINT ["uv", "run", "--offline", "/migrate.py"]

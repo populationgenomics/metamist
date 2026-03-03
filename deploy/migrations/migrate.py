@@ -122,7 +122,14 @@ def run_dbmate(
     Returns:
         CompletedProcess result
     """
-    cmd = ['dbmate', '--url', database_url, *args]
+    cmd = [
+        'dbmate',
+        '--url',
+        database_url,
+        '--migrations-dir',
+        str(MIGRATIONS_DIR),
+        *args,
+    ]
     return subprocess.run(cmd, capture_output=True, text=True, check=check)
 
 
@@ -167,7 +174,12 @@ def show_status(database_url: str) -> tuple[list[str], list[str]]:
     print_separator()
 
     result = run_dbmate(database_url, 'status', check=False)
-    print(result.stdout)
+    if result.stdout:
+        print(result.stdout)
+    if result.stderr:
+        print(f'stderr: {result.stderr}')
+    if result.returncode != 0:
+        print(f'dbmate exited with code {result.returncode}')
 
     print_separator()
 
