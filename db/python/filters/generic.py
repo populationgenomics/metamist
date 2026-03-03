@@ -124,7 +124,7 @@ class GenericFilter[T](SMBase):
         # CASEFOLD(value) and the column query is also wrapped in CASEFOLD
         original_gf: GenericFilter[T] = self
         gf: GenericFilter[T] = self.copy_with_casefolded_strings()
-        value_type = infer_pg_type_from_filter(self)
+        value_type = self.infer_pg_type_from_filter()
 
         original_column_query = (
             column
@@ -242,6 +242,56 @@ class GenericFilter[T](SMBase):
 
         return self.transform(casefold_if_str, map_array_values=True)
 
+    def infer_pg_type_from_filter(self) -> str | None:
+        """
+        Infer the SQL cast type from actual values in the filter
+
+        In order for these values to work you could just check the
+        type of the first non-None value, but to be thorough we will enforce
+        that all values in the filter (excluding isnull) are of the same type.
+
+        This does require trust in the user to apply an appropriate filter
+        for the column key value type e.g. for the json column "meta" and a row value {'favnum': int}
+        We hope that a filter would be appropriately applied like
+        meta={'favnum': GenericFilter(eq=5)} <- we'll infer the type as integer from the value 5
+        and not
+        meta={'favnum': GenericFilter(eq='five')} <- we'll infer the type as text
+
+        If the casting of any value fails, the database will raise an error.
+
+        If the type cannot be inferred, None is returned
+        """
+        # Collect all non-None comparison values
+        sample_values: list[Any] = []
+        for k, v in self.__dict__.items():
+            if k == 'isnull' or v is None:
+                continue
+            if isinstance(v, list):
+                sample_values.extend(v)
+            else:
+                sample_values.append(v)
+
+        # Infer type non-None values
+        cast_types: set[str] = set()
+        for v in sample_values:
+            if isinstance(v, bool):
+                cast_types.add('bool')
+            elif isinstance(v, (int, float)):
+                cast_types.add('numeric')
+            elif isinstance(v, Enum):
+                cast_types.add('enum')
+            elif isinstance(v, (datetime.datetime, datetime.date)):
+                cast_types.add('timestamp')
+            elif isinstance(v, str):
+                cast_types.add('text')
+
+        if len(cast_types) > 1:
+            raise ValueError(
+                f'Mixed types in filter values: {cast_types}. All values in a filter must be of the same type.'
+            )
+
+        return cast_types.pop() if cast_types else None
+
 
 GenericMetaFilter = dict[str, GenericFilter[Any]]
 
@@ -346,57 +396,6 @@ class GenericFilterModel:
         return sql.SQL(' AND ').join(filters_rm_none)
 
 
-def infer_pg_type_from_filter(value: GenericFilter[Any]) -> str | None:
-    """
-    Infer the SQL cast type from actual values in the filter
-
-    In order for these values to work you could just check the
-    type of the first non-None value, but to be thorough we will enforce
-    that all values in the filter (excluding isnull) are of the same type.
-
-    This does require trust in the user to apply an appropriate filter
-    for the column key value type e.g. for the json column "meta" and a row value {'favnum': int}
-    We hope that a filter would be appropriately applied like
-    meta={'favnum': GenericFilter(eq=5)} <- we'll infer the type as integer from the value 5
-    and not
-    meta={'favnum': GenericFilter(eq='five')} <- we'll infer the type as text
-
-    If the casting of any value fails, the database will raise an error.
-
-    If the type cannot be inferred, None is returned
-    """
-    # Collect all non-None comparison values
-    sample_values: list[Any] = []
-    for k, v in value.__dict__.items():
-        if k == 'isnull' or v is None:
-            continue
-        if isinstance(v, list):
-            sample_values.extend(v)
-        else:
-            sample_values.append(v)
-
-    # Infer type non-None values
-    cast_types: set[str] = set()
-    for v in sample_values:
-        if isinstance(v, bool):
-            cast_types.add('bool')
-        elif isinstance(v, (int, float)):
-            cast_types.add('numeric')
-        elif isinstance(v, Enum):
-            cast_types.add('enum')
-        elif isinstance(v, (datetime.datetime, datetime.date)):
-            cast_types.add('timestamp')
-        elif isinstance(v, str):
-            cast_types.add('text')
-
-    if len(cast_types) > 1:
-        raise ValueError(
-            f'Mixed types in filter values: {cast_types}. All values in a filter must be of the same type.'
-        )
-
-    return cast_types.pop() if cast_types else None
-
-
 def prepare_query_from_dict_field(
     filter_: dict[str, Any],
     column_name: str | Template,
@@ -420,7 +419,22 @@ def prepare_query_from_dict_field(
 
         # In the case where an 'isnull' filter is applied and the type
         # cannot be inferred, we will default to text
-        pg_type = infer_pg_type_from_filter(value) or 'text'
+        pg_type = value.infer_pg_type_from_filter() or 'text'
+
+        if pg_type == 'enum':
+            raise ValueError(
+                f'Unsupported type "enum" for dict field filter. '
+                f'Enum types are not supported in dict field filters because the database cannot infer the correct enum type to cast to.'
+            )
+
+        # Validate that the pg_type is supported for dict field queries
+        # The `returning {pg_type}` clause only works with numeric, bool, or text
+        supported_types = {'numeric', 'bool', 'text'}
+        if pg_type not in supported_types:
+            raise ValueError(
+                f'Unsupported type {pg_type!r} for dict field filter. '
+                f'Supported types are: {", ".join(sorted(supported_types))}'
+            )
 
         _inner_query = value.to_sql(t"json_value(a, '$' returning {pg_type:i})")
 
