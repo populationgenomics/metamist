@@ -103,7 +103,12 @@ def create_migration_resources(
                         envs=[
                             gcp.cloudrunv2.JobTemplateTemplateContainerEnvArgs(
                                 name='DATABASE_URL_SECRET',
-                                value=f'projects/{config.project}/secrets/{config.migrations.db_credentials_secret_name}/versions/latest',
+                                value_source=gcp.cloudrunv2.JobTemplateTemplateContainerEnvValueSourceArgs(
+                                    secret_key_ref=gcp.cloudrunv2.JobTemplateTemplateContainerEnvValueSourceSecretKeyRefArgs(
+                                        secret=config.migrations.db_credentials_secret_name,
+                                        version='latest',
+                                    )
+                                ),
                             ),
                             gcp.cloudrunv2.JobTemplateTemplateContainerEnvArgs(
                                 name='MIGRATION_COMMAND',
@@ -111,7 +116,12 @@ def create_migration_resources(
                             ),
                             gcp.cloudrunv2.JobTemplateTemplateContainerEnvArgs(
                                 name='GITHUB_TOKEN_SECRET',
-                                value=f'projects/{config.project}/secrets/{config.migrations.github_token_secret_name}/versions/latest',
+                                value_source=gcp.cloudrunv2.JobTemplateTemplateContainerEnvValueSourceArgs(
+                                    secret_key_ref=gcp.cloudrunv2.JobTemplateTemplateContainerEnvValueSourceSecretKeyRefArgs(
+                                        secret=config.migrations.github_token_secret_name,
+                                        version='latest',
+                                    )
+                                ),
                             ),
                             # GITHUB_REPOSITORY and GITHUB_REF are passed at
                             # execution time via workflow env var overrides

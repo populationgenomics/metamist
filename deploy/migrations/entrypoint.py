@@ -3,7 +3,6 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "pygithub",
-#     "google-cloud-secret-manager",
 # ]
 # ///
 """
@@ -14,12 +13,10 @@ Commands:
     up      - Apply all pending migrations
 
 Required environment variables:
-    DATABASE_URL_SECRET  - Secret Manager resource name for PostgreSQL connection string
-                           (e.g., projects/PROJECT/secrets/SECRET/versions/latest)
+    DATABASE_URL_SECRET  - PostgreSQL connection string (value injected from Secret Manager)
     GITHUB_REPOSITORY    - GitHub repository (e.g., populationgenomics/metamist)
     GITHUB_REF           - Git ref to fetch migrations from (e.g., main, refs/heads/dev)
-    GITHUB_TOKEN_SECRET  - Secret Manager resource name for GitHub token
-                           (e.g., projects/PROJECT/secrets/SECRET/versions/latest)
+    GITHUB_TOKEN_SECRET  - GitHub token for API access (value injected from Secret Manager)
 
 Optional environment variables:
     MIGRATION_COMMAND    - Command to run: status, up, down (default: status)
@@ -33,7 +30,6 @@ import sys
 from pathlib import Path
 
 from github import Auth, Github
-from google.cloud import secretmanager
 
 
 MIGRATIONS_DIR = Path('/db/migrations')
@@ -49,22 +45,6 @@ def print_header(title: str) -> None:
 def print_separator() -> None:
     """Print a separator line."""
     print('-' * 44)
-
-
-def get_secret(secret_name: str) -> str:
-    """
-    Fetch a secret from Google Cloud Secret Manager.
-
-    Args:
-        secret_name: Full resource name of the secret version
-                     (e.g., projects/PROJECT/secrets/SECRET/versions/latest)
-
-    Returns:
-        The secret value as a string
-    """
-    client = secretmanager.SecretManagerServiceClient()
-    response = client.access_secret_version(name=secret_name)
-    return response.payload.data.decode('utf-8')
 
 
 def download_migrations_from_github(
@@ -286,10 +266,10 @@ def main() -> int:
     # Ensure migrations directory exists
     MIGRATIONS_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Fetch secrets from Secret Manager
-    print('Fetching secrets from Secret Manager...')
-    database_url = get_secret(database_url_secret)
-    github_token = get_secret(github_token_secret)
+    # Use secret values directly from environment
+    # (Cloud Run injects them from Secret Manager)
+    database_url = database_url_secret
+    github_token = github_token_secret
     print()
 
     # Download migrations from GitHub

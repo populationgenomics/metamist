@@ -19,6 +19,26 @@ class ServerConfig(BaseModel):
     oauth_client_config_secret_name: str
     db_credentials_secret_name: str
     iap_audience: str | None = None
+    slack_token_secret_name: str
+    enable_gcp_logging: str
+    logging_level: str
+    sample_prefix: str
+    sample_check_offset: str
+    environment: str
+    seqr_url: str
+    seqr_audience: str
+    seqr_map_location: str
+    seqr_slack_notification_channel: str | None = None
+    sequencing_group_prefix: str
+    sequencing_group_check_offset: str
+    gcp_bq_aggreg_view: str
+    gcp_bq_aggreg_raw: str
+    gcp_bq_aggreg_ext_view: str
+    gcp_bq_budget_view: str
+    gcp_bq_billing_view: str
+    gcp_bq_batches_view: str
+    metamist_gcp_project: str
+    oauth_audience: str
 
 
 class MigrationsConfig(BaseModel):
