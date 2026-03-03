@@ -1,13 +1,15 @@
+from typing import Any
+
 import pulumi_gcp as gcp
 from pulumi import Config, get_stack
 from pydantic import BaseModel
 
 
-class DatabaseVpcConfig(BaseModel):
-    """Config for the main VPC that metamist uses to connect to the database"""
+class CommonConfig(BaseModel):
+    """Config that is common across infra modules"""
 
-    network: str
-    subnet: str
+    vpc_network: str | None = None
+    vpc_subnet: str | None = None
 
 
 class ServerConfig(BaseModel):
@@ -34,7 +36,7 @@ class InfraConfig(BaseModel):
     region: str
 
     # VPC settings (production only)
-    db_vpc: DatabaseVpcConfig | None
+    common: CommonConfig
 
     # Server configuration
     server: ServerConfig
@@ -51,41 +53,31 @@ def load_config() -> InfraConfig:
     """Load configuration from Pulumi config."""
     stack = get_stack()
     gcp_config = Config('gcp')
-    common_config = Config('metamist:common')
-    server_config = Config('metamist:server')
-    migrations_config = Config('metamist:migrations')
+    metamist_config = Config('metamist')
 
     project_info = gcp.organizations.get_project()
     project = project_info.project_id or gcp_config.require('project')
 
     # Load VPC config from common section (optional)
-    vpc_network = common_config.get('vpc_network')
-    vpc_subnet = common_config.get('vpc_subnet')
-    vpc_config = (
-        DatabaseVpcConfig(network=vpc_network, subnet=vpc_subnet)
-        if vpc_network and vpc_subnet
-        else None
-    )
+    common_config: dict[str, Any] = metamist_config.get_object('common') or {}
+    common = CommonConfig.model_validate(common_config)
 
     # Load server configuration
-    server = ServerConfig(
-        web_domain=server_config.require('web_domain'),
-        oauth_client_config_secret_name=server_config.require('oauth_client_config_secret_name'),
-        db_credentials_secret_name=server_config.require('db_credentials_secret_name'),
-        iap_audience=server_config.get('iap_audience'),
-    )
+    server_config = metamist_config.require_object('server')
+    server = ServerConfig.model_validate(server_config)
 
     # Load migrations configuration
+    migrations_config = metamist_config.require_object('migrations')
     migrations = MigrationsConfig(
-        db_credentials_secret_name=migrations_config.require('db_credentials_secret_name'),
-        github_token_secret_name=migrations_config.require('github_token_secret_name'),
+        db_credentials_secret_name=migrations_config['db_credentials_secret_name'],
+        github_token_secret_name=migrations_config['github_token_secret_name'],
     )
 
     return InfraConfig(
         stack=stack,
         project=project,
         region=gcp_config.require('region'),
-        db_vpc=vpc_config,
+        common=common,
         server=server,
         migrations=migrations,
     )

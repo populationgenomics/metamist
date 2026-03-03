@@ -79,13 +79,14 @@ def create_migration_resources(
                     gcp.cloudrunv2.JobTemplateTemplateVpcAccessArgs(
                         network_interfaces=[
                             gcp.cloudrunv2.JobTemplateTemplateVpcAccessNetworkInterfaceArgs(
-                                network=config.db_vpc.network,
-                                subnetwork=config.db_vpc.subnet,
+                                network=config.common.vpc_network,
+                                subnetwork=config.common.vpc_subnet,
                             )
                         ],
                         egress='PRIVATE_RANGES_ONLY',
                     )
-                    if config.db_vpc is not None
+                    if config.common.vpc_network is not None
+                    and config.common.vpc_subnet is not None
                     else None
                 ),
                 containers=[

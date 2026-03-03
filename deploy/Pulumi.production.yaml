@@ -6,17 +6,16 @@ config:
   gcp:user_project_override: 'true'
   gcp:region: australia-southeast1
 
-  metamist:common:
-    vpc_network: metamist-db
-    vpc_subnet: cloud-run-access
-
-  metamist:server:
-    web_domain: metamist.populationgenomics.org.au
-    oauth_client_config_secret_name: metamist-oauth-client-config 
-    db_credentials_secret_name: metamist-server-db-credentials
-    iap_audience: /projects/890472361088/global/backendServices/1657741685801176969
-    
-  metamist:migrations:
-    db_credentials_secret_name: metamist-migration-db-credentials
-    github_token_secret_name: metamist-github-token
+  metamist:
+    common:
+      vpc_network: metamist-db
+      vpc_subnet: cloud-run-access
+    server:
+      web_domain: metamist.populationgenomics.org.au
+      oauth_client_config_secret_name: metamist-oauth-client-config
+      db_credentials_secret_name: metamist-server-db-credentials
+      iap_audience: /projects/890472361088/global/backendServices/1657741685801176969
+    migrations:
+      db_credentials_secret_name: metamist-migration-db-credentials
+      github_token_secret_name: metamist-github-token
 

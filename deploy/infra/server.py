@@ -61,13 +61,14 @@ def create_server_resources(
                 gcp.cloudrunv2.ServiceTemplateVpcAccessArgs(
                     network_interfaces=[
                         gcp.cloudrunv2.ServiceTemplateVpcAccessNetworkInterfaceArgs(
-                            network=config.db_vpc.network,
-                            subnetwork=config.db_vpc.subnet,
+                            network=config.common.vpc_network,
+                            subnetwork=config.common.vpc_subnet,
                         )
                     ],
                     egress='PRIVATE_RANGES_ONLY',
                 )
-                if config.db_vpc
+                if config.common.vpc_network is not None
+                and config.common.vpc_subnet is not None
                 else None
             ),
             containers=[
