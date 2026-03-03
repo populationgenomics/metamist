@@ -2,8 +2,7 @@ import pulumi
 from infra.common import create_common_resources
 from infra.config import load_config
 from infra.migrations import create_migration_resources
-
-from deploy.infra.server import create_server_resources
+from infra.server import create_server_resources
 
 
 # Load shared configuration
