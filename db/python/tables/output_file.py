@@ -1,5 +1,4 @@
 import logging
-from textwrap import dedent
 from urllib.parse import urlparse
 
 from fastapi.concurrency import run_in_threadpool
@@ -66,8 +65,6 @@ class OutputFileTable(DbBase):
         """
         Create a new file, and add it to database
         """
-        # file_obj = AnyPath(path, client=GSClient(storage_client=client))
-
         if not path:
             raise ValueError('Invalid cloud file path')
 
@@ -83,37 +80,35 @@ class OutputFileTable(DbBase):
         if not file_obj or not file_obj.valid:
             return None
 
-        kv_pairs = [
-            ('path', path),
-            ('basename', file_obj.basename),
-            ('dirname', file_obj.dirname),
-            ('nameroot', file_obj.nameroot),
-            ('nameext', file_obj.nameext),
-            ('file_checksum', file_obj.file_checksum),
-            ('size', file_obj.size),
-            ('valid', file_obj.valid),
-            ('parent_id', parent_id),
-        ]
-
-        kv_pairs = [(k, v) for k, v in kv_pairs if v is not None]
-        keys = [k for k, _ in kv_pairs]
-        cs_keys = ', '.join(keys)
-        cs_id_keys = ', '.join(f':{k}' for k in keys)
-        non_pk_keys = [k for k in keys if k != 'path']
-        update_clause = ', '.join([f'{k} = VALUES({k})' for k in non_pk_keys])
-
-        _query = dedent(
-            f"""
-            INSERT INTO output_file ({cs_keys}) VALUES ({cs_id_keys})
-            ON DUPLICATE KEY UPDATE {update_clause} RETURNING id
+        create_update_file = t"""
+            INSERT INTO output_file
+                (path, basename, dirname, nameroot, nameext, file_checksum, size, valid, parent_id)
+            VALUES
+                ({path},
+                {file_obj.basename},
+                {file_obj.dirname},
+                {file_obj.nameroot},
+                {file_obj.nameext},
+                {file_obj.file_checksum},
+                {file_obj.size},
+                {file_obj.valid},
+                {parent_id})
+            ON CONFLICT (path) DO UPDATE SET
+                basename = EXCLUDED.basename,
+                dirname = EXCLUDED.dirname,
+                nameroot = EXCLUDED.nameroot,
+                nameext = EXCLUDED.nameext,
+                file_checksum = EXCLUDED.file_checksum,
+                size = EXCLUDED.size,
+                valid = EXCLUDED.valid,
+                parent_id = EXCLUDED.parent_id
+            RETURNING id
             """
-        )
-        id_of_new_file = await self.connection.fetch_val(
-            _query,
-            dict(kv_pairs),
-        )
 
-        return id_of_new_file
+        cur = await self.connection.pg_connection.execute(create_update_file)
+        id_of_new_file = await cur.fetchone()
+
+        return id_of_new_file['id']
 
     async def add_output_file_to_analysis(
         self,
@@ -124,25 +119,14 @@ class OutputFileTable(DbBase):
     ):
         """Add file to an analysis (through the join table)"""
 
-        # The IGNORE is to avoid duplicate entries if the same file is added multiple times
-        # and we used this over ON DUPLICATE because there are reported deadlocks with that
-        # syntax in high concurrency situations?
-        _query = dedent(
-            """
-            INSERT IGNORE INTO analysis_outputs
+        add_analysis_output = t"""
+            INSERT INTO analysis_outputs
                 (analysis_id, file_id, json_structure, output)
-            VALUES (:analysis_id, :file_id, :json_structure, :output)
-        """
-        )
-        await self.connection.execute(
-            _query,
-            {
-                'analysis_id': analysis_id,
-                'file_id': file_id,
-                'json_structure': json_structure,
-                'output': output,
-            },
-        )
+            VALUES
+                ({analysis_id}, {file_id}, {json_structure}, {output})
+            ON CONFLICT DO NOTHING"""
+
+        await self.connection.pg_connection.execute(add_analysis_output)
 
     async def create_or_update_analysis_output_files_from_output(
         self,
@@ -154,10 +138,15 @@ class OutputFileTable(DbBase):
         Create analysis files from JSON
         """
         files = await self.find_files_from_dict(json_dict=json_dict)  # type: ignore [arg-type]
-        file_ids: list[int] = []
-        outputs: list[str] = []
 
         async with self.connection.transaction():
+            # Delete all existing analysis_outputs for this analysis
+            # before re-inserting the current set. This ensures idempotency
+            # and correctly handles key renames, primary/secondary moves, etc.
+            await self.connection.pg_connection.execute(
+                t'DELETE FROM analysis_outputs WHERE analysis_id = {analysis_id}'
+            )
+
             if 'main_files' in files:
                 for primary_file in files['main_files']:
                     parent_file_id = await self.create_or_update_output_file(
@@ -195,51 +184,6 @@ class OutputFileTable(DbBase):
                                         else secondary_file['basename']
                                     ),
                                 )
-                                if secondary_file_id:
-                                    file_ids.append(secondary_file_id)
-                                else:
-                                    outputs.append(secondary_file['basename'])
-                    if parent_file_id:
-                        file_ids.append(parent_file_id)
-                    else:
-                        outputs.append(primary_file['basename'])
-
-            # check that only the files in this json_dict should be in the analysis. Remove what isn't in this dict.
-            if not file_ids and not outputs:
-                # If both file_ids and outputs are empty, don't execute the query
-                pass
-
-            _update_query = dedent(
-                # Delete analysis outputs not in the current set of file_ids or outputs
-                """
-                DELETE FROM analysis_outputs
-                WHERE analysis_id = :analysis_id
-                """
-            )
-
-            query_params: dict[str, int | list[int] | list[str]] = {
-                'analysis_id': analysis_id
-            }
-
-            # Add the OR condition to include file_ids or outputs
-            conditions = []
-
-            # Add file_id condition if file_ids is not empty
-            if file_ids:
-                conditions.append('file_id IS NOT NULL AND file_id NOT IN :file_ids')
-                query_params['file_ids'] = file_ids  # Add file_ids to query parameters
-
-            # Add output condition if outputs is not empty
-            if outputs:
-                conditions.append('output IS NOT NULL AND output NOT IN :outputs')
-                query_params['outputs'] = outputs  # Add outputs to query parameters
-
-            # Join the conditions with OR since either can be valid
-            if conditions:
-                _update_query += ' AND (' + ' OR '.join(conditions) + ')'
-
-            # Execute the query only if either file_ids or outputs were provided
-            await self.connection.execute(_update_query, query_params)
 
     async def find_files_from_dict(
         self,
