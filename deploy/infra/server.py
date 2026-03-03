@@ -45,6 +45,14 @@ def create_server_resources(
         display_name='metamist service account',
     )
 
+    # Grant the service account access to the database credentials secret
+    gcp.secretmanager.SecretIamMember(
+        'metamist-server-db-secret-accessor',
+        secret_id=config.server.db_credentials_secret_name,
+        role='roles/secretmanager.secretAccessor',
+        member=service_account.email.apply(lambda email: f'serviceAccount:{email}'),
+    )
+
     # Cloud Run service
     cloud_run = gcp.cloudrunv2.Service(
         'metamist',
