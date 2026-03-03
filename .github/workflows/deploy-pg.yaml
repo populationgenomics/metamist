@@ -124,7 +124,7 @@ jobs:
       - uses: pulumi/actions@8582a9e8cc630786854029b4e09281acd6794b58 # v6.6.1
         with:
           command: up
-          work-dir: ./deploy/api
+          work-dir: ./deploy
           stack-name: ${{ vars.PULUMI_STACK_NAME }}
           cloud-url: ${{ vars.PULUMI_STATE_BUCKET }}
           parallel: 20 # Otherwise requests might time out.

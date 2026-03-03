@@ -1,9 +1,9 @@
 name: Database Migration
 
 on:
-  push:
-    branches:
-      - SET-1017-set-up-metamist-postgres-deployment
+  # push:
+  #   branches:
+  #     - SET-1017-set-up-metamist-postgres-deployment
   workflow_dispatch:
     inputs:
       environment:
@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Validate production runs from main only
-        if: github.event.inputs.environment == 'production' && github.ref != 'refs/heads/main'
+        if: github.event.inputs.environment == 'production' && github.ref != 'refs/heads/SET-1017-set-up-metamist-postgres-deployment'
         run: |
           echo "::error::Production migrations can only be triggered from the main branch"
           echo ""
