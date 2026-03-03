@@ -25,10 +25,12 @@ def create_server_resources(
     # Build server Docker image
     image = docker.Image(
         'metamist-image',
-        image_name=f'{image_repository.registry_uri}/metamist-image:latest',
+        image_name=image_repository.registry_uri.apply(
+            lambda registry_uri: f'{registry_uri}/metamist-image:latest'
+        ),
         build=docker.DockerBuildArgs(
             context='../',
-            dockerfile='./api/Dockerfile',
+            dockerfile='./server/Dockerfile',
             args={'BUILDKIT_INLINE_CACHE': '1'},
             builder_version=BuilderVersion.BUILDER_BUILD_KIT,
             platform='linux/amd64',

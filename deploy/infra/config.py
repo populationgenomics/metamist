@@ -58,20 +58,20 @@ def load_config() -> InfraConfig:
     project_info = gcp.organizations.get_project()
     project = project_info.project_id or gcp_config.require('project')
 
+    # Load the entire metamist config object
+    metamist_config: dict[str, Any] = project_config.require_object('metamist')
+
     # Load VPC config from common section (optional)
-    common_config: dict[str, Any] = project_config.get_object('common') or {}
+    common_config: dict[str, Any] = metamist_config.get('common') or {}
     common = CommonConfig.model_validate(common_config)
 
     # Load server configuration
-    server_config = project_config.require_object('server')
+    server_config = metamist_config['server']
     server = ServerConfig.model_validate(server_config)
 
     # Load migrations configuration
-    migrations_config = project_config.require_object('migrations')
-    migrations = MigrationsConfig(
-        db_credentials_secret_name=migrations_config['db_credentials_secret_name'],
-        github_token_secret_name=migrations_config['github_token_secret_name'],
-    )
+    migrations_config = metamist_config['migrations']
+    migrations = MigrationsConfig.model_validate(migrations_config)
 
     return InfraConfig(
         stack=stack,

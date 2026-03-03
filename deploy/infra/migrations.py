@@ -24,7 +24,9 @@ def create_migration_resources(
     # Docker image for migrations
     migration_image = docker.Image(
         'metamist-migration-image',
-        image_name=f'{image_repository.registry_uri}/metamist-migration:latest',
+        image_name=image_repository.registry_uri.apply(
+            lambda registry_uri: f'{registry_uri}/metamist-image:latest'
+        ),
         build=docker.DockerBuildArgs(
             context='../',
             dockerfile='./migrations/Dockerfile',
