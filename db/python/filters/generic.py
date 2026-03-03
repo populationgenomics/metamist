@@ -157,23 +157,17 @@ class GenericFilter[T](SMBase):
             if len(self.in_) == 0:
                 return t'FALSE'
 
-            # Converting the list a query string will work for Any type
-            # in GenericFilter.in_ including a sql.Composed value
             filters.append(t'{column_query:q} = ANY({wrap_val_list(self.in_):q})')
 
         if self.nin is not None and len(self.nin) > 0:
             if not isinstance(self.nin, list):
                 raise ValueError('NIN filter must be a list')
 
-            # Converting the list to a query string will work for Any type
-            # in GenericFilter.nin including a sql.Composed value
-
             # Include NULLs here as the user would expect to recieve nulls in the
             # results when they are trying to exclude certain values
             filters.append(
                 t'({column_query:q} IS NULL OR NOT ({column_query:q} = ANY({wrap_val_list(self.nin):q})))'
             )
-
         if self.gt is not None:
             filters.append(t'{column_query:q} > {self.gt}')
         if self.gte is not None:
@@ -189,10 +183,12 @@ class GenericFilter[T](SMBase):
             )
         if self.icontains is not None:
             search_term = wrap_val(escape_like_term(str(self.icontains)))
-            filters.append(t"{column_query:q} ILIKE '%' || {search_term:q} || '%'")
+            filters.append(
+                t"{original_column_query:q} ILIKE '%' || {search_term:q} || '%'"
+            )
         if self.startswith is not None:
             search_term = wrap_val(escape_like_term(str(self.startswith)))
-            filters.append(t"{column_query:q} ILIKE {search_term:q} || '%'")
+            filters.append(t"{original_column_query:q} ILIKE {search_term:q} || '%'")
         if self.isnull is not None:
             if self.isnull:
                 filters.append(t'{column_query:q} IS NULL')
@@ -210,17 +206,17 @@ class GenericFilter[T](SMBase):
         Apply a function to each value in the filter
         """
         return GenericFilter(
-            eq=func(self.eq) if self.eq is not None else None,
-            neq=func(self.neq) if self.neq is not None else None,
+            eq=func(self.eq) if self.eq else None,
+            neq=func(self.neq) if self.neq else None,
             in_=list(map(func, self.in_)) if self.in_ else None,
             nin=list(map(func, self.nin)) if self.nin else None,
-            gt=func(self.gt) if self.gt is not None else None,
-            gte=func(self.gte) if self.gte is not None else None,
-            lt=func(self.lt) if self.lt is not None else None,
-            lte=func(self.lte) if self.lte is not None else None,
-            contains=func(self.contains) if self.contains is not None else None,
-            icontains=func(self.icontains) if self.icontains is not None else None,
-            startswith=func(self.startswith) if self.startswith is not None else None,
+            gt=func(self.gt) if self.gt else None,
+            gte=func(self.gte) if self.gte else None,
+            lt=func(self.lt) if self.lt else None,
+            lte=func(self.lte) if self.lte else None,
+            contains=func(self.contains) if self.contains else None,
+            icontains=func(self.icontains) if self.icontains else None,
+            startswith=func(self.startswith) if self.startswith else None,
             isnull=self.isnull,
         )
 
