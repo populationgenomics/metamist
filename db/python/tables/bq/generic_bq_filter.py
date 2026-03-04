@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from enum import Enum
 from typing import Any, TypeVar
@@ -8,6 +9,7 @@ from db.python.filters import GenericFilter
 
 
 T = TypeVar('T')
+NONFIELD_CHARS_REGEX = re.compile(r'[^a-zA-Z0-9_]')
 
 
 class GenericBQFilter(GenericFilter[T]):  # noqa: PLW1641
@@ -27,6 +29,20 @@ class GenericBQFilter(GenericFilter[T]):  # noqa: PLW1641
 
         # all attributes are equal
         return True
+
+    @staticmethod
+    def generate_field_name(name):
+        """
+        Replace any non \\w characters with an underscore
+
+        >>> GenericFilter.generate_field_name('foo')
+        'foo'
+        >>> GenericFilter.generate_field_name('foo.bar')
+        'foo_bar'
+        >>> GenericFilter.generate_field_name('$foo bar:>baz')
+        '_foo_bar__baz'
+        """  # noqa: D301
+        return NONFIELD_CHARS_REGEX.sub('_', name)
 
     def to_sql(
         self, column: str, column_name: str = None

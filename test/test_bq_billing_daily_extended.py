@@ -1,20 +1,22 @@
 import datetime
 from typing import Any
 
+import pytest
+
 from db.python.tables.bq.billing_daily_extended import BillingDailyExtendedTable
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from db.python.utils import InternalError
 from models.models import BillingColumn, BillingTotalCostQueryModel
-from test.testbase import run_as_sync
 from test.testbqbase import BqTest
 
 
 class TestBillingGcpDailyTable(BqTest):
     """Test BillingRawTable and its methods"""
 
-    def setUp(self):
-        super().setUp()
+    @pytest.fixture(autouse=True)
+    def set_up(self):
+        super().set_up()
 
         # setup table object
         self.table_obj = BillingDailyExtendedTable(self.connection)
@@ -47,17 +49,17 @@ class TestBillingGcpDailyTable(BqTest):
         filter_ = BillingDailyExtendedTable._query_to_partitioned_filter(query)
 
         # BillingFilter has __eq__ method, so we can compare them directly
-        self.assertEqual(expected_filter, filter_)
+        assert expected_filter == filter_
 
     def test_error_no_connection(self):
         """Test No connection exception"""
 
-        with self.assertRaises(InternalError) as context:
+        with pytest.raises(InternalError) as context:
             BillingDailyExtendedTable(None)
 
-        self.assertTrue(
+        assert (
             "No connection was provided to the table 'BillingDailyExtendedTable'"
-            in str(context.exception)
+            in str(context.value)
         )
 
     def test_get_table_name(self):
@@ -72,44 +74,45 @@ class TestBillingGcpDailyTable(BqTest):
         # test get table name function
         table_name = self.table_obj.get_table_name()
 
-        self.assertEqual(given_table_name, table_name)
+        assert given_table_name == table_name
 
-    @run_as_sync
-    async def test_get_extended_values_return_empty_list(self):
+    @pytest.mark.asyncio
+    async def test_get_extended_values_return_empty_list(self, monkeypatch):
         """Test get_extended_values as empty list"""
 
         # mock BigQuery result as empty list
-        self.bq_result.result.return_value = []
+        monkeypatch.setattr(self.bq_result, 'result', self.mock_return([]))
 
         # test get table name function
         records = await self.table_obj.get_extended_values('dataset')
 
-        self.assertEqual([], records)
+        assert records == []
 
-    @run_as_sync
-    async def test_get_extended_values_return_valid_list(self):
+    @pytest.mark.asyncio
+    async def test_get_extended_values_return_valid_list(self, monkeypatch):
         """Test get_extended_values as list of 2 records"""
 
         # mock BigQuery result as list of 2 records
-        self.bq_result.result.return_value = [
-            {'dataset': 'DATA1'},
-            {'dataset': 'DATA2'},
-        ]
+        monkeypatch.setattr(
+            self.bq_result,
+            'result',
+            self.mock_return([{'dataset': 'DATA1'}, {'dataset': 'DATA2'}]),
+        )
 
         # test get table name function
         records = await self.table_obj.get_extended_values('dataset')
 
-        self.assertEqual(['DATA1', 'DATA2'], records)
+        assert records == ['DATA1', 'DATA2']
 
-    @run_as_sync
-    async def test_get_extended_values_error(self):
+    @pytest.mark.asyncio
+    async def test_get_extended_values_error(self, monkeypatch):
         """Test get_extended_values return exception as invalid ext column"""
 
         # mock BigQuery result as empty list
-        self.bq_result.result.return_value = []
+        monkeypatch.setattr(self.bq_result, 'result', self.mock_return([]))
 
         # test get table name function
-        with self.assertRaises(ValueError) as context:
+        with pytest.raises(ValueError) as context:
             await self.table_obj.get_extended_values('rubish')
 
-        self.assertTrue('Invalid field value' in str(context.exception))
+        assert 'Invalid field value' in str(context.value)

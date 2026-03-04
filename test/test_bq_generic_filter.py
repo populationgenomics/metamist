@@ -1,9 +1,9 @@
 import dataclasses
-import unittest
 from datetime import datetime
 from enum import Enum, StrEnum
 from typing import Any
 
+import pytest
 from google.cloud import bigquery
 
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
@@ -30,7 +30,7 @@ class BGFilterTestEnum(StrEnum):
     VALUE = 'value'
 
 
-class TestGenericBQFilter(unittest.TestCase):
+class TestGenericBQFilter:
     """Test generic filter SQL generation"""
 
     def test_basic_no_override(self):
@@ -38,30 +38,24 @@ class TestGenericBQFilter(unittest.TestCase):
         filter_ = GenericBQFilterTest(test_string=GenericBQFilter(eq='test'))
         sql, values = filter_.to_sql()
 
-        self.assertEqual('test_string = @test_string_eq', sql)
-        self.assertDictEqual(
-            {
-                'test_string_eq': bigquery.ScalarQueryParameter(
-                    'test_string_eq', 'STRING', 'test'
-                )
-            },
-            values,
-        )
+        assert sql == 'test_string = @test_string_eq'
+        assert {
+            'test_string_eq': bigquery.ScalarQueryParameter(
+                'test_string_eq', 'STRING', 'test'
+            )
+        } == values
 
     def test_basic_override(self):
         """Test that the basic filter with an override converts to SQL as expected"""
         filter_ = GenericBQFilterTest(test_string=GenericBQFilter(eq='test'))
         sql, values = filter_.to_sql({'test_string': 't.string'})
 
-        self.assertEqual('t.string = @t_string_eq', sql)
-        self.assertDictEqual(
-            {
-                't_string_eq': bigquery.ScalarQueryParameter(
-                    't_string_eq', 'STRING', 'test'
-                )
-            },
-            values,
-        )
+        assert sql == 't.string = @t_string_eq'
+        assert {
+            't_string_eq': bigquery.ScalarQueryParameter(
+                't_string_eq', 'STRING', 'test'
+            )
+        } == values
 
     def test_single_string(self):
         """
@@ -71,15 +65,12 @@ class TestGenericBQFilter(unittest.TestCase):
         filter_ = GenericBQFilterTest(test_string=GenericBQFilter(in_=['test']))
         sql, values = filter_.to_sql()
 
-        self.assertEqual('test_string = @test_string_in_eq', sql)
-        self.assertDictEqual(
-            {
-                'test_string_in_eq': bigquery.ScalarQueryParameter(
-                    'test_string_in_eq', 'STRING', 'test'
-                )
-            },
-            values,
-        )
+        assert sql == 'test_string = @test_string_in_eq'
+        assert {
+            'test_string_in_eq': bigquery.ScalarQueryParameter(
+                'test_string_in_eq', 'STRING', 'test'
+            )
+        } == values
 
     def test_single_int(self):
         """
@@ -89,15 +80,10 @@ class TestGenericBQFilter(unittest.TestCase):
         filter_ = GenericBQFilterTest(test_int=GenericBQFilter(gt=value))
         sql, values = filter_.to_sql()
 
-        self.assertEqual('test_int > @test_int_gt', sql)
-        self.assertDictEqual(
-            {
-                'test_int_gt': bigquery.ScalarQueryParameter(
-                    'test_int_gt', 'INT64', value
-                )
-            },
-            values,
-        )
+        assert sql == 'test_int > @test_int_gt'
+        assert {
+            'test_int_gt': bigquery.ScalarQueryParameter('test_int_gt', 'INT64', value)
+        } == values
 
     def test_single_float(self):
         """
@@ -107,15 +93,12 @@ class TestGenericBQFilter(unittest.TestCase):
         filter_ = GenericBQFilterTest(test_float=GenericBQFilter(gte=value))
         sql, values = filter_.to_sql()
 
-        self.assertEqual('test_float >= @test_float_gte', sql)
-        self.assertDictEqual(
-            {
-                'test_float_gte': bigquery.ScalarQueryParameter(
-                    'test_float_gte', 'FLOAT64', value
-                )
-            },
-            values,
-        )
+        assert sql == 'test_float >= @test_float_gte'
+        assert {
+            'test_float_gte': bigquery.ScalarQueryParameter(
+                'test_float_gte', 'FLOAT64', value
+            )
+        } == values
 
     def test_single_datetime(self):
         """
@@ -126,15 +109,12 @@ class TestGenericBQFilter(unittest.TestCase):
         filter_ = GenericBQFilterTest(test_dt=GenericBQFilter(lt=value))
         sql, values = filter_.to_sql()
 
-        self.assertEqual('test_dt < TIMESTAMP(@test_dt_lt)', sql)
-        self.assertDictEqual(
-            {
-                'test_dt_lt': bigquery.ScalarQueryParameter(
-                    'test_dt_lt', 'STRING', datetime_str
-                )
-            },
-            values,
-        )
+        assert sql == 'test_dt < TIMESTAMP(@test_dt_lt)'
+        assert {
+            'test_dt_lt': bigquery.ScalarQueryParameter(
+                'test_dt_lt', 'STRING', datetime_str
+            )
+        } == values
 
     def test_single_enum(self):
         """
@@ -144,15 +124,12 @@ class TestGenericBQFilter(unittest.TestCase):
         filter_ = GenericBQFilterTest(test_enum=GenericBQFilter(lte=value))
         sql, values = filter_.to_sql()
 
-        self.assertEqual('test_enum <= @test_enum_lte', sql)
-        self.assertDictEqual(
-            {
-                'test_enum_lte': bigquery.ScalarQueryParameter(
-                    'test_enum_lte', 'STRING', value.value
-                )
-            },
-            values,
-        )
+        assert sql == 'test_enum <= @test_enum_lte'
+        assert {
+            'test_enum_lte': bigquery.ScalarQueryParameter(
+                'test_enum_lte', 'STRING', value.value
+            )
+        } == values
 
     def test_in_multiple_int(self):
         """
@@ -162,15 +139,10 @@ class TestGenericBQFilter(unittest.TestCase):
         filter_ = GenericBQFilterTest(test_int=GenericBQFilter(in_=value))
         sql, values = filter_.to_sql()
 
-        self.assertEqual('test_int IN UNNEST(@test_int_in)', sql)
-        self.assertDictEqual(
-            {
-                'test_int_in': bigquery.ArrayQueryParameter(
-                    'test_int_in', 'INT64', value
-                )
-            },
-            values,
-        )
+        assert sql == 'test_int IN UNNEST(@test_int_in)'
+        assert {
+            'test_int_in': bigquery.ArrayQueryParameter('test_int_in', 'INT64', value)
+        } == values
 
     def test_in_multiple_float(self):
         """
@@ -180,15 +152,12 @@ class TestGenericBQFilter(unittest.TestCase):
         filter_ = GenericBQFilterTest(test_float=GenericBQFilter(in_=value))
         sql, values = filter_.to_sql()
 
-        self.assertEqual('test_float IN UNNEST(@test_float_in)', sql)
-        self.assertDictEqual(
-            {
-                'test_float_in': bigquery.ArrayQueryParameter(
-                    'test_float_in', 'FLOAT64', value
-                )
-            },
-            values,
-        )
+        assert sql == 'test_float IN UNNEST(@test_float_in)'
+        assert {
+            'test_float_in': bigquery.ArrayQueryParameter(
+                'test_float_in', 'FLOAT64', value
+            )
+        } == values
 
     def test_in_multiple_str(self):
         """
@@ -198,15 +167,12 @@ class TestGenericBQFilter(unittest.TestCase):
         filter_ = GenericBQFilterTest(test_string=GenericBQFilter(in_=value))
         sql, values = filter_.to_sql()
 
-        self.assertEqual('test_string IN UNNEST(@test_string_in)', sql)
-        self.assertDictEqual(
-            {
-                'test_string_in': bigquery.ArrayQueryParameter(
-                    'test_string_in', 'STRING', value
-                )
-            },
-            values,
-        )
+        assert sql == 'test_string IN UNNEST(@test_string_in)'
+        assert {
+            'test_string_in': bigquery.ArrayQueryParameter(
+                'test_string_in', 'STRING', value
+            )
+        } == values
 
     def test_nin_multiple_str(self):
         """
@@ -216,15 +182,12 @@ class TestGenericBQFilter(unittest.TestCase):
         filter_ = GenericBQFilterTest(test_string=GenericBQFilter(nin=value))
         sql, values = filter_.to_sql()
 
-        self.assertEqual('test_string NOT IN UNNEST(@test_string_nin)', sql)
-        self.assertDictEqual(
-            {
-                'test_string_nin': bigquery.ArrayQueryParameter(
-                    'test_string_nin', 'STRING', value
-                )
-            },
-            values,
-        )
+        assert sql == 'test_string NOT IN UNNEST(@test_string_nin)'
+        assert {
+            'test_string_nin': bigquery.ArrayQueryParameter(
+                'test_string_nin', 'STRING', value
+            )
+        } == values
 
     def test_in_and_eq_multiple_str(self):
         """
@@ -234,21 +197,17 @@ class TestGenericBQFilter(unittest.TestCase):
         filter_ = GenericBQFilterTest(test_string=GenericBQFilter(in_=value, eq='B'))
         sql, values = filter_.to_sql()
 
-        self.assertEqual(
-            'test_string = @test_string_eq AND test_string = @test_string_in_eq',
-            sql,
+        assert (
+            sql == 'test_string = @test_string_eq AND test_string = @test_string_in_eq'
         )
-        self.assertDictEqual(
-            {
-                'test_string_eq': bigquery.ScalarQueryParameter(
-                    'test_string_eq', 'STRING', 'B'
-                ),
-                'test_string_in_eq': bigquery.ScalarQueryParameter(
-                    'test_string_in_eq', 'STRING', 'A'
-                ),
-            },
-            values,
-        )
+        assert {
+            'test_string_eq': bigquery.ScalarQueryParameter(
+                'test_string_eq', 'STRING', 'B'
+            ),
+            'test_string_in_eq': bigquery.ScalarQueryParameter(
+                'test_string_in_eq', 'STRING', 'A'
+            ),
+        } == values
 
     def test_fail_none_in_tuple(self):
         """
@@ -257,14 +216,14 @@ class TestGenericBQFilter(unittest.TestCase):
         value = (None,)
 
         # check if ValueError is raised
-        with self.assertRaises(ValueError) as context:
+        with pytest.raises(ValueError) as context:
             filter_ = GenericBQFilterTest(test_any=value)
             filter_.to_sql()
 
-        self.assertTrue(
+        assert (
             'There is very likely a trailing comma on the end of '
             'GenericBQFilterTest.test_any. '
             'If you actually want a tuple of length one with the value = (None,), '
             'then use dataclasses.field(default_factory=lambda: (None,))'
-            in str(context.exception)
+            in str(context.value)
         )

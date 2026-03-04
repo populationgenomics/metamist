@@ -1,24 +1,24 @@
 import datetime
 from textwrap import dedent
 from typing import Any
-from unittest import mock
 
 import google.cloud.bigquery as bq
+import pytest
 
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.billing_gcp_daily import BillingGcpDailyTable
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
 from db.python.utils import InternalError
 from models.models import BillingColumn, BillingTotalCostQueryModel
-from test.testbase import run_as_sync
 from test.testbqbase import BqTest
 
 
 class TestBillingGcpDailyTable(BqTest):
     """Test BillingRawTable and its methods"""
 
-    def setUp(self):
-        super().setUp()
+    @pytest.fixture(autouse=True)
+    def set_up(self):
+        super().set_up()
 
         # setup table object
         self.table_obj = BillingGcpDailyTable(self.connection)
@@ -55,17 +55,16 @@ class TestBillingGcpDailyTable(BqTest):
         filter_ = BillingGcpDailyTable._query_to_partitioned_filter(query)
 
         # BillingFilter has __eq__ method, so we can compare them directly
-        self.assertEqual(expected_filter, filter_)
+        assert expected_filter == filter_
 
     def test_error_no_connection(self):
         """Test No connection exception"""
 
-        with self.assertRaises(InternalError) as context:
+        with pytest.raises(InternalError) as context:
             BillingGcpDailyTable(None)
 
-        self.assertTrue(
-            "No connection was provided to the table 'BillingGcpDailyTable'"
-            in str(context.exception)
+        assert "No connection was provided to the table 'BillingGcpDailyTable'" in str(
+            context.value
         )
 
     def test_get_table_name(self):
@@ -80,41 +79,41 @@ class TestBillingGcpDailyTable(BqTest):
         # test get table name function
         table_name = self.table_obj.get_table_name()
 
-        self.assertEqual(given_table_name, table_name)
+        assert given_table_name == table_name
 
-    @run_as_sync
-    async def test_last_loaded_day_return_valid_day(self):
+    @pytest.mark.asyncio
+    async def test_last_loaded_day_return_valid_day(self, monkeypatch):
         """Test _last_loaded_day"""
 
         given_last_day = '2021-01-01 00:00:00'
 
         # mock BigQuery result
+        row_values = (
+            (datetime.datetime.strptime(given_last_day, '%Y-%m-%d %H:%M:%S')),
+        )
 
-        self.bq_result.result.return_value = [
-            mock.MagicMock(
-                spec=bq.Row,
-                last_loaded_day=datetime.datetime.strptime(
-                    given_last_day, '%Y-%m-%d %H:%M:%S'
-                ),
-            )
-        ]  # 2021-01-01
+        monkeypatch.setattr(
+            self.bq_result,
+            'result',
+            self.mock_return([bq.Row(row_values, {'last_loaded_day': 0})]),
+        )  # 2021-01-01
 
         # test get table name function
         last_loaded_day = await self.table_obj._last_loaded_day()
 
-        self.assertEqual(given_last_day, last_loaded_day)
+        assert given_last_day == last_loaded_day
 
-    @run_as_sync
-    async def test_last_loaded_day_return_none(self):
+    @pytest.mark.asyncio
+    async def test_last_loaded_day_return_none(self, monkeypatch):
         """Test _last_loaded_day as None"""
 
         # mock BigQuery result as empty list
-        self.bq_result.result.return_value = []
+        monkeypatch.setattr(self.bq_result, 'result', self.mock_return([]))
 
         # test get table name function
         last_loaded_day = await self.table_obj._last_loaded_day()
 
-        self.assertEqual(None, last_loaded_day)
+        assert last_loaded_day is None
 
     def test_prepare_daily_cost_subquery(self):
         """Test _prepare_daily_cost_subquery"""
@@ -157,40 +156,42 @@ class TestBillingGcpDailyTable(BqTest):
         AND month.cost_category = day.cost_category
         """
 
-        self.assertEqual(
-            [
-                bq.ScalarQueryParameter(
-                    'last_loaded_day', 'STRING', '2021-01-01 00:00:00'
-                )
-            ],
-            query_params,
-        )
-        self.assertEqual(', day.cost as daily_cost', daily_cost_field)
-        self.assertEqual(dedent(expected_daily_cost_join), dedent(daily_cost_join))
+        assert [
+            bq.ScalarQueryParameter('last_loaded_day', 'STRING', '2021-01-01 00:00:00')
+        ] == query_params
 
-    @run_as_sync
-    async def test_get_gcp_projects_return_empty_list(self):
+        assert daily_cost_field == ', day.cost as daily_cost'
+        assert dedent(expected_daily_cost_join) == dedent(daily_cost_join)
+
+    @pytest.mark.asyncio
+    async def test_get_gcp_projects_return_empty_list(self, monkeypatch):
         """Test get_gcp_projects as empty list"""
 
         # mock BigQuery result as empty list
-        self.bq_result.result.return_value = []
+        monkeypatch.setattr(self.bq_result, 'result', self.mock_return([]))
 
         # test get table name function
         gcp_projects = await self.table_obj.get_gcp_projects()
 
-        self.assertEqual([], gcp_projects)
+        assert gcp_projects == []
 
-    @run_as_sync
-    async def test_get_gcp_projects_return_valid_list(self):
+    @pytest.mark.asyncio
+    async def test_get_gcp_projects_return_valid_list(self, monkeypatch):
         """Test get_gcp_projects as empty list"""
 
         # mock BigQuery result as list of 2 records
-        self.bq_result.result.return_value = [
-            {'gcp_project': 'PROJECT1'},
-            {'gcp_project': 'PROJECT2'},
-        ]
+        monkeypatch.setattr(
+            self.bq_result,
+            'result',
+            self.mock_return(
+                [
+                    {'gcp_project': 'PROJECT1'},
+                    {'gcp_project': 'PROJECT2'},
+                ]
+            ),
+        )
 
         # test get table name function
         gcp_projects = await self.table_obj.get_gcp_projects()
 
-        self.assertEqual(['PROJECT1', 'PROJECT2'], gcp_projects)
+        assert gcp_projects == ['PROJECT1', 'PROJECT2']
