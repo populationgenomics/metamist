@@ -1,6 +1,5 @@
 -- migrate:up
 
-CREATE EXTENSION IF NOT EXISTS temporal_tables;
 SET search_path TO history, main;
 
 CREATE TRIGGER versioning_trigger BEFORE INSERT OR UPDATE OR DELETE ON main.analysis FOR EACH ROW EXECUTE PROCEDURE versioning('sys_period', 'history.analysis_history', true);
