@@ -82,7 +82,7 @@ class TestBillingGcpDailyTable(BqTest):
         assert given_table_name == table_name
 
     @pytest.mark.asyncio
-    async def test_last_loaded_day_return_valid_day(self, monkeypatch):
+    async def test_last_loaded_day_return_valid_day(self):
         """Test _last_loaded_day"""
 
         given_last_day = '2021-01-01 00:00:00'
@@ -92,11 +92,9 @@ class TestBillingGcpDailyTable(BqTest):
             (datetime.datetime.strptime(given_last_day, '%Y-%m-%d %H:%M:%S')),
         )
 
-        monkeypatch.setattr(
-            self.bq_result,
-            'result',
-            self.mock_return([bq.Row(row_values, {'last_loaded_day': 0})]),
-        )  # 2021-01-01
+        self.bq_result._rows = [
+            bq.Row(row_values, {'last_loaded_day': 0})
+        ]  # 2021-01-01
 
         # test get table name function
         last_loaded_day = await self.table_obj._last_loaded_day()
@@ -104,11 +102,11 @@ class TestBillingGcpDailyTable(BqTest):
         assert given_last_day == last_loaded_day
 
     @pytest.mark.asyncio
-    async def test_last_loaded_day_return_none(self, monkeypatch):
+    async def test_last_loaded_day_return_none(self):
         """Test _last_loaded_day as None"""
 
         # mock BigQuery result as empty list
-        monkeypatch.setattr(self.bq_result, 'result', self.mock_return([]))
+        self.bq_result._rows = []
 
         # test get table name function
         last_loaded_day = await self.table_obj._last_loaded_day()
@@ -164,11 +162,11 @@ class TestBillingGcpDailyTable(BqTest):
         assert dedent(expected_daily_cost_join) == dedent(daily_cost_join)
 
     @pytest.mark.asyncio
-    async def test_get_gcp_projects_return_empty_list(self, monkeypatch):
+    async def test_get_gcp_projects_return_empty_list(self):
         """Test get_gcp_projects as empty list"""
 
         # mock BigQuery result as empty list
-        monkeypatch.setattr(self.bq_result, 'result', self.mock_return([]))
+        self.bq_result._rows = []
 
         # test get table name function
         gcp_projects = await self.table_obj.get_gcp_projects()
@@ -176,20 +174,14 @@ class TestBillingGcpDailyTable(BqTest):
         assert gcp_projects == []
 
     @pytest.mark.asyncio
-    async def test_get_gcp_projects_return_valid_list(self, monkeypatch):
+    async def test_get_gcp_projects_return_valid_list(self):
         """Test get_gcp_projects as empty list"""
 
         # mock BigQuery result as list of 2 records
-        monkeypatch.setattr(
-            self.bq_result,
-            'result',
-            self.mock_return(
-                [
-                    {'gcp_project': 'PROJECT1'},
-                    {'gcp_project': 'PROJECT2'},
-                ]
-            ),
-        )
+        self.bq_result._rows = [
+            {'gcp_project': 'PROJECT1'},
+            {'gcp_project': 'PROJECT2'},
+        ]
 
         # test get table name function
         gcp_projects = await self.table_obj.get_gcp_projects()

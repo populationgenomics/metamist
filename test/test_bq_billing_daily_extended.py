@@ -77,11 +77,11 @@ class TestBillingGcpDailyTable(BqTest):
         assert given_table_name == table_name
 
     @pytest.mark.asyncio
-    async def test_get_extended_values_return_empty_list(self, monkeypatch):
+    async def test_get_extended_values_return_empty_list(self):
         """Test get_extended_values as empty list"""
 
         # mock BigQuery result as empty list
-        monkeypatch.setattr(self.bq_result, 'result', self.mock_return([]))
+        self.bq_result._rows = []
 
         # test get table name function
         records = await self.table_obj.get_extended_values('dataset')
@@ -89,15 +89,11 @@ class TestBillingGcpDailyTable(BqTest):
         assert records == []
 
     @pytest.mark.asyncio
-    async def test_get_extended_values_return_valid_list(self, monkeypatch):
+    async def test_get_extended_values_return_valid_list(self):
         """Test get_extended_values as list of 2 records"""
 
         # mock BigQuery result as list of 2 records
-        monkeypatch.setattr(
-            self.bq_result,
-            'result',
-            self.mock_return([{'dataset': 'DATA1'}, {'dataset': 'DATA2'}]),
-        )
+        self.bq_result._rows = [{'dataset': 'DATA1'}, {'dataset': 'DATA2'}]
 
         # test get table name function
         records = await self.table_obj.get_extended_values('dataset')
@@ -105,11 +101,11 @@ class TestBillingGcpDailyTable(BqTest):
         assert records == ['DATA1', 'DATA2']
 
     @pytest.mark.asyncio
-    async def test_get_extended_values_error(self, monkeypatch):
+    async def test_get_extended_values_error(self):
         """Test get_extended_values return exception as invalid ext column"""
 
         # mock BigQuery result as empty list
-        monkeypatch.setattr(self.bq_result, 'result', self.mock_return([]))
+        self.bq_result._rows = []
 
         # test get table name function
         with pytest.raises(ValueError) as context:

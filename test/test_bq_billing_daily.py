@@ -77,7 +77,7 @@ class TestBillingDailyTable(BqTest):
         assert given_table_name == table_name
 
     @pytest.mark.asyncio
-    async def test_last_loaded_day_return_valid_day(self, monkeypatch):
+    async def test_last_loaded_day_return_valid_day(self):
         """Test _last_loaded_day"""
 
         given_last_day = '2021-01-01 00:00:00'
@@ -85,11 +85,9 @@ class TestBillingDailyTable(BqTest):
         # mock BigQuery result
         row_values = (datetime.datetime.strptime(given_last_day, '%Y-%m-%d %H:%M:%S'),)
 
-        monkeypatch.setattr(
-            self.bq_result,
-            'result',
-            self.mock_return([bq.Row(row_values, {'last_loaded_day': 0})]),
-        )  # 2021-01-01
+        self.bq_result._rows = [
+            bq.Row(row_values, {'last_loaded_day': 0})
+        ]  # 2021-01-01
 
         # test get table name function
         last_loaded_day = await self.table_obj._last_loaded_day()
@@ -97,11 +95,11 @@ class TestBillingDailyTable(BqTest):
         assert given_last_day == last_loaded_day
 
     @pytest.mark.asyncio
-    async def test_last_loaded_day_return_none(self, monkeypatch):
+    async def test_last_loaded_day_return_none(self):
         """Test _last_loaded_day as None"""
 
         # mock BigQuery result as empty list
-        monkeypatch.setattr(self.bq_result, 'result', self.mock_return([]))
+        self.bq_result._rows = []
 
         # test get table name function
         last_loaded_day = await self.table_obj._last_loaded_day()
@@ -151,14 +149,14 @@ class TestBillingDailyTable(BqTest):
         assert expected_daily_cost_join == daily_cost_join
 
     @pytest.mark.asyncio
-    async def test_get_entities_as_empty_list(self, monkeypatch):
+    async def test_get_entities_as_empty_list(self):
         """
         Test get_topics, get_invoice_months,
         get_cost_categories and get_skus as empty list
         """
 
         # mock BigQuery result as empty list
-        monkeypatch.setattr(self.bq_result, 'result', self.mock_return([]))
+        self.bq_result._rows = []
 
         # test get_topics function
         records = await self.table_obj.get_topics()
@@ -177,20 +175,14 @@ class TestBillingDailyTable(BqTest):
         assert records == []
 
     @pytest.mark.asyncio
-    async def test_get_topics_return_valid_list(self, monkeypatch):
+    async def test_get_topics_return_valid_list(self):
         """Test get_topics as empty list"""
 
         # mock BigQuery result as list of 2 records
-        monkeypatch.setattr(
-            self.bq_result,
-            'result',
-            self.mock_return(
-                [
-                    {'topic': 'TOPIC1'},
-                    {'topic': 'TOPIC2'},
-                ]
-            ),
-        )
+        self.bq_result._rows = [
+            {'topic': 'TOPIC1'},
+            {'topic': 'TOPIC2'},
+        ]
 
         # test get_topics function
         records = await self.table_obj.get_topics()
@@ -198,20 +190,14 @@ class TestBillingDailyTable(BqTest):
         assert records == ['TOPIC1', 'TOPIC2']
 
     @pytest.mark.asyncio
-    async def test_get_invoice_months_return_valid_list(self, monkeypatch):
+    async def test_get_invoice_months_return_valid_list(self):
         """Test get_invoice_months as empty list"""
 
         # mock BigQuery result as list of 2 records
-        monkeypatch.setattr(
-            self.bq_result,
-            'result',
-            self.mock_return(
-                [
-                    {'invoice_month': '202401'},
-                    {'invoice_month': '202402'},
-                ]
-            ),
-        )
+        self.bq_result._rows = [
+            {'invoice_month': '202401'},
+            {'invoice_month': '202402'},
+        ]
 
         # test get_invoice_months function
         records = await self.table_obj.get_invoice_months()
@@ -219,19 +205,13 @@ class TestBillingDailyTable(BqTest):
         assert records == ['202401', '202402']
 
     @pytest.mark.asyncio
-    async def test_get_cost_categories_return_valid_list(self, monkeypatch):
+    async def test_get_cost_categories_return_valid_list(self):
         """Test get_cost_categories as empty list"""
 
         # mock BigQuery result as list of 2 records
-        monkeypatch.setattr(
-            self.bq_result,
-            'result',
-            self.mock_return(
-                [
-                    {'cost_category': 'CAT1'},
-                ]
-            ),
-        )
+        self.bq_result._rows = [
+            {'cost_category': 'CAT1'},
+        ]
 
         # test get_cost_categories function
         records = await self.table_obj.get_cost_categories()
@@ -239,21 +219,15 @@ class TestBillingDailyTable(BqTest):
         assert records == ['CAT1']
 
     @pytest.mark.asyncio
-    async def test_get_skus_return_valid_list(self, monkeypatch):
+    async def test_get_skus_return_valid_list(self):
         """Test get_skus as empty list"""
 
         # mock BigQuery result as list of 3 records
-        monkeypatch.setattr(
-            self.bq_result,
-            'result',
-            self.mock_return(
-                [
-                    {'sku': 'SKU1'},
-                    {'sku': 'SKU2'},
-                    {'sku': 'SKU3'},
-                ]
-            ),
-        )
+        self.bq_result._rows = [
+            {'sku': 'SKU1'},
+            {'sku': 'SKU2'},
+            {'sku': 'SKU3'},
+        ]
 
         # test get_skus function
         records = await self.table_obj.get_skus()

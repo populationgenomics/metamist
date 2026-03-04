@@ -77,13 +77,13 @@ class TestBillingArBatchTable(BqTest):
         assert given_table_name == table_name
 
     @pytest.mark.asyncio
-    async def test_get_batches_by_ar_guid_no_data(self, monkeypatch):
+    async def test_get_batches_by_ar_guid_no_data(self):
         """Test get_batches_by_ar_guid"""
 
         ar_guid = '1234567890'
 
         # mock BigQuery result
-        monkeypatch.setattr(self.bq_result, 'result', self.mock_return([]))
+        self.bq_result._rows = []
 
         # test get_batches_by_ar_guid function
         (start_day, end_day, batch_ids) = await self.table_obj.get_batches_by_ar_guid(
@@ -95,7 +95,7 @@ class TestBillingArBatchTable(BqTest):
         assert batch_ids == []
 
     @pytest.mark.asyncio
-    async def test_get_batches_by_ar_guid_one_record(self, monkeypatch):
+    async def test_get_batches_by_ar_guid_one_record(self):
         """Test get_batches_by_ar_guid"""
 
         ar_guid = '1234567890'
@@ -103,19 +103,12 @@ class TestBillingArBatchTable(BqTest):
         given_end_day = datetime.datetime(2023, 1, 1, 2, 3)
 
         # mock BigQuery result
-        monkeypatch.setattr(
-            self.bq_result,
-            'result',
-            self.mock_return(
-                [
-                    bq.Row(
-                        (given_start_day, given_end_day, 'Batch1234'),
-                        {'start_day': 0, 'end_day': 1, 'batch_id': 2},
-                    )
-                ]
-            ),
-        )
-
+        self.bq_result._rows = [
+            bq.Row(
+                (given_start_day, given_end_day, 'Batch1234'),
+                {'start_day': 0, 'end_day': 1, 'batch_id': 2},
+            )
+        ]
         # test get_batches_by_ar_guid function
         (start_day, end_day, batch_ids) = await self.table_obj.get_batches_by_ar_guid(
             ar_guid
@@ -127,7 +120,7 @@ class TestBillingArBatchTable(BqTest):
         assert batch_ids == ['Batch1234']
 
     @pytest.mark.asyncio
-    async def test_get_batches_by_ar_guid_two_record(self, monkeypatch):
+    async def test_get_batches_by_ar_guid_two_record(self):
         """Test get_batches_by_ar_guid"""
 
         ar_guid = '1234567890'
@@ -139,13 +132,10 @@ class TestBillingArBatchTable(BqTest):
         row_keys = {'start_day': 0, 'end_day': 1, 'batch_id': 2}
 
         # mock BigQuery result
-        monkeypatch.setattr(
-            self.bq_result,
-            'result',
-            self.mock_return(
-                [bq.Row(row_1_values, row_keys), bq.Row(row_2_values, row_keys)]
-            ),
-        )
+        self.bq_result._rows = [
+            bq.Row(row_1_values, row_keys),
+            bq.Row(row_2_values, row_keys),
+        ]
 
         # test get_batches_by_ar_guid function
         (start_day, end_day, batch_ids) = await self.table_obj.get_batches_by_ar_guid(
@@ -168,26 +158,20 @@ class TestBillingArBatchTable(BqTest):
         assert ar_guid is None
 
     @pytest.mark.asyncio
-    async def test_get_ar_guid_by_batch_id_one_rec(self, monkeypatch):
+    async def test_get_ar_guid_by_batch_id_one_rec(self):
         """Test get_ar_guid_by_batch_id"""
 
         batch_id = '1234567890'
         expected_ar_guid = 'AR_GUID_1234'
 
         # mock BigQuery result
-        monkeypatch.setattr(
-            self.bq_result,
-            'result',
-            self.mock_return(
-                [
-                    {
-                        'ar_guid': expected_ar_guid,
-                        'start_day': datetime.datetime(2024, 1, 1, 0, 0),
-                        'end_day': datetime.datetime(2024, 1, 2, 0, 0),
-                    }
-                ]
-            ),
-        )
+        self.bq_result._rows = [
+            {
+                'ar_guid': expected_ar_guid,
+                'start_day': datetime.datetime(2024, 1, 1, 0, 0),
+                'end_day': datetime.datetime(2024, 1, 2, 0, 0),
+            }
+        ]
 
         # test get_ar_guid_by_batch_id function
         _, _, ar_guid = await self.table_obj.get_ar_guid_by_batch_id(batch_id)

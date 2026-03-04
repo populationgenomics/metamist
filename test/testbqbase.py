@@ -1,5 +1,3 @@
-from typing import Any
-
 import google.cloud.bigquery as bq
 
 from db.python.gcp_connect import BqConnection
@@ -7,7 +5,7 @@ from db.python.layers.billing import BillingLayer
 
 
 class MockResult:
-    """Mimics the RowIterator returned by query_job.result()."""
+    """Mimics the RowIterator returned by MockQueryJob.result()."""
 
     def __init__(self, rows=None, total_rows=None):
         self._rows = rows or []
@@ -18,6 +16,8 @@ class MockResult:
 
 
 class MockQueryJob:
+    """Mimics the BigQuery Job"""
+
     def __init__(self, rows=None):
         self._rows = rows or MockResult()
         self.total_bytes_processed = 0
@@ -27,12 +27,16 @@ class MockQueryJob:
 
 
 class MockBqClient(bq.Client):
+    """
+    Mock BigQuery Client class.
+    """
+
     def __init__(self):
         super().__init__()
         self.mock_query_job = MockQueryJob()
         self.executed_queries = []
 
-    def query(self, query: str, *args, **kwargs) -> MockQueryJob:
+    def query(self, query: str, *_args, **_kwargs) -> MockQueryJob:
         self.executed_queries.append(query)
         return self.mock_query_job
 
@@ -65,9 +69,3 @@ class BqTest:
         )
 
         self.layer = BillingLayer(self.connection)
-
-    def mock_return(self, value: Any) -> Any:
-        def mock_return_value(*args, **kwargs):
-            return value
-
-        return mock_return_value

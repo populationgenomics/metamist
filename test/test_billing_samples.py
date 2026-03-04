@@ -33,7 +33,7 @@ def mock_fetchall(monkeypatch):
             async def fetchall(self):
                 return fetch_all_return
 
-        async def mock_execute(*args):
+        async def mock_execute(*_args):
             return MockCursor()
 
         monkeypatch.setattr(connection.pg_connection, 'execute', mock_execute)
