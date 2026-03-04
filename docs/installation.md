@@ -32,24 +32,23 @@ uv sync
 
 #### Running MariaDB
 
-Metamist uses a MariaDB 11 database. Docker is the easiest way to run the Metamist MariaDB database locally.
+Metamist uses a Postgres database. Docker is the easiest way to run the Metamist Postgres database locally.
 
 We have found that [OrbStack](https://orbstack.dev/) is faster and easier to use than [Docker Desktop](https://docs.docker.com/desktop/) but either should work fine.
 
-If you would prefer to not use Docker, you could also install MariaDB standalone using [homebrew](brew.sh) or another package manager.
-
-To start the database, run:
+To start the database, firstly `cd` into the `db` directory. Then run:
 
 ```bash
-docker run --name mariadb-p3306 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -p 3306:3306 -d docker.io/library/mariadb:11.7.2
+docker compose up -d
 ```
 
-If port 3306 is already in use, you can specify a different port in the mapping. For example:
+Then run the database migrations:
 
 ```bash
-docker run --name mariadb-p3307 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -p 3307:3306 -d docker.io/library/mariadb:11.7.2
+docker compose exec postgres dbmate up
 ```
 
+At this point, the database will be sufficiently setup to run unit tests.
 
 #### Setting up the database and permissions
 
@@ -76,32 +75,6 @@ mariadb -u root --execute "
 ```
 
 Once that is done you can disconnect from the container.
-
-
-#### Running database migrations
-
-Metamist uses liquibase to manage database migrations. To create the Metamist database tables you will need to run the migrations.
-
-Start by installing liquibase:
-
-```bash
-brew install liquibase
-```
-
-Then in the `db` folder, run the migrations:
-
-```bash
-cd db
-
-liquibase \
-    --changeLogFile project.xml \
-    --url jdbc:mariadb://127.0.0.1:3306/sm_dev \
-    --driver org.mariadb.jdbc.Driver \
-    --username root \
-    update
-```
-
-This should create all the necessary tables.
 
 
 ### Setting environment variables
@@ -136,12 +109,12 @@ in `.vscode/launch.json`
             "module": "api.server",
             "justMyCode": false,
             "env": {
-                "SM_URL": "http://localhost:8000",
                 "SM_LOCALONLY_DEFAULTUSER": "<localusername>",
                 "SM_ENVIRONMENT": "local",
-                "SM_DEV_DB_USER": "sm_api",
-                "SM_DEV_DB_PORT": "3306"
-
+                "SM_DEV_DB_NAME": "metamist_db",
+                "SM_DEV_DB_USER": "metamist",
+                "SM_DEV_DB_PASSWORD": "metamist_password",
+                "SM_DEV_DB_PORT": "5432",
             }
         }
     ]
