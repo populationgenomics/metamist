@@ -257,7 +257,7 @@ class ParticipantTable:
     async def query_count(self, filter_: ParticipantFilter) -> int:
         """Query for participants count"""
         query = await self._construct_participant_query(
-            filter_, keys=['COUNT(*) as cnt'], group_result_by_id=False
+            filter_, keys=[sql.SQL('COUNT(*) AS cnt')], group_result_by_id=False
         )
 
         conn = self.connection.pg_connection
