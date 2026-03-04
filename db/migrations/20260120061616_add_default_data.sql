@@ -1,5 +1,7 @@
 -- migrate:up
 
+INSERT INTO "group" (name) VALUES ('project-creators');
+INSERT INTO "group" (name) VALUES ('members-admin');
 INSERT INTO assay_type (id, name) VALUES ('sequencing', 'sequencing');
 INSERT INTO sample_type (id, name) VALUES ('blood', 'blood');
 INSERT INTO sample_type (id, name) VALUES ('saliva', 'saliva');
@@ -27,6 +29,7 @@ INSERT INTO analysis_type (id, name) VALUES ('analysis-runner', 'analysis-runner
 
 -- migrate:down
 
+DELEtE FROM "group" WHERE name IN ('project-creators', 'members-admin');
 DELETE FROM assay_type WHERE id = 'sequencing';
 DELETE FROM sample_type WHERE id IN ('blood', 'saliva');
 DELETE FROM sequencing_type WHERE id IN ('genome', 'exome', 'transcriptome', 'mtseq', 'chip');
