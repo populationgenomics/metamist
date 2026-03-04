@@ -14,7 +14,7 @@ from api.settings import get_default_user
 from api.utils.gcp import email_from_id_token
 from db.python.connect import Connection, SMConnections
 from db.python.gcp_connect import BqConnection, PubSubConnection
-from models.models.project import ProjectMemberRole
+from models.models.project import Project, ProjectId, ProjectMemberRole
 
 
 EXPECTED_AUDIENCE = getenv('SM_OAUTHAUDIENCE')
@@ -161,17 +161,30 @@ async def dependable_get_connection_getter(
         meta.update(extra_values)
 
     pool = SMConnections.get_postgres_pool()
+    project_id_map: dict[ProjectId, Project] | None = None
+    project_name_map: dict[str, Project] | None = None
 
     @asynccontextmanager
     async def get_connection():
+        nonlocal project_id_map, project_name_map
         async with pool.connection() as connection:
-            yield await SMConnections.get_connection_no_project(
+            sm_connection = await SMConnections.get_connection_no_project(
                 connection,
                 author,
                 ar_guid=ar_guid,
                 meta=meta,
                 on_behalf_of=on_behalf_of,
+                project_id_map=project_id_map,
+                project_name_map=project_name_map,
             )
+
+            # Cache these maps for the next time this get_connection() is called
+            if project_id_map is None:
+                project_id_map = sm_connection.project_id_map
+            if project_name_map is None:
+                project_name_map = sm_connection.project_name_map
+
+            yield sm_connection
 
     return get_connection
 
