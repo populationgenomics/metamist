@@ -125,6 +125,21 @@ class PostgresContainer(DockerContainer):
         )
         return self
 
+    def create_extensions(self) -> None:
+        """Create required PostgreSQL extensions before running migrations."""
+        database_url = self.get_internal_database_url()
+
+        extensions = ['temporal_tables']
+
+        for extension in extensions:
+            exit_code, output = self.exec(
+                f'psql "{database_url}" -c "CREATE EXTENSION IF NOT EXISTS {extension} SCHEMA public;"'
+            )
+            if exit_code != 0:
+                raise RuntimeError(
+                    f'Failed to create extension {extension} with exit code {exit_code}: {output.decode()}'
+                )
+
     def run_migrations(self) -> None:
         """Run dbmate migrations inside the container."""
         database_url = self.get_internal_database_url()
@@ -206,6 +221,8 @@ def postgres_container(
         container.start()
 
         try:
+            # Create required extensions before running migrations
+            container.create_extensions()
             # Run dbmate migrations inside the container to apply schema
             container.run_migrations()
             _mark_database_as_template(container)

@@ -1,6 +1,6 @@
 -- migrate:up
 
-SET search_path TO history, main;
+SET search_path TO history, main, public;
 
 CREATE TRIGGER versioning_trigger BEFORE INSERT OR UPDATE OR DELETE ON main.analysis FOR EACH ROW EXECUTE PROCEDURE versioning('sys_period', 'history.analysis_history', true);
 CREATE TRIGGER versioning_trigger BEFORE INSERT OR UPDATE OR DELETE ON main.analysis_cohort FOR EACH ROW EXECUTE PROCEDURE versioning('sys_period', 'history.analysis_cohort_history', true);
