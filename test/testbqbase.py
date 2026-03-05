@@ -62,7 +62,6 @@ class BqTest:
     gcp_project: str = 'GCP_PROJECT'
 
     def set_up(self):
-        self.table_obj = None
 
         # mock BigQuery client
         self.bq_client = MockBqClient()
@@ -77,3 +76,6 @@ class BqTest:
 
         # Mockup BillingLayer
         self.layer = BillingLayer(self.connection)
+
+        # overwrite table object in inhereted tests:
+        self.table_obj = None
