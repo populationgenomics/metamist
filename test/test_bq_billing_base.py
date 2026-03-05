@@ -55,13 +55,6 @@ def mock_execute_query_running_cost(query, *_args, **_kwargs):
     ]
 
 
-def mock_execute_query_empty(_query, *_args, **_kwargs):
-    """
-    Mock function returning an empty MockQueryJob.
-    """
-    return MockQueryJob(MockResult(rows=[], total_rows=0))
-
-
 def mock_execute_query_get_total_cost(_query, *_args, **_kwargs):
     """
     This is a mockup function for _execute_query function
@@ -560,8 +553,8 @@ class TestBillingBaseTable(BqTest):
             )
         )
 
-        assert False is is_current_month
-        assert None is last_loaded_day
+        assert is_current_month is False
+        assert last_loaded_day is None
         assert query_job_result == []
 
     @pytest.mark.asyncio
@@ -581,8 +574,8 @@ class TestBillingBaseTable(BqTest):
             )
         )
 
-        assert True is is_current_month
-        assert None is last_loaded_day
+        assert is_current_month
+        assert last_loaded_day is None
         assert query_job_result == []
 
     @pytest.mark.asyncio

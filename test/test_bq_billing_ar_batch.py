@@ -152,6 +152,10 @@ class TestBillingArBatchTable(BqTest):
         """Test get_ar_guid_by_batch_id"""
 
         batch_id = '1234567890'
+
+        # mock BigQuery result
+        self.bq_result._rows = []
+
         # test get_ar_guid_by_batch_id function
         _, _, ar_guid = await self.table_obj.get_ar_guid_by_batch_id(batch_id)
 

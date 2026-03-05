@@ -6,25 +6,11 @@ from db.python.connect import Connection
 from db.python.tables.sample import SampleTable
 
 
-def get_mock_date(date_to_mock: datetime.date):
-    """
-    Patches the return value of date.today()
-    Additionally, the fromisoformat of the date class is configured to function as it would without mocking.
-    """
-
-    class MockDate(datetime.date):
-        @classmethod
-        def today(cls):
-            return date_to_mock
-
-    return MockDate
-
-
 @pytest.fixture
 def mock_fetchall(monkeypatch):
     """
-    This is a mockup function for fetch_all function on the Database object.
-    This returns one mockup of a query result that contains the the number of samples
+    This is a mockup function for fetchall function on the Database object.
+    This returns one mockup of a query result that contains the number of samples
     in a project for each month.
     """
 
@@ -39,6 +25,20 @@ def mock_fetchall(monkeypatch):
         monkeypatch.setattr(connection.pg_connection, 'execute', mock_execute)
 
     return _mock_fetchall
+
+
+def get_mock_date(date_to_mock: datetime.date):
+    """
+    Patches the return value of date.today()
+    Additionally, the fromisoformat of the date class is configured to function as it would without mocking.
+    """
+
+    class MockDate(datetime.date):
+        @classmethod
+        def today(cls):
+            return date_to_mock
+
+    return MockDate
 
 
 class TestMonthlySamplesPerProject:
@@ -68,7 +68,9 @@ class TestMonthlySamplesPerProject:
         )
 
         result = await self.sample_table.get_monthly_samples_count_per_project()
-        month_costs = result[0]
+        month_costs = result[
+            0
+        ]  # Retrieve the cost/month for the given test project ID.
 
         assert month_costs == {
             datetime.date(year=2025, month=2, day=1): 100,
@@ -83,6 +85,8 @@ class TestMonthlySamplesPerProject:
 
     @pytest.mark.asyncio
     async def test_only_this_month(self, monkeypatch, mock_fetchall):
+        """Tests the case wherein the only record in the database is the current month."""
+        # Set up sample count mocking.
 
         monkeypatch.setattr(
             'db.python.tables.sample.date', get_mock_date(datetime.date(2025, 9, 1))
@@ -95,5 +99,7 @@ class TestMonthlySamplesPerProject:
         )
 
         result = await self.sample_table.get_monthly_samples_count_per_project()
-        month_costs = result[0]
+        month_costs = result[
+            0
+        ]  # Retrieve the cost/month for the given test project ID.
         assert month_costs == {datetime.date(year=2025, month=9, day=1): 170}
