@@ -89,8 +89,10 @@ export SM_LOCALONLY_DEFAULTUSER="<localusername>"
 export SM_URL="http://localhost:8000"
 export SM_ENVIRONMENT="local"
 
-export SM_DEV_DB_USER="sm_api"
-export SM_DEV_DB_PORT="3306"
+export SM_DEV_DB_NAME="metamist_db"
+export SM_DEV_DB_USER="metamist"
+export SM_DEV_DB_PASSWORD="metamist_password"
+export SM_DEV_DB_PORT="5432"
 ```
 
 
