@@ -61,9 +61,9 @@ export SM_DEV_DB_USER="metamist"
 export SM_DEV_DB_PASSWORD="metamist_password"
 export SM_DEV_DB_PORT="5432"
 ```
-<p class="callout info">Environment variables in VSCode</p>
 
->If you are using VSCode to run the API, you should still set the first two variables from the above snippet in your bash/zsh profile.
+> [!NOTE] Environment variables in VSCode
+> If you are using VSCode to run the API, you should still set the first two variables from the above snippet in your bash/zsh profile.
 > These variables are used in scripts we will run later in the setup, and will not be inherited from your `launch.json` file, *so ensure that the values are the same*.
 
 In your `.vscode/launch.json`, create the following configuration:
