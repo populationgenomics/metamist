@@ -77,5 +77,5 @@ class BqTest:
         # Mockup BillingLayer
         self.layer = BillingLayer(self.connection)
 
-        # overwrite table object in inhereted tests:
+        # overwrite table object in inherited tests:
         self.table_obj = None
