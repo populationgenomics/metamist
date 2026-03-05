@@ -74,4 +74,3 @@ DROP TRIGGER IF EXISTS versioning_trigger ON sequencing_group_assay;
 DROP TRIGGER IF EXISTS versioning_trigger ON sequencing_group_comment;
 DROP TRIGGER IF EXISTS versioning_trigger ON sequencing_group_external_id;
 
-DROP EXTENSION IF EXISTS temporal_tables;
