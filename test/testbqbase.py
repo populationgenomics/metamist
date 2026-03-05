@@ -5,7 +5,7 @@ from db.python.layers.billing import BillingLayer
 
 
 class MockResult:
-    """Mimics the RowIterator returned by MockQueryJob.result()."""
+    """Mimics the RowIterator returned by google.cloud.bigquery.job.query.QueryJob.result()."""
 
     def __init__(self, rows=None, total_rows=None):
         self._rows = rows or []
@@ -16,7 +16,7 @@ class MockResult:
 
 
 class MockQueryJob:
-    """Mimics the BigQuery Job"""
+    """Mimics google.cloud.bigquery.job.query.QueryJob class."""
 
     def __init__(self, rows=None):
         self._rows = rows or MockResult()
@@ -28,7 +28,7 @@ class MockQueryJob:
 
 class MockBqClient(bq.Client):
     """
-    Mock BigQuery Client class.
+    Mock  google.cloud.bigquery.client.Client class.
     """
 
     def __init__(self):
@@ -56,16 +56,24 @@ class MockBqConnection(BqConnection):
 class BqTest:
     """Base class for Big Query integration tests"""
 
+    # author and grp_project are not used in the BQ tests, but are required
+    # so some dummy values are preset
     author: str = 'Author'
     gcp_project: str = 'GCP_PROJECT'
 
     def set_up(self):
         self.table_obj = None
 
+        # mock BigQuery client
         self.bq_client = MockBqClient()
+
+        # Mockup BQ results
         self.bq_result = self.bq_client.mock_query_job
+
+        # Mock BqConnection
         self.connection = MockBqConnection(
             gcp_project=self.gcp_project, author=self.author, client=self.bq_client
         )
 
+        # Mockup BillingLayer
         self.layer = BillingLayer(self.connection)
