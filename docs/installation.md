@@ -30,7 +30,6 @@ uv sync
 
 #### Running Postgres
 Metamist uses a Postgres database. Docker is the easiest way to run the Metamist Postgres database locally.
-
 We have found that [OrbStack](https://orbstack.dev/) is faster and easier to use than [Docker Desktop](https://docs.docker.com/desktop/) but either should work fine.
 
 Setup the Postgres container with docker:
@@ -47,6 +46,7 @@ docker compose exec postgres dbmate up
 At this point, the database will be sufficiently setup to run the unit tests.
 
 ### Running the API
+
 #### Setting environment variables
 To run the API you'll need to set some environment variables. You can either add these to your bash/zsh profile, or if you use vscode you can set up a `.vscode/launch.json` file to make it easy to run and debug the API in vscode. 
 Make sure to choose a username for the `SM_LOCALONLY_DEFAULTUSER` variable, this is the username that will be used for all local operations, it can take any format that you like.
@@ -62,7 +62,7 @@ export SM_DEV_DB_PASSWORD="metamist_password"
 export SM_DEV_DB_PORT="5432"
 ```
 
-> [!NOTE] 
+> [!NOTE]
 > If you are using VSCode to run the API, you should still set the first two variables from the above snippet in your bash/zsh profile.
 > These variables are used in scripts we will run later in the setup, and will not be inherited from your `launch.json` file, *so ensure that the values are the same*.
 
@@ -90,7 +90,7 @@ In your `.vscode/launch.json`, create the following configuration:
 }
 ```
 
-### Giving yourself project creator permissions
+#### Giving yourself project creator permissions
 
 To bootstrap the database with some data, your local user will need permissions. To provide these you will need to connect to the database.
 
@@ -113,11 +113,12 @@ INSERT INTO group_member(group_id, member)
 SELECT id, '<localusername>'
 FROM "group" WHERE name IN ('project-creators', 'members-admin');
 ```
+Make sure that the `<localusername>` is identical to that set in the `SM_LOCALONLY_DEFAULTUSER` environment variable.
 
 You can now exit the Postgres prompt and the container.
 
 
-### Building and installing the local python client
+#### Building and installing the local python client
 
 Next up, we need to run the API generator to create the python client, which will then be used to load some test data into the database.
 
@@ -135,7 +136,7 @@ If you have installed openapi generator using a different method you can set the
 
 The API will be generated in the directory `packages/metamist/src/metamist` and you can build the API for packaging using the `pyproject.toml` file in the `packages/metamist/` directory.
 
-### Starting the API
+#### Starting the API
 
 Now that everything is set up, you can start the api server. If you are using vscode you can do this with the debugger, by first setting up the `launch.json` as described [above](#setting-environment-variables), and then running the API with "Run API" under the *Run and Debug* tab (⌘⇧D) or (Ctrl+Shift+D). F5 is the default shortcut to run the current launch config.
 
@@ -148,7 +149,7 @@ uv run uvicorn --port 8000 --host 0.0.0.0 api.server:app
 ```
 
 
-### Generating some data
+#### Generating some data
 
 To add some data to your database, you can run the `test/data/generate_data.py` script. Make sure you have your virtualenv activated and the `SM_ENVIRONMENT` and `SM_LOCALONLY_DEFAULTUSER` environment variables set before running this, otherwise the Metamist python client will try to add the data to production Metamist.
 
@@ -158,7 +159,7 @@ uv run test/data/generate_data.py
 ```
 
 
-### Conclusion
+#### Conclusion
 
 At this point, your API should be fully functional. You can test scripts by setting the `SM_ENVIRONMENT` variable to `local` so that the Metamist python client points to your local installation. You can also work on developing backend features.
 
