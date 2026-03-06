@@ -113,7 +113,8 @@ INSERT INTO group_member(group_id, member)
 SELECT id, '<localusername>'
 FROM "group" WHERE name IN ('project-creators', 'members-admin');
 ```
-Make sure that the `<localusername>` is identical to that set in the `SM_LOCALONLY_DEFAULTUSER` environment variable.
+> [!NOTE]
+> Make sure that the `<localusername>` is identical to what you set in the `SM_LOCALONLY_DEFAULTUSER` environment variable.
 
 You can now exit the Postgres prompt and the container.
 
