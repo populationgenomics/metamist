@@ -1,4 +1,5 @@
 -- migrate:up
+CREATE EXTENSION IF NOT EXISTS temporal_tables SCHEMA public;
 
 SET search_path TO history, main, public;
 
@@ -74,3 +75,4 @@ DROP TRIGGER IF EXISTS versioning_trigger ON sequencing_group_assay;
 DROP TRIGGER IF EXISTS versioning_trigger ON sequencing_group_comment;
 DROP TRIGGER IF EXISTS versioning_trigger ON sequencing_group_external_id;
 
+DROP EXTENSION IF EXISTS temporal_tables SCHEMA public;
