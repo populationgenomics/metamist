@@ -439,6 +439,8 @@ class SMConnections:
         ar_guid: str,
         meta: dict[str, str],
         on_behalf_of: str | None,
+        project_id_map: dict[ProjectId, Project] | None = None,
+        project_name_map: dict[str, Project] | None = None,
     ):
         """Get a db connection from a project and user"""
         # maybe it makes sense to perform permission checks here too
@@ -451,9 +453,10 @@ class SMConnections:
             on_behalf_of=on_behalf_of,
             ar_guid=ar_guid,
             meta=meta,
-            project_id_map={},
-            project_name_map={},
+            project_id_map=project_id_map or {},
+            project_name_map=project_name_map or {},
         )
 
-        await connection.refresh_projects()
+        if project_id_map is None or project_name_map is None:
+            await connection.refresh_projects()
         return connection
