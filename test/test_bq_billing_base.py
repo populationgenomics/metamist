@@ -1,12 +1,10 @@
 from datetime import datetime
 from typing import Any
-from unittest import mock
 
 import google.cloud.bigquery as bq
+import pytest
 
-from db.python.tables.bq.billing_base import (
-    BillingBaseTable,
-)
+from db.python.tables.bq.billing_base import BillingBaseTable
 from db.python.tables.bq.billing_daily_extended import BillingDailyExtendedTable
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.billing_utils import (
@@ -29,8 +27,7 @@ from models.models import (
     BillingRunningCostQueryModel,
     BillingTotalCostQueryModel,
 )
-from test.testbase import run_as_sync
-from test.testbqbase import BqTest
+from test.testbqbase import BqTest, MockQueryJob, MockResult
 
 
 def mock_execute_query_running_cost(query, *_args, **_kwargs):
@@ -45,20 +42,16 @@ def mock_execute_query_running_cost(query, *_args, **_kwargs):
     if ' as last_loaded_day' in query:
         # This is the 1st query to get last loaded day
         # mockup BQ query result for last_loaded_day as list of rows
-        return [
-            mock.MagicMock(spec=bq.Row, last_loaded_day='2024-01-01 00:00:00+00:00')
-        ]
+        row_values = ('2024-01-01 00:00:00+00:00',)
+        return [bq.Row(row_values, {'last_loaded_day': 0})]
 
     # This is the 2nd query to get aggregated monthly cost
     # return mockup BQ query result as list of rows
     return [
-        mock.MagicMock(
-            spec=bq.Row,
-            field='TOPIC1',
-            cost_category='Compute Engine',
-            daily_cost=123.45,
-            monthly_cost=2345.67,
-        )
+        bq.Row(
+            ('TOPIC1', 'Compute Engine', 123.45, 2345.67),
+            {'field': 0, 'cost_category': 1, 'daily_cost': 2, 'monthly_cost': 3},
+        ),
     ]
 
 
@@ -68,23 +61,20 @@ def mock_execute_query_get_total_cost(_query, *_args, **_kwargs):
     This returns one mockup BQ query result
     """
     # mockup BQ query result topic cost by invoice month, return row iterator
-    mock_rows = mock.MagicMock(spec=bq.table.RowIterator)
-    mock_rows.total_rows = 3
-    mock_rows.__iter__.return_value = [
+    rows = [
         {'day': '202301', 'topic': 'TOPIC1', 'cost': 123.10},
         {'day': '202302', 'topic': 'TOPIC1', 'cost': 223.20},
         {'day': '202303', 'topic': 'TOPIC1', 'cost': 323.30},
     ]
-    mock_result = mock.MagicMock(spec=bq.job.QueryJob)
-    mock_result.result.return_value = mock_rows
-    return mock_result
+    return MockQueryJob(MockResult(rows=rows))
 
 
 class TestBillingBaseTable(BqTest):
     """Test BillingBaseTable and its methods"""
 
-    def setUp(self):
-        super().setUp()
+    @pytest.fixture(autouse=True)
+    def set_up(self):
+        super().set_up()
 
         # setup table object
         # base is abstract, so we need to use a child class
@@ -118,8 +108,7 @@ class TestBillingBaseTable(BqTest):
         )
         filter_ = BillingBaseTable._query_to_partitioned_filter(query)
 
-        # BillingFilter has __eq__ method, so we can compare them directly
-        self.assertEqual(expected_filter, filter_)
+        assert expected_filter == filter_
 
     def test_abbrev_cost_category(self):
         """Test abbrev_cost_category"""
@@ -133,7 +122,7 @@ class TestBillingBaseTable(BqTest):
 
         # test category to abreveation
         for cat, expected_abrev in categories_to_expected.items():
-            self.assertEqual(expected_abrev, abbrev_cost_category(cat))
+            assert expected_abrev == abbrev_cost_category(cat)
 
     def test_prepare_time_periods_by_day(self):
         """Test prepare_time_periods"""
@@ -147,9 +136,9 @@ class TestBillingBaseTable(BqTest):
 
         time_group = prepare_time_periods(query)
 
-        self.assertEqual('FORMAT_DATE("%Y-%m-%d", day) as day', time_group.field)
-        self.assertEqual('PARSE_DATE("%Y-%m-%d", day) as day', time_group.formula)
-        self.assertEqual(',', time_group.separator)
+        assert time_group.field == 'FORMAT_DATE("%Y-%m-%d", day) as day'
+        assert time_group.formula == 'PARSE_DATE("%Y-%m-%d", day) as day'
+        assert time_group.separator == ','
 
     def test_prepare_time_periods_by_week(self):
         """Test prepare_time_periods"""
@@ -163,9 +152,9 @@ class TestBillingBaseTable(BqTest):
 
         time_group = prepare_time_periods(query)
 
-        self.assertEqual('FORMAT_DATE("%Y%W", day) as day', time_group.field)
-        self.assertEqual('PARSE_DATE("%Y%W", day) as day', time_group.formula)
-        self.assertEqual(',', time_group.separator)
+        assert time_group.field == 'FORMAT_DATE("%Y%W", day) as day'
+        assert time_group.formula == 'PARSE_DATE("%Y%W", day) as day'
+        assert time_group.separator == ','
 
     def test_prepare_time_periods_by_month(self):
         """Test prepare_time_periods"""
@@ -179,9 +168,9 @@ class TestBillingBaseTable(BqTest):
 
         time_group = prepare_time_periods(query)
 
-        self.assertEqual('FORMAT_DATE("%Y%m", day) as day', time_group.field)
-        self.assertEqual('PARSE_DATE("%Y%m", day) as day', time_group.formula)
-        self.assertEqual(',', time_group.separator)
+        assert time_group.field == 'FORMAT_DATE("%Y%m", day) as day'
+        assert time_group.formula == 'PARSE_DATE("%Y%m", day) as day'
+        assert time_group.separator == ','
 
     def test_prepare_time_periods_by_invoice_month(self):
         """Test prepare_time_periods"""
@@ -195,106 +184,74 @@ class TestBillingBaseTable(BqTest):
 
         time_group = prepare_time_periods(query)
 
-        self.assertEqual('invoice_month as day', time_group.field)
-        self.assertEqual('PARSE_DATE("%Y%m", day) as day', time_group.formula)
-        self.assertEqual(',', time_group.separator)
+        assert time_group.field == 'invoice_month as day'
+        assert time_group.formula == 'PARSE_DATE("%Y%m", day) as day'
+        assert time_group.separator == ','
 
     def test_filter_to_optimise_query(self):
         """Test _filter_to_optimise_query"""
 
         result = filter_to_optimise_query()
-        self.assertEqual(
-            'day >= TIMESTAMP(@start_day) AND day <= TIMESTAMP(@last_day)', result
-        )
+        assert result == 'day >= TIMESTAMP(@start_day) AND day <= TIMESTAMP(@last_day)'
 
     def test_last_loaded_day_filter(self):
         """Test _last_loaded_day_filter"""
 
         result = last_loaded_day_filter()
-        self.assertEqual('day = TIMESTAMP(@last_loaded_day)', result)
+        assert result == 'day = TIMESTAMP(@last_loaded_day)'
 
     def test_convert_output_empty_results(self):
         """Test _convert_output - various empty results"""
-
-        empty_results = convert_output(None)
-        self.assertEqual([], empty_results)
-
-        query_job_result = mock.MagicMock(spec=bq.job.QueryJob)
-        query_job_result.result.total_rows = 0
-
-        empty_list = convert_output(query_job_result)
-        self.assertEqual([], empty_list)
-
-        query_job_result = mock.MagicMock(spec=bq.job.QueryJob)
-        query_job_result.result.return_value = mock.MagicMock(spec=bq.table.RowIterator)
-
-        empty_row_iterator = convert_output(query_job_result)
-        self.assertEqual([], empty_row_iterator)
+        assert convert_output(None) == []
+        assert convert_output(MockQueryJob(MockResult(total_rows=0))) == []
+        assert convert_output(MockQueryJob(MockResult(rows=[]))) == []
 
     def test_convert_output_one_record(self):
         """Test _convert_output - one record result"""
-
-        mock_rows = mock.MagicMock(spec=bq.table.RowIterator)
-        mock_rows.total_rows = 1
-        mock_rows.__iter__.return_value = [{}]
-
-        query_job_result = mock.MagicMock(spec=bq.job.QueryJob)
-        query_job_result.result.return_value = mock_rows
-
-        single_row = convert_output(query_job_result)
-        self.assertEqual([{}], single_row)
+        single_row = convert_output(MockQueryJob(MockResult(rows=[{}])))
+        assert single_row == [{}]
 
     def test_convert_output_label_record(self):
         """Test _convert_output - test with label item"""
-        mock_rows = mock.MagicMock(spec=bq.table.RowIterator)
-        mock_rows.total_rows = 1
-        mock_rows.__iter__.return_value = [
-            {'labels': [{'key': 'test_key', 'value': 'test_value'}]}
-        ]
-
-        query_job_result = mock.MagicMock(spec=bq.job.QueryJob)
-        query_job_result.result.return_value = mock_rows
-
-        row_iterator = convert_output(query_job_result)
-        self.assertEqual(
-            [
-                {
-                    # keep the original labels
-                    'labels': [{'key': 'test_key', 'value': 'test_value'}],
-                    # append the labels as key-value pairs
-                    'test_key': 'test_value',
-                }
-            ],
-            row_iterator,
+        row_iterator = convert_output(
+            MockQueryJob(
+                MockResult(
+                    rows=[{'labels': [{'key': 'test_key', 'value': 'test_value'}]}]
+                )
+            )
         )
+        assert row_iterator == [
+            {
+                # keep the original tables
+                'labels': [{'key': 'test_key', 'value': 'test_value'}],
+                # append the labels as key-value pairs
+                'test_key': 'test_value',
+            }
+        ]
 
     def test_prepare_order_by_string_empty(self):
         """Test _prepare_order_by_string - empty results"""
-
-        self.assertEqual('', prepare_order_by_string(None))
+        assert prepare_order_by_string(None) == ''
 
     def test_prepare_order_by_string_order_by_one_column(self):
         """Test _prepare_order_by_string"""
 
         # DESC order by column
-        self.assertEqual(
-            'ORDER BY cost DESC',
-            prepare_order_by_string({BillingColumn.COST: True}),
+        assert (
+            prepare_order_by_string({BillingColumn.COST: True}) == 'ORDER BY cost DESC'
         )
-
         # ASC order by column
-        self.assertEqual(
-            'ORDER BY cost ASC',
-            prepare_order_by_string({BillingColumn.COST: False}),
+        assert (
+            prepare_order_by_string({BillingColumn.COST: False}) == 'ORDER BY cost ASC'
         )
 
     def test_prepare_order_by_string_order_by_two_columns(self):
         """Test _prepare_order_by_string - order by 2 columns"""
-        self.assertEqual(
-            'ORDER BY cost ASC,day DESC',
+        assert (
             prepare_order_by_string(
                 {BillingColumn.COST: False, BillingColumn.DAY: True}
-            ),
+            )
+            == 'ORDER BY cost ASC,day DESC'
         )
 
     def test_prepare_aggregation_default_group_by(self):
@@ -305,10 +262,11 @@ class TestBillingBaseTable(BqTest):
         )
 
         fields_selected, group_by = prepare_aggregation(query)
+
         # no fields selected so it is empty
-        self.assertEqual('', fields_selected)
+        assert fields_selected == ''
         # by default results are grouped by day
-        self.assertEqual('GROUP BY day', group_by)
+        assert group_by == 'GROUP BY day'
 
     def test_prepare_aggregation_default_no_grouping_by(self):
         """Test _prepare_aggregation"""
@@ -322,10 +280,11 @@ class TestBillingBaseTable(BqTest):
         )
 
         fields_selected, group_by = prepare_aggregation(query)
+
         # topic field is selected
-        self.assertEqual('topic', fields_selected)
+        assert fields_selected == 'topic'
         # group by is switched off
-        self.assertEqual('', group_by)
+        assert group_by == ''
 
     def test_prepare_aggregation_default_group_by_more_columns(self):
         """Test _prepare_aggregation"""
@@ -340,9 +299,9 @@ class TestBillingBaseTable(BqTest):
         )
 
         fields_selected, group_by = prepare_aggregation(query)
-        self.assertEqual('topic', fields_selected)
+        assert fields_selected == 'topic'
         # always group by day and any field that can be grouped by
-        self.assertEqual('GROUP BY day,topic', group_by)
+        assert group_by == 'GROUP BY day,topic'
 
     def test_execute_query_results_as_list(self):
         """Test _execute_query"""
@@ -354,11 +313,11 @@ class TestBillingBaseTable(BqTest):
         # test results_as_list=True
         given_bq_results = [[], [123], ['a', 'b', 'c']]
         for bq_result in given_bq_results:
-            self.bq_result.result.return_value = bq_result
+            self.bq_result._rows = bq_result
             results = self.table_obj._execute_query(
                 sql_query, sql_params, results_as_list=True
             )
-            self.assertEqual(bq_result, results)
+            assert bq_result == results
 
     def test_execute_query_results_not_as_list(self):
         """Test _execute_query"""
@@ -371,12 +330,12 @@ class TestBillingBaseTable(BqTest):
         given_bq_results = [[], [123], ['a', 'b', 'c']]
         for bq_result in given_bq_results:
             # mock BigQuery result
-            self.bq_result.result.return_value = bq_result
+            self.bq_result._rows = bq_result
             self.bq_result.total_bytes_processed = 0
             results = self.table_obj._execute_query(
                 sql_query, sql_params, results_as_list=True
             )
-            self.assertEqual(bq_result, results)
+            assert bq_result == results
 
     def test_execute_query_with_sql_params(self):
         """Test _execute_query"""
@@ -390,14 +349,14 @@ class TestBillingBaseTable(BqTest):
         given_bq_results = [[], [123], ['a', 'b', 'c']]
         for bq_result in given_bq_results:
             # mock BigQuery result
-            self.bq_result.result.return_value = bq_result
+            self.bq_result._rows = bq_result
             self.bq_result.total_bytes_processed = 0
             results = self.table_obj._execute_query(
                 sql_query, sql_params, results_as_list=True
             )
-            self.assertEqual(bq_result, results)
+            assert bq_result == results
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_append_total_running_cost_no_topic(self):
         """Test _append_total_running_cost"""
 
@@ -413,26 +372,23 @@ class TestBillingBaseTable(BqTest):
             results=[],
         )
 
-        self.assertEqual(
-            [
-                BillingCostBudgetRecord(
-                    field='All Topics',
-                    total_monthly=3000.0,
-                    total_daily=300.0,
-                    compute_monthly=1000.0,
-                    compute_daily=100.0,
-                    storage_monthly=2000.0,
-                    storage_daily=200.0,
-                    details=[],
-                    budget_spent=None,
-                    budget=None,
-                    last_loaded_day=None,
-                )
-            ],
-            total_record,
-        )
+        assert [
+            BillingCostBudgetRecord(
+                field='All Topics',
+                total_monthly=3000.0,
+                total_daily=300.0,
+                compute_monthly=1000.0,
+                compute_daily=100.0,
+                storage_monthly=2000.0,
+                storage_daily=200.0,
+                details=[],
+                budget_spent=None,
+                budget=None,
+                last_loaded_day=None,
+            )
+        ] == total_record
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_append_total_running_cost_not_current_month(self):
         """Test _append_total_running_cost"""
 
@@ -448,26 +404,23 @@ class TestBillingBaseTable(BqTest):
             results=[],
         )
 
-        self.assertEqual(
-            [
-                BillingCostBudgetRecord(
-                    field='All Topics',
-                    total_monthly=3000.0,
-                    total_daily=None,
-                    compute_monthly=1000.0,
-                    compute_daily=None,
-                    storage_monthly=2000.0,
-                    storage_daily=None,
-                    details=[],
-                    budget_spent=None,
-                    budget=None,
-                    last_loaded_day=None,
-                )
-            ],
-            total_record,
-        )
+        assert [
+            BillingCostBudgetRecord(
+                field='All Topics',
+                total_monthly=3000.0,
+                total_daily=None,
+                compute_monthly=1000.0,
+                compute_daily=None,
+                storage_monthly=2000.0,
+                storage_daily=None,
+                details=[],
+                budget_spent=None,
+                budget=None,
+                last_loaded_day=None,
+            )
+        ] == total_record
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_append_total_running_cost_current_month(self):
         """Test _append_total_running_cost"""
 
@@ -490,45 +443,42 @@ class TestBillingBaseTable(BqTest):
             results=[],
         )
 
-        self.assertEqual(
-            [
-                BillingCostBudgetRecord(
-                    field='All Topics',
-                    total_monthly=3000.0,
-                    total_daily=300.0,
-                    compute_monthly=1000.0,
-                    compute_daily=100.0,
-                    storage_monthly=2000.0,
-                    storage_daily=200.0,
-                    details=[
-                        BillingCostDetailsRecord(
-                            cost_group='C',
-                            cost_category='Compute Engine',
-                            daily_cost=90.0,
-                            monthly_cost=900.0,
-                        ),
-                        BillingCostDetailsRecord(
-                            cost_group='S',
-                            cost_category='Cloud Storage',
-                            daily_cost=200.0,
-                            monthly_cost=2000.0,
-                        ),
-                        BillingCostDetailsRecord(
-                            cost_group='C',
-                            cost_category='Other',
-                            daily_cost=10.0,
-                            monthly_cost=100.0,
-                        ),
-                    ],
-                    budget_spent=None,
-                    budget=None,
-                    last_loaded_day=None,
-                )
-            ],
-            total_record,
-        )
+        assert [
+            BillingCostBudgetRecord(
+                field='All Topics',
+                total_monthly=3000.0,
+                total_daily=300.0,
+                compute_monthly=1000.0,
+                compute_daily=100.0,
+                storage_monthly=2000.0,
+                storage_daily=200.0,
+                details=[
+                    BillingCostDetailsRecord(
+                        cost_group='C',
+                        cost_category='Compute Engine',
+                        daily_cost=90.0,
+                        monthly_cost=900.0,
+                    ),
+                    BillingCostDetailsRecord(
+                        cost_group='S',
+                        cost_category='Cloud Storage',
+                        daily_cost=200.0,
+                        monthly_cost=2000.0,
+                    ),
+                    BillingCostDetailsRecord(
+                        cost_group='C',
+                        cost_category='Other',
+                        daily_cost=10.0,
+                        monthly_cost=100.0,
+                    ),
+                ],
+                budget_spent=None,
+                budget=None,
+                last_loaded_day=None,
+            )
+        ] == total_record
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_budgets_by_gcp_project_empty_results(self):
         """Test _budgets_by_gcp_project"""
 
@@ -536,61 +486,59 @@ class TestBillingBaseTable(BqTest):
         empty_result = await self.table_obj._budgets_by_gcp_project(
             BillingColumn.TOPIC, False
         )
-        self.assertEqual({}, empty_result)
+        assert empty_result == {}
 
         # GCP_PROJECT and current month, but BQ mockup setup as empty values
         empty_result = await self.table_obj._budgets_by_gcp_project(
             BillingColumn.GCP_PROJECT, True
         )
-        self.assertEqual({}, empty_result)
+        assert empty_result == {}
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_budgets_by_gcp_project_with_results(self):
         """Test _budgets_by_gcp_project"""
 
         # GCP_PROJECT and current month and Mockup set as 2 records
-        self.bq_result.result.return_value = [
-            mock.MagicMock(spec=bq.Row, gcp_project='Project1', budget=1000.0),
-            mock.MagicMock(spec=bq.Row, gcp_project='Project2', budget=2000.0),
+        self.bq_result._rows = [
+            bq.Row(('Project1', 1000.0), {'gcp_project': 0, 'budget': 1}),
+            bq.Row(('Project2', 2000.0), {'gcp_project': 0, 'budget': 1}),
         ]
 
         non_empty_result = await self.table_obj._budgets_by_gcp_project(
             BillingColumn.GCP_PROJECT, True
         )
-        self.assertDictEqual({'Project1': 1000.0, 'Project2': 2000.0}, non_empty_result)
+        assert non_empty_result == {'Project1': 1000.0, 'Project2': 2000.0}
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_execute_running_cost_query_invalid_months(self):
         """Test _execute_running_cost_query"""
 
         # test invalid inputs
-        with self.assertRaises(ValueError) as context:
+        with pytest.raises(ValueError) as context:
             await self.table_obj._execute_running_cost_query_with_filters(
                 BillingRunningCostQueryModel(
                     field=BillingColumn.TOPIC, invoice_month=None
                 )
             )
+        assert 'Invalid invoice month' in str(context.value)
 
-        self.assertTrue('Invalid invoice month' in str(context.exception))
-
-        with self.assertRaises(ValueError) as context:
+        with pytest.raises(ValueError) as context:
             await self.table_obj._execute_running_cost_query_with_filters(
                 BillingRunningCostQueryModel(
                     field=BillingColumn.TOPIC, invoice_month='12345678'
                 )
             )
+        assert 'Invalid invoice month' in str(context.value)
 
-        self.assertTrue('Invalid invoice month' in str(context.exception))
-
-        with self.assertRaises(ValueError) as context:
+        with pytest.raises(ValueError) as context:
             await self.table_obj._execute_running_cost_query_with_filters(
                 BillingRunningCostQueryModel(
                     field=BillingColumn.TOPIC, invoice_month='1024AA'
                 )
             )
-        self.assertTrue('Invalid invoice month' in str(context.exception))
+        assert 'Invalid invoice month' in str(context.value)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_execute_running_cost_query_empty_results_old_month(self):
         """Test _execute_running_cost_query"""
 
@@ -605,11 +553,11 @@ class TestBillingBaseTable(BqTest):
             )
         )
 
-        self.assertEqual(False, is_current_month)
-        self.assertEqual(None, last_loaded_day)
-        self.assertEqual([], query_job_result)
+        assert is_current_month is False
+        assert last_loaded_day is None
+        assert query_job_result == []
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_execute_running_cost_query_empty_results_current_month(self):
         """Test _execute_running_cost_query"""
 
@@ -626,11 +574,11 @@ class TestBillingBaseTable(BqTest):
             )
         )
 
-        self.assertEqual(True, is_current_month)
-        self.assertEqual(None, last_loaded_day)
-        self.assertEqual([], query_job_result)
+        assert is_current_month
+        assert last_loaded_day is None
+        assert query_job_result == []
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_append_total_running_cost_empty_results(self):
         """Test append_total_running_cost"""
 
@@ -645,9 +593,9 @@ class TestBillingBaseTable(BqTest):
             results=[],
         )
 
-        self.assertEqual([], empty_results)
+        assert empty_results == []
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_append_running_cost_records_simple_data(self):
         """Test append_running_cost_records"""
 
@@ -666,26 +614,23 @@ class TestBillingBaseTable(BqTest):
             results=[],
         )
 
-        self.assertEqual(
-            [
-                BillingCostBudgetRecord(
-                    field='Project1',
-                    total_monthly=0.0,
-                    compute_monthly=0.0,
-                    compute_daily=0.0,
-                    storage_monthly=0.0,
-                    storage_daily=0.0,
-                    details=[],
-                    last_loaded_day=None,
-                    total_daily=None,
-                    budget_spent=None,
-                    budget=None,
-                )
-            ],
-            simple_result,
-        )
+        assert [
+            BillingCostBudgetRecord(
+                field='Project1',
+                total_monthly=0.0,
+                compute_monthly=0.0,
+                compute_daily=0.0,
+                storage_monthly=0.0,
+                storage_daily=0.0,
+                details=[],
+                last_loaded_day=None,
+                total_daily=None,
+                budget_spent=None,
+                budget=None,
+            )
+        ] == simple_result
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_append_running_cost_records_with_details(self):
         """Test append_running_cost_records"""
 
@@ -711,38 +656,35 @@ class TestBillingBaseTable(BqTest):
             results=[],
         )
 
-        self.assertEqual(
-            [
-                BillingCostBudgetRecord(
-                    field='Project2',
-                    total_monthly=0.0,
-                    compute_monthly=0.0,
-                    compute_daily=0.0,
-                    storage_monthly=0.0,
-                    storage_daily=0.0,
-                    details=[
-                        BillingCostDetailsRecord(
-                            cost_group='C',
-                            cost_category='Compute Engine',
-                            daily_cost=90.0,
-                            monthly_cost=900.0,
-                        )
-                    ],
-                    last_loaded_day=None,
-                    total_daily=None,
-                    budget_spent=None,
-                    budget=None,
-                )
-            ],
-            detailed_result,
-        )
+        assert [
+            BillingCostBudgetRecord(
+                field='Project2',
+                total_monthly=0.0,
+                compute_monthly=0.0,
+                compute_daily=0.0,
+                storage_monthly=0.0,
+                storage_daily=0.0,
+                details=[
+                    BillingCostDetailsRecord(
+                        cost_group='C',
+                        cost_category='Compute Engine',
+                        daily_cost=90.0,
+                        monthly_cost=900.0,
+                    )
+                ],
+                last_loaded_day=None,
+                total_daily=None,
+                budget_spent=None,
+                budget=None,
+            )
+        ] == detailed_result
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_get_running_cost_invalid_input(self):
         """Test get_running_cost"""
 
         # test invalid outputs
-        with self.assertRaises(ValueError) as context:
+        with pytest.raises(ValueError) as context:
             await self.table_obj.get_running_cost_with_filters(
                 # not allowed field
                 BillingRunningCostQueryModel(
@@ -751,15 +693,12 @@ class TestBillingBaseTable(BqTest):
                 )
             )
 
-        self.assertTrue(
-            (
-                'Invalid field only topic, dataset, gcp-project, compute_category, '
-                'wdl_task_name, cromwell_sub_workflow_name & namespace are allowed'
-            )
-            in str(context.exception)
-        )
+        assert (
+            'Invalid field only topic, dataset, gcp-project, compute_category, '
+            'wdl_task_name, cromwell_sub_workflow_name & namespace are allowed'
+        ) in str(context.value)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_get_running_cost_empty_results(self):
         """Test get_running_cost"""
 
@@ -771,16 +710,14 @@ class TestBillingBaseTable(BqTest):
             )
         )
 
-        self.assertEqual([], empty_results)
+        assert empty_results == []
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_get_running_cost_older_month(self):
         """Test get_running_cost"""
 
         # mockup BQ sql query result for _execute_running_cost_query function
-        self.table_obj._execute_query = mock.MagicMock(
-            side_effect=mock_execute_query_running_cost
-        )
+        self.table_obj._execute_query = mock_execute_query_running_cost
 
         one_record_result = await self.table_obj.get_running_cost_with_filters(
             BillingRunningCostQueryModel(
@@ -789,61 +726,55 @@ class TestBillingBaseTable(BqTest):
             )
         )
 
-        self.assertEqual(
-            [
-                BillingCostBudgetRecord(
-                    field='All Topics',
-                    total_monthly=2345.67,
-                    total_daily=None,
-                    compute_monthly=2345.67,
-                    compute_daily=None,
-                    storage_monthly=0.0,
-                    storage_daily=None,
-                    details=[
-                        BillingCostDetailsRecord(
-                            cost_group='C',
-                            cost_category='Compute Engine',
-                            daily_cost=None,
-                            monthly_cost=2345.67,
-                        )
-                    ],
-                    budget_spent=None,
-                    budget=None,
-                    last_loaded_day=None,
-                ),
-                BillingCostBudgetRecord(
-                    field='TOPIC1',
-                    total_monthly=2345.67,
-                    total_daily=None,
-                    compute_monthly=2345.67,
-                    compute_daily=0.0,
-                    storage_monthly=0.0,
-                    storage_daily=0.0,
-                    details=[
-                        BillingCostDetailsRecord(
-                            cost_group='C',
-                            cost_category='Compute Engine',
-                            daily_cost=None,
-                            monthly_cost=2345.67,
-                        )
-                    ],
-                    budget_spent=None,
-                    budget=None,
-                    last_loaded_day=None,
-                ),
-            ],
-            one_record_result,
-        )
+        assert [
+            BillingCostBudgetRecord(
+                field='All Topics',
+                total_monthly=2345.67,
+                total_daily=None,
+                compute_monthly=2345.67,
+                compute_daily=None,
+                storage_monthly=0.0,
+                storage_daily=None,
+                details=[
+                    BillingCostDetailsRecord(
+                        cost_group='C',
+                        cost_category='Compute Engine',
+                        daily_cost=None,
+                        monthly_cost=2345.67,
+                    )
+                ],
+                budget_spent=None,
+                budget=None,
+                last_loaded_day=None,
+            ),
+            BillingCostBudgetRecord(
+                field='TOPIC1',
+                total_monthly=2345.67,
+                total_daily=None,
+                compute_monthly=2345.67,
+                compute_daily=0.0,
+                storage_monthly=0.0,
+                storage_daily=0.0,
+                details=[
+                    BillingCostDetailsRecord(
+                        cost_group='C',
+                        cost_category='Compute Engine',
+                        daily_cost=None,
+                        monthly_cost=2345.67,
+                    )
+                ],
+                budget_spent=None,
+                budget=None,
+                last_loaded_day=None,
+            ),
+        ] == one_record_result
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_get_running_cost_current_month(self):
         """Test get_running_cost"""
 
         # mockup BQ sql query result for _execute_running_cost_query function
-        self.table_obj._execute_query = mock.MagicMock(
-            side_effect=mock_execute_query_running_cost
-        )
-
+        self.table_obj._execute_query = mock_execute_query_running_cost
         # use the current month to test the current month branch
         current_month_as_string = datetime.now().strftime('%Y%m')
 
@@ -854,53 +785,50 @@ class TestBillingBaseTable(BqTest):
             )
         )
 
-        self.assertEqual(
-            [
-                BillingCostBudgetRecord(
-                    field='All Topics',
-                    total_monthly=2345.67,
-                    total_daily=123.45,
-                    compute_monthly=2345.67,
-                    compute_daily=123.45,
-                    storage_monthly=0.0,
-                    storage_daily=0.0,
-                    details=[
-                        BillingCostDetailsRecord(
-                            cost_group='C',
-                            cost_category='Compute Engine',
-                            daily_cost=123.45,
-                            monthly_cost=2345.67,
-                        )
-                    ],
-                    budget_spent=None,
-                    budget=None,
-                    last_loaded_day='Jan 01',
-                ),
-                BillingCostBudgetRecord(
-                    field='TOPIC1',
-                    total_monthly=2345.67,
-                    total_daily=123.45,
-                    compute_monthly=2345.67,
-                    compute_daily=123.45,
-                    storage_monthly=0.0,
-                    storage_daily=0.0,
-                    details=[
-                        BillingCostDetailsRecord(
-                            cost_group='C',
-                            cost_category='Compute Engine',
-                            daily_cost=123.45,
-                            monthly_cost=2345.67,
-                        )
-                    ],
-                    budget_spent=None,
-                    budget=None,
-                    last_loaded_day='Jan 01',
-                ),
-            ],
-            current_month_result,
-        )
+        assert [
+            BillingCostBudgetRecord(
+                field='All Topics',
+                total_monthly=2345.67,
+                total_daily=123.45,
+                compute_monthly=2345.67,
+                compute_daily=123.45,
+                storage_monthly=0.0,
+                storage_daily=0.0,
+                details=[
+                    BillingCostDetailsRecord(
+                        cost_group='C',
+                        cost_category='Compute Engine',
+                        daily_cost=123.45,
+                        monthly_cost=2345.67,
+                    )
+                ],
+                budget_spent=None,
+                budget=None,
+                last_loaded_day='Jan 01',
+            ),
+            BillingCostBudgetRecord(
+                field='TOPIC1',
+                total_monthly=2345.67,
+                total_daily=123.45,
+                compute_monthly=2345.67,
+                compute_daily=123.45,
+                storage_monthly=0.0,
+                storage_daily=0.0,
+                details=[
+                    BillingCostDetailsRecord(
+                        cost_group='C',
+                        cost_category='Compute Engine',
+                        daily_cost=123.45,
+                        monthly_cost=2345.67,
+                    )
+                ],
+                budget_spent=None,
+                budget=None,
+                last_loaded_day='Jan 01',
+            ),
+        ] == current_month_result
 
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_get_total_cost(self):
         """Test get_total_cost"""
 
@@ -909,10 +837,9 @@ class TestBillingBaseTable(BqTest):
             fields=[], start_date='2023-01-01', end_date='2024-01-01'
         )
 
-        with self.assertRaises(ValueError) as context:
+        with pytest.raises(ValueError) as context:
             await self.table_obj.get_total_cost(query)
-
-        self.assertTrue('Date and Fields are required' in str(context.exception))
+        assert 'Date and Fields are required' in str(context.value)
 
         # test empty results
         query = BillingTotalCostQueryModel(
@@ -924,19 +851,15 @@ class TestBillingBaseTable(BqTest):
 
         # no BQ mockup data setup, returns empty list
         empty_results = await self.table_obj.get_total_cost(query)
-        self.assertEqual([], empty_results)
+        assert empty_results == []
 
         # mockup BQ sql query result for _execute_query to return 3 records.
         # implementation is inside mock_execute_query function
-        self.table_obj._execute_query = mock.MagicMock(
-            side_effect=mock_execute_query_get_total_cost
-        )
+        self.table_obj._execute_query = mock_execute_query_get_total_cost
+
         results = await self.table_obj.get_total_cost(query)
-        self.assertEqual(
-            [
-                {'day': '202301', 'topic': 'TOPIC1', 'cost': 123.1},
-                {'day': '202302', 'topic': 'TOPIC1', 'cost': 223.2},
-                {'day': '202303', 'topic': 'TOPIC1', 'cost': 323.3},
-            ],
-            results,
-        )
+        assert results == [
+            {'day': '202301', 'topic': 'TOPIC1', 'cost': 123.1},
+            {'day': '202302', 'topic': 'TOPIC1', 'cost': 223.2},
+            {'day': '202303', 'topic': 'TOPIC1', 'cost': 323.3},
+        ]

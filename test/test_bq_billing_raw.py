@@ -1,6 +1,8 @@
 import datetime
 from typing import Any
 
+import pytest
+
 from db.python.tables.bq.billing_filter import BillingFilter
 from db.python.tables.bq.billing_raw import BillingRawTable
 from db.python.tables.bq.generic_bq_filter import GenericBQFilter
@@ -12,8 +14,9 @@ from test.testbqbase import BqTest
 class TestBillingRawTable(BqTest):
     """Test BillingRawTable and its methods"""
 
-    def setUp(self):
-        super().setUp()
+    @pytest.fixture(autouse=True)
+    def set_up(self):
+        super().set_up()
 
         # setup table object
         self.table_obj = BillingRawTable(self.connection)
@@ -46,17 +49,16 @@ class TestBillingRawTable(BqTest):
         filter_ = BillingRawTable._query_to_partitioned_filter(query)
 
         # BillingFilter has __eq__ method, so we can compare them directly
-        self.assertEqual(expected_filter, filter_)
+        assert expected_filter == filter_
 
     def test_error_no_connection(self):
         """Test No connection exception"""
 
-        with self.assertRaises(InternalError) as context:
+        with pytest.raises(InternalError) as context:
             BillingRawTable(None)
 
-        self.assertTrue(
-            "No connection was provided to the table 'BillingRawTable'"
-            in str(context.exception)
+        assert "No connection was provided to the table 'BillingRawTable'" in str(
+            context.value
         )
 
     def test_get_table_name(self):
@@ -71,4 +73,4 @@ class TestBillingRawTable(BqTest):
         # test get table name function
         table_name = self.table_obj.get_table_name()
 
-        self.assertEqual(given_table_name, table_name)
+        assert given_table_name == table_name
