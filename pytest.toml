@@ -27,7 +27,15 @@ python_files = [
     "test_pedigree.py",
     "test_search.py",
     "test_graphql.py",
-    "test_analysis_output_files.py"
+    "test_billing_samples.py",
+    "test_bq_billing_ar_batch.py",
+    "test_bq_billing_base.py",
+    "test_bq_billing_daily.py",
+    "test_bq_billing_daily_extended.py",
+    "test_bq_billing_gcp_daily.py",
+    "test_bq_billing_raw.py",
+    "test_bq_function_filter.py",
+    "test_bq_generic_filter.py"
 ]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
