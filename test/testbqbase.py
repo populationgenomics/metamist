@@ -32,7 +32,6 @@ class MockBqClient(bq.Client):
     """
 
     def __init__(self):
-        super().__init__()
         self.mock_query_job = MockQueryJob()
         self.executed_queries = []
 
@@ -47,10 +46,10 @@ class MockBqConnection(BqConnection):
     """
 
     def __init__(self, gcp_project: str, author: str, client: MockBqClient):
-        super().__init__(author)
         self.gcp_project = gcp_project
         self.author = author
         self.connection = client
+        self._cost = 0
 
 
 class BqTest:
