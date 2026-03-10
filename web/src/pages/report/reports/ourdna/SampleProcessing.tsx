@@ -464,6 +464,62 @@ export default function ProcessingTimes({ project }: { project: string }) {
                     })}
                 />
             </ReportRow>
+            <ReportRow>
+                <ReportItemPlot
+                    height={ROW_HEIGHT}
+                    flexGrow={1}
+                    title="Viability by collection day"
+                    description="Shows the percent viability of PBMC samples based on their collection date."
+                    project={project}
+                    query={[
+                        {
+                            name: 'result',
+                            query: `
+                                SELECT
+                                    try_strptime(meta_collection_datetime, '%Y-%m-%dT%H:%M:%S') as collection_time,
+                                    meta_percent_viability as percent_viability
+                                FROM
+                                    sample
+                                WHERE
+                                    type = 'pbmc'
+                                    AND meta_collection_datetime IS NOT NULL
+                                    AND meta_percent_viability IS NOT NULL
+                            `,
+                        },
+                    ]}
+                    plot={(data) => ({
+                        y: { grid: true, label: 'Percent Viability' },
+                        x: { grid: true, label: 'Collection Date' },
+                        marginTop: 20,
+                        marginRight: 20,
+                        marginBottom: 50,
+                        marginLeft: 50,
+                        marks: [
+                            Plot.dot(data, {
+                                x: 'collection_time',
+                                y: 'percent_viability',
+                                // stroke: null,
+                                tip: true,
+                            }),
+                            // Plot.dot(data, {
+                            //     x: 'collection_time',
+                            //     y: 'percent_viability',
+                                
+                            //     fill: 'processing_site',
+                            //     fillOpacity: 0.5,
+                            //     channels: {
+                            //         process_end: 'process_end_time',
+                            //         sample_id: 'sample_id',
+                            //         sample_agd_id: 'sample_agd_id',
+                            //         participant_id: 'participant_id',
+                            //         participant_portal_id: 'participant_portal_id',
+                            //     },
+                            //     tip: true,
+                            // }),
+                        ],
+                    })}
+                />
+            </ReportRow>
         </Report>
     )
 }
