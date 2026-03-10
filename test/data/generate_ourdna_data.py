@@ -4,6 +4,8 @@ This is a simple script to generate some participants and samples for testing ou
 Local Backend API needs to run prior executing this script
 
 """
+import os
+import sys
 
 import argparse
 import datetime
@@ -11,7 +13,7 @@ import random
 import uuid
 from collections.abc import Sequence
 
-from metamist.apis import EnumsApi, ParticipantApi
+from metamist.apis import EnumsApi, ParticipantApi, ProjectApi
 from metamist.models import ParticipantUpsert, SampleUpsert
 
 
@@ -350,6 +352,7 @@ def create_participant():
 
 def main(project='ourdna', num_participants=10):
     """Doing the generation for you"""
+    project_api = ProjectApi()
     participant_api = ParticipantApi()
 
     sample_types = [
@@ -364,6 +367,26 @@ def main(project='ourdna', num_participants=10):
     # add sample type enums
     for typ in sample_types:
         enums_api.post_sample_types(new_type=typ)
+
+    # Create the project if it doesn't exist
+    existing_projects = project_api.get_my_projects()
+    if project not in existing_projects:
+        project_api.create_project(
+            name=project, dataset=project, create_test_project=False
+        )
+        default_user = os.getenv('SM_LOCALONLY_DEFAULTUSER')
+        if not default_user:
+            print(
+                'SM_LOCALONLY_DEFAULTUSER env var is not set, please set it before generating data'
+            )
+            sys.exit(1)
+
+        project_api.update_project_members(
+            project=project,
+            project_member_update=[
+                {'member': default_user, 'roles': ['reader', 'writer']}
+            ],
+        )
 
     participants = [create_participant() for _ in range(num_participants)]
     participants_rec = participant_api.upsert_participants(project, participants)
