@@ -17,6 +17,8 @@ from typing import Any, Protocol
 import psycopg
 import pytest
 from fastapi import FastAPI
+from gql import GraphQLRequest
+from graphql import DocumentNode, print_ast
 from httpx import ASGITransport, AsyncClient
 from psycopg import AsyncConnection, sql
 from psycopg.rows import DictRow, dict_row
@@ -359,6 +361,28 @@ class GraphQLQueryFunction(Protocol):
     def __call__(
         self, query: str, variables: dict[str, Any] | None = None
     ) -> Awaitable[dict[str, Any]]: ...
+
+
+def convert_query_to_string(query):
+    """Convert DocumentNode or GraphQLRequest to string for testing."""
+    if isinstance(query, GraphQLRequest):
+        return print_ast(query.document)
+    if isinstance(query, DocumentNode):
+        return print_ast(query)
+    return query
+
+
+def make_graphql_query_mock(graphql_query: GraphQLQueryFunction):
+    """Create a mock for query_async that routes through the test graphql_query fixture."""
+
+    async def _mock(query, variables=None):
+        query_str = convert_query_to_string(query)
+        result = await graphql_query(query_str, variables)
+        if 'errors' in result and result['errors']:
+            raise Exception(result['errors'])
+        return result['data']
+
+    return _mock
 
 
 @pytest.fixture

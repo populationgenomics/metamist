@@ -1,18 +1,20 @@
+import pytest
+
+from db.python.connect import Connection
 from db.python.layers.sample import SampleLayer
 from models.models import PRIMARY_EXTERNAL_ORG, SampleUpsertInternal
-from test.testbase import DbIsolatedTest, run_as_sync
 
 
-class TestChangelog(DbIsolatedTest):
+class TestChangelog:
     """Test audit_log"""
 
-    @run_as_sync
-    async def test_insert_sample(self):
+    @pytest.mark.asyncio
+    async def test_insert_sample(self, connection_with_project: Connection):
         """
         Test inserting a sample, and check that the audit_log_id reflects the current
         change
         """
-        slayer = SampleLayer(self.connection)
+        slayer = SampleLayer(connection_with_project)
         sample = await slayer.upsert_sample(
             SampleUpsertInternal(
                 external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
@@ -22,8 +24,10 @@ class TestChangelog(DbIsolatedTest):
             )
         )
 
-        sample_cl_id = await self.connection.connection.fetch_val(
-            'SELECT audit_log_id FROM sample WHERE id = :sid', {'sid': sample.id}
+        cur = await connection_with_project.pg_connection.execute(
+            'SELECT audit_log_id FROM sample WHERE id = %(sid)s', {'sid': sample.id}
         )
+        row = await cur.fetchone()
+        sample_cl_id = row['audit_log_id']
 
-        self.assertEqual(await self.audit_log_id(), sample_cl_id)
+        assert await connection_with_project.audit_log_id() == sample_cl_id

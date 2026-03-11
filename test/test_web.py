@@ -366,25 +366,175 @@ SINGLE_PARTICIPANT_QUERY_RESULT = ProjectParticipantGridResponse(
     fields={
         MetaSearchEntityPrefix.FAMILY: [
             ProjectParticipantGridField(
-                key='external_ids', label='Family ID', is_visible=True
+                key='external_ids',
+                label='Family ID',
+                is_visible=True,
+                filter_key='external_id',
             )
         ],
         MetaSearchEntityPrefix.PARTICIPANT: [
             ProjectParticipantGridField(
-                key='external_ids', label='Participant ID', is_visible=True
+                key='id',
+                label='Participant ID',
+                is_visible=True,
+                filter_key='id',
+                filter_types=[
+                    ProjectParticipantGridFilterType.eq,
+                    ProjectParticipantGridFilterType.neq,
+                    ProjectParticipantGridFilterType.gt,
+                    ProjectParticipantGridFilterType.gte,
+                    ProjectParticipantGridFilterType.lt,
+                    ProjectParticipantGridFilterType.lte,
+                ],
+            ),
+            ProjectParticipantGridField(
+                key='external_ids',
+                label='External Participant ID',
+                is_visible=True,
+                filter_key='external_id',
+            ),
+            ProjectParticipantGridField(
+                key='reported_sex',
+                label='Reported sex',
+                is_visible=False,
+                filter_key='reported_sex',
+            ),
+            ProjectParticipantGridField(
+                key='reported_gender',
+                label='Reported gender',
+                is_visible=False,
+                filter_key='reported_gender',
+            ),
+            ProjectParticipantGridField(
+                key='karyotype',
+                label='Karyotype',
+                is_visible=False,
+                filter_key='karyotype',
             ),
         ],
         MetaSearchEntityPrefix.SAMPLE: [
-            ProjectParticipantGridField(key='meta.skey', label='', is_visible=True),
-            ProjectParticipantGridField(key='external_ids', label='', is_visible=True),
+            ProjectParticipantGridField(
+                key='id',
+                label='Sample ID',
+                is_visible=True,
+                filter_key='id',
+                filter_types=[
+                    ProjectParticipantGridFilterType.eq,
+                    ProjectParticipantGridFilterType.neq,
+                ],
+            ),
+            ProjectParticipantGridField(
+                key='external_ids',
+                label='External Sample ID',
+                is_visible=True,
+                filter_key='external_id',
+            ),
+            ProjectParticipantGridField(
+                key='type',
+                label='Type',
+                is_visible=True,
+            ),
+            ProjectParticipantGridField(
+                key='sample_root_id',
+                label='Root Sample ID',
+                is_visible=False,
+                filter_key='sample_root_id',
+            ),
+            ProjectParticipantGridField(
+                key='sample_parent_id',
+                label='Parent Sample ID',
+                is_visible=False,
+                filter_key='sample_root_id',
+            ),
+            ProjectParticipantGridField(
+                key='created_date',
+                label='Created date',
+                is_visible=True,
+            ),
         ],
         MetaSearchEntityPrefix.SEQUENCING_GROUP: [
-            ProjectParticipantGridField(key='type', label='', is_visible=True),
-            ProjectParticipantGridField(key='meta.sgkey', label='', is_visible=True),
+            ProjectParticipantGridField(
+                key='id',
+                label='Sequencing Group ID',
+                is_visible=True,
+                filter_key='id',
+                filter_types=[
+                    ProjectParticipantGridFilterType.eq,
+                    ProjectParticipantGridFilterType.neq,
+                ],
+            ),
+            ProjectParticipantGridField(
+                key='type',
+                label='Type',
+                is_visible=True,
+                filter_key='type',
+            ),
+            ProjectParticipantGridField(
+                key='technology',
+                label='Technology',
+                is_visible=True,
+                filter_key='technology',
+            ),
+            ProjectParticipantGridField(
+                key='platform',
+                label='Platform',
+                is_visible=True,
+                filter_key='platform',
+            ),
         ],
         MetaSearchEntityPrefix.ASSAY: [
-            ProjectParticipantGridField(key='type', label='', is_visible=True),
-            ProjectParticipantGridField(key='meta.akey', label='', is_visible=True),
+            ProjectParticipantGridField(
+                key='id',
+                label='Assay ID',
+                is_visible=True,
+                filter_key='id',
+                filter_types=[
+                    ProjectParticipantGridFilterType.eq,
+                    ProjectParticipantGridFilterType.neq,
+                ],
+            ),
+            ProjectParticipantGridField(
+                key='type',
+                label='Type',
+                is_visible=True,
+                filter_key='type',
+            ),
+            ProjectParticipantGridField(
+                key='meta.batch',
+                label='batch',
+                is_visible=True,
+                filter_key='meta.batch',
+            ),
+            ProjectParticipantGridField(
+                key='meta.reads',
+                label='reads',
+                is_visible=False,
+                filter_key='meta.reads',
+            ),
+            ProjectParticipantGridField(
+                key='meta.reads_type',
+                label='reads_type',
+                is_visible=True,
+                filter_key='meta.reads_type',
+            ),
+            ProjectParticipantGridField(
+                key='meta.sequencing_type',
+                label='sequencing_type',
+                is_visible=False,
+                filter_key='meta.sequencing_type',
+            ),
+            ProjectParticipantGridField(
+                key='meta.sequencing_platform',
+                label='sequencing_platform',
+                is_visible=False,
+                filter_key='meta.sequencing_platform',
+            ),
+            ProjectParticipantGridField(
+                key='meta.sequencing_technology',
+                label='sequencing_technology',
+                is_visible=False,
+                filter_key='meta.sequencing_technology',
+            ),
         ],
     },
 )
@@ -505,8 +655,6 @@ class TestWeb:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(reason='Querying JSON keys is not implemented at the moment')
-    # TODO Revisit this when querying JSON keys is implemented
     async def test_project_summary_with_filter_with_results(
         self, test_participant: ParticipantUpsertInternal
     ):
@@ -535,8 +683,6 @@ class TestWeb:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(reason='Querying JSON keys is not implemented at the moment')
-    # TODO Revisit this when querying JSON keys is implemented
     async def test_project_summary_with_filter_no_results(
         self, test_participant: ParticipantUpsertInternal
     ):
@@ -560,14 +706,17 @@ class TestWeb:
             total_results=0,
             filter_fields=pfilter,
         )
-        result.participants = []
-        assert result == SINGLE_PARTICIPANT_QUERY_RESULT
+        # Verify correct total and empty participants
+        assert result.total_results == 0
+        assert result.participants == []
 
-        empty_result = ProjectParticipantGridResponse(
-            total_results=0, participants=[], fields={}
-        )
-
-        assert empty_result == result
+        # Fields should still be generated from filter, even with no data
+        assert result.fields is not None
+        # Should have fields for each entity prefix
+        assert MetaSearchEntityPrefix.ASSAY in result.fields
+        # The batch filter key should appear in assay fields
+        assay_field_keys = [f.key for f in result.fields[MetaSearchEntityPrefix.ASSAY]]
+        assert 'meta.batch' in assay_field_keys
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
@@ -735,8 +884,6 @@ class TestWeb:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    @pytest.mark.skip(reason='Querying JSON keys is not implemented at the moment')
-    # TODO Revisit this when querying JSON keys is implemented
     async def test_field_with_space(
         self,
         test_participant: ParticipantUpsertInternal,
@@ -749,7 +896,7 @@ class TestWeb:
 
         pfilter = ProjectParticipantGridFilter(
             assay=ProjectParticipantGridFilter.ParticipantGridAssayFilter(
-                meta={'field with spaces': GenericFilter[Any](contains='field wi')}
+                meta={'"field with spaces"': GenericFilter[Any](contains='field wi')}
             )
         )
         nested_participants = await self.web_layer.query_participants(
