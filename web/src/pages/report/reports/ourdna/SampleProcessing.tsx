@@ -590,6 +590,86 @@ export default function ProcessingTimes({ project }: { project: string }) {
                     })}
                 />
             </ReportRow>
+            <ReportRow>
+                <ReportItemTable
+                    height={ROW_HEIGHT}
+                    flexGrow={1}
+                    flexBasis={300}
+                    title="PBMC Viability Statistics"
+                    description="Summary statistics for the box-and-whisker plot, showing the distribution of PBMC sample viability for each biobank, event-type, collection-centre combination."
+                    project={project}
+                    showToolbar={true}
+                    query={[
+                        {
+                            name: 'pbmc_data',
+                            query: `
+                                SELECT
+                                    s_child.meta_percent_viability as percent_viability,
+                                    s_parent.meta_processing_site || ' - ' || s_parent.meta_collection_event_type || ' - ' || s_parent.meta_collection_lab as grouping_combination
+                                FROM
+                                    sample AS s_child
+                                JOIN
+                                    sample AS s_parent ON s_child.sample_parent_id = s_parent.sample_id
+                                WHERE
+                                    s_child.type = 'pbmc'
+                                    AND s_child.meta_percent_viability IS NOT NULL
+                                    AND s_parent.meta_processing_site IS NOT NULL
+                                    AND s_parent.meta_collection_event_type IS NOT NULL
+                                    AND s_parent.meta_collection_lab IS NOT NULL
+                            `,
+                        },
+                        {
+                            name: 'quartiles',
+                            query: `
+                                SELECT
+                                    grouping_combination,
+                                    quantile_disc(percent_viability, 0.25) AS q1,
+                                    quantile_disc(percent_viability, 0.75) AS q3,
+                                    q3 - q1 AS iqr
+                                FROM pbmc_data
+                                GROUP BY 1
+                            `,
+                        },
+                        {
+                            name: 'stats_no_outliers',
+                            query: `
+                                WITH non_outliers AS (
+                                    SELECT
+                                        p.grouping_combination,
+                                        p.percent_viability
+                                    FROM pbmc_data p
+                                    JOIN quartiles q ON p.grouping_combination = q.grouping_combination
+                                    WHERE p.percent_viability >= q.q1 - 1.5 * q.iqr AND p.percent_viability <= q.q3 + 1.5 * q.iqr
+                                )
+                                SELECT
+                                    grouping_combination,
+                                    MIN(percent_viability) as min_val,
+                                    MAX(percent_viability) as max_val
+                                FROM non_outliers
+                                GROUP BY 1
+                            `,
+                        },
+                        {
+                            name: 'result',
+                            query: `
+                                SELECT
+                                    p.grouping_combination AS "Processing Combination",
+                                    s.min_val AS "Minimum (No Outliers)",
+                                    q.q1 AS "Q1",
+                                    median(p.percent_viability) AS "Median (Q2)",
+                                    q.q3 AS "Q3",
+                                    s.max_val AS "Maximum (No Outliers)",
+                                    avg(p.percent_viability) AS "Average"
+                                FROM pbmc_data p
+                                JOIN quartiles q ON p.grouping_combination = q.grouping_combination
+                                JOIN stats_no_outliers s ON p.grouping_combination = s.grouping_combination
+                                GROUP BY 1, 2, 3, 5, 6
+                                ORDER BY 1
+                            `,
+                        },
+                    ]}
+                />
+            </ReportRow>
         </Report>
     )
 }
