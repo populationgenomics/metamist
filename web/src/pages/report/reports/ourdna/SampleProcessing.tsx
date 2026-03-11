@@ -527,7 +527,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                     plot={(data) => ({
                         y: { grid: true, label: 'Percent Viability' },
                         x: { grid: true, label: 'Collection Date' },
-                        colour: { legend: true },
+                        color: { legend: true },
                         marginTop: 20,
                         marginRight: 20,
                         marginBottom: 50,
