@@ -544,8 +544,8 @@ export default function ProcessingTimes({ project }: { project: string }) {
                 <ReportItemPlot
                     height={ROW_HEIGHT}
                     flexGrow={1}
-                    title="PBMC Viability by Processing Group"
-                    description="Box-and-whisker plot of PBMC sample viability, grouped by processing site, collection event type, and collection lab."
+                    title="PBMC Viability by Processing Combination"
+                    description="Box-and-whisker plot of PBMC sample viability, grouped by their biobank, event-type, collection-centre combination."
                     project={project}
                     query={[
                         {
@@ -569,7 +569,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                     ]}
                     plot={(data) => ({
                         y: { grid: true, label: 'Percent Viability' },
-                        x: { label: 'Processing Group' },
+                        x: { label: 'Processing Combination' },
                         color: {
                             scheme: 'RdYlGn',
                             legend: true,
