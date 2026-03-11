@@ -1,4 +1,13 @@
+import {
+    Box,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    Select,
+    SelectChangeEvent,
+} from '@mui/material'
 import * as Plot from '@observablehq/plot'
+import { useState } from 'react'
 import Report from '../../components/Report'
 import { ReportItemPlot, ReportItemTable } from '../../components/ReportItem'
 import ReportRow from '../../components/ReportRow'
@@ -84,7 +93,7 @@ function ProcessingTimesByCollectionDay(props: {
                 marginRight: 0,
                 marginBottom: 40,
                 marginLeft: 0,
-                color: {
+                colour: {
                     scheme: 'RdYlGn',
                     legend: true,
                     reverse: true,
@@ -164,7 +173,7 @@ function ProcessingTimesByAncestry(props: { project: string }) {
                 marginRight: 100,
                 marginBottom: 40,
                 marginLeft: 100,
-                color: {
+                colour: {
                     scheme: 'RdYlGn',
                     legend: true,
                     reverse: true,
@@ -194,6 +203,12 @@ function ProcessingTimesByAncestry(props: { project: string }) {
 }
 
 export default function ProcessingTimes({ project }: { project: string }) {
+    const [viabilityColour, setViabilityColour] = useState('processing_site')
+
+    const handleColourChange = (event: SelectChangeEvent) => {
+        setViabilityColour(event.target.value as string)
+    }
+
     return (
         <Report>
             <ReportRow>
@@ -221,7 +236,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                         marginTop: 20,
                         marginRight: 20,
                         marginBottom: 40,
-                        color: { legend: true },
+                        colour: { legend: true },
 
                         marginLeft: 40,
                         marks: [
@@ -270,7 +285,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                         marginTop: 20,
                         marginRight: 20,
                         marginBottom: 40,
-                        color: { legend: true },
+                        colour: { legend: true },
 
                         marginLeft: 40,
                         marks: [
@@ -336,7 +351,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                     plot={(data) => ({
                         marginLeft: 100,
                         inset: 10,
-                        color: {
+                        colour: {
                             scheme: 'RdYlGn',
                             reverse: true,
                         },
@@ -380,7 +395,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                         marginLeft: 100,
                         marginRight: 100,
                         inset: 10,
-                        color: {
+                        colour: {
                             scheme: 'RdYlGn',
                             reverse: true,
                         },
@@ -465,6 +480,23 @@ export default function ProcessingTimes({ project }: { project: string }) {
                 />
             </ReportRow>
             <ReportRow>
+                <Box>
+                    <FormControl sx={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2, minWidth: 200 }}>
+                        <InputLabel id="viability-colour-label">Colour by</InputLabel>
+                        <Select
+                            labelId="viability-colour-label"
+                            value={viabilityColour}
+                            label="Colour by"
+                            onChange={handleColourChange}
+                        >
+                            <MenuItem value="processing_site">Processing Site</MenuItem>
+                            <MenuItem value="collection_lab">Collection Lab</MenuItem>
+                            <MenuItem value="collection_event_type">Collection Event Type</MenuItem>
+                        </Select>
+                    </FormControl>
+                </Box>
+            </ReportRow>
+            <ReportRow>
                 <ReportItemPlot
                     height={ROW_HEIGHT}
                     flexGrow={1}
@@ -495,6 +527,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                     plot={(data) => ({
                         y: { grid: true, label: 'Percent Viability' },
                         x: { grid: true, label: 'Collection Date' },
+                        colour: { legend: true },
                         marginTop: 20,
                         marginRight: 20,
                         marginBottom: 50,
@@ -503,24 +536,9 @@ export default function ProcessingTimes({ project }: { project: string }) {
                             Plot.dot(data, {
                                 x: 'collection_time',
                                 y: 'percent_viability',
-                                // stroke: null,
+                                fill: viabilityColour,
                                 tip: true,
                             }),
-                            // Plot.dot(data, {
-                            //     x: 'collection_time',
-                            //     y: 'percent_viability',
-                                
-                            //     fill: 'processing_site',
-                            //     fillOpacity: 0.5,
-                            //     channels: {
-                            //         process_end: 'process_end_time',
-                            //         sample_id: 'sample_id',
-                            //         sample_agd_id: 'sample_agd_id',
-                            //         participant_id: 'participant_id',
-                            //         participant_portal_id: 'participant_portal_id',
-                            //     },
-                            //     tip: true,
-                            // }),
                         ],
                     })}
                 />
