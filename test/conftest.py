@@ -13,6 +13,7 @@ import uuid
 from collections.abc import AsyncGenerator, Awaitable, Generator
 from pathlib import Path
 from typing import Any, Protocol
+from unittest.mock import MagicMock
 
 import psycopg
 import pytest
@@ -46,6 +47,24 @@ DB_DIR = Path(__file__).parent.parent / 'db'
 
 # Default test user for authentication
 TEST_USER = 'testuser@example.com'
+
+
+@pytest.fixture(autouse=True)
+def mock_gcs_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Mock the GCS client to avoid requiring GCP credentials in tests.
+
+    This is automatically used by all tests unless overridden by a more specific
+    fixture (e.g. test_analysis_output_files.py has its own fake GCS server).
+    """
+
+    def _mock_get_gcs_client():
+        """Return a mock GCS client that doesn't require credentials."""
+        return MagicMock()
+
+    monkeypatch.setattr(
+        'models.models.output_file.get_gcs_client', _mock_get_gcs_client
+    )
 
 
 class PostgresContainer(DockerContainer):
