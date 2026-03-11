@@ -181,3 +181,14 @@ constraint-dependencies = [
 
 [tool.uv.sources]
 metamist = { path = "packages/metamist", editable = true }
+
+[tool.coverage.run]
+omit = [
+    "test/*",
+    "test/**/*",
+    "packages/metamist/src/metamist/api/*",
+    "packages/metamist/src/metamist/apis/*",
+    "packages/metamist/src/metamist/model/*",
+    "packages/metamist/src/metamist/models/*",
+    "packages/metamist/src/metamist/*.py",
+]
