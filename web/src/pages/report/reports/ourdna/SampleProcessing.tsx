@@ -476,14 +476,19 @@ export default function ProcessingTimes({ project }: { project: string }) {
                             name: 'result',
                             query: `
                                 SELECT
-                                    try_strptime(meta_collection_datetime, '%Y-%m-%dT%H:%M:%S') as collection_time,
-                                    meta_percent_viability as percent_viability
+                                    try_strptime(s_parent.meta_collection_datetime, '%Y-%m-%dT%H:%M:%S') as collection_time,
+                                    s_child.meta_percent_viability as percent_viability,
+                                    s_parent.meta_processing_site as processing_site,
+                                    s_parent.meta_collection_lab as collection_lab,
+                                    s_parent.meta_collection_event_type as collection_event_type
                                 FROM
-                                    sample
+                                    sample AS s_child
+                                JOIN
+                                    sample AS s_parent ON s_child.sample_parent_id = s_parent.sample_id
                                 WHERE
-                                    type = 'pbmc'
-                                    AND meta_collection_datetime IS NOT NULL
-                                    AND meta_percent_viability IS NOT NULL
+                                    s_child.type = 'pbmc'
+                                    AND s_parent.meta_collection_datetime IS NOT NULL
+                                    AND s_child.meta_percent_viability IS NOT NULL
                             `,
                         },
                     ]}
