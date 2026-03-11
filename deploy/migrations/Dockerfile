@@ -19,13 +19,5 @@ RUN uv sync --script /migrate.py
 ENV DBMATE_NO_DUMP_SCHEMA=true
 ENV DBMATE_MIGRATIONS_DIR=/db/migrations
 
-# Secret references (set via Pulumi)
-ENV DATABASE_URL_SECRET=""
-ENV GITHUB_TOKEN_SECRET=""
-
-# Runtime variables (set at execution time)
-ENV GITHUB_REPOSITORY=""
-ENV GITHUB_REF=""
-
 # Run script offline (dependencies already synced)
 ENTRYPOINT ["uv", "run", "--offline", "/migrate.py"]

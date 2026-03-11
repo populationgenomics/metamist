@@ -70,15 +70,16 @@ def mock_gcs_client(monkeypatch: pytest.MonkeyPatch) -> None:
 class PostgresContainer(DockerContainer):
     """Custom PostgreSQL container with temporal_tables extension and dbmate."""
 
-    POSTGRES_USER = 'test_user'
+    POSTGRES_SUPERUSER = 'metamist_superuser'
+    POSTGRES_USER = 'metamist_server'
     POSTGRES_PASSWORD = 'test_password'
-    POSTGRES_DB = 'template_metamist'  # This will be our template database
+    POSTGRES_DB = 'metamist'  # This will be our template database
     POSTGRES_PORT = 5432
 
     def __init__(self, image: str = 'metamist-postgres-test:latest'):
         super().__init__(image)
         self.with_exposed_ports(self.POSTGRES_PORT)
-        self.with_env('POSTGRES_USER', self.POSTGRES_USER)
+        self.with_env('POSTGRES_USER', self.POSTGRES_SUPERUSER)
         self.with_env('POSTGRES_PASSWORD', self.POSTGRES_PASSWORD)
         self.with_env('POSTGRES_DB', self.POSTGRES_DB)
         # Use /dev/shm which is an in-memory tmpfs mount, using this for the postgres
@@ -104,17 +105,24 @@ class PostgresContainer(DockerContainer):
             '-c max_wal_size=1GB'  # Allow more WAL before checkpoint
         )
 
-    def get_connection_url(self, database: str | None = None) -> str:
+    def get_external_server_database_url(self, database: str | None = None) -> str:
         """Get the connection URL for the container. This is the connection used by tests"""
         host = self.get_container_host_ip()
         port = self.get_exposed_port(self.POSTGRES_PORT)
         db = database or self.POSTGRES_DB
         return f'postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{host}:{port}/{db}'
 
-    def get_internal_database_url(self, database: str | None = None) -> str:
+    def get_external_superuser_database_url(self, database: str | None = None) -> str:
+        """Get the database URL for superuser connections from outside the container"""
+        host = self.get_container_host_ip()
+        port = self.get_exposed_port(self.POSTGRES_PORT)
+        db = database or self.POSTGRES_DB
+        return f'postgresql://{self.POSTGRES_SUPERUSER}:{self.POSTGRES_PASSWORD}@{host}:{port}/{db}'
+
+    def get_superuser_database_url(self, database: str | None = None) -> str:
         """Get the database URL for use inside the container, this is used for migrations"""
         db = database or self.POSTGRES_DB
-        return f'postgres://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@localhost:5432/{db}'
+        return f'postgres://{self.POSTGRES_SUPERUSER}:{self.POSTGRES_PASSWORD}@localhost:5432/{db}'
 
     def start(self) -> PostgresContainer:
         """Start the container and wait for PostgreSQL to be ready."""
@@ -125,26 +133,22 @@ class PostgresContainer(DockerContainer):
         )
         return self
 
-    def create_extensions(self) -> None:
-        """Create required PostgreSQL extensions before running migrations."""
-        database_url = self.get_internal_database_url()
+    def run_sql_statements(self, statements: list[str]) -> None:
+        """Run any custom sql required."""
+        database_url = self.get_superuser_database_url()
 
-        extensions = ['temporal_tables']
-
-        for extension in extensions:
-            exit_code, output = self.exec(
-                f'psql "{database_url}" -c "CREATE EXTENSION IF NOT EXISTS {extension} SCHEMA public;"'
-            )
+        for statement in statements:
+            exit_code, output = self.exec(f'psql "{database_url}" -c "{statement}"')
             if exit_code != 0:
                 raise RuntimeError(
-                    f'Failed to create extension {extension} with exit code {exit_code}: {output.decode()}'
+                    f'Failed to execute SQL with exit code {exit_code}: {output.decode()}'
                 )
 
     def run_migrations(self) -> None:
         """Run dbmate migrations inside the container."""
-        database_url = self.get_internal_database_url()
+        database_url = self.get_superuser_database_url()
         exit_code, output = self.exec(
-            f'dbmate --url "{database_url}?sslmode=disable&search_path=main" --migrations-dir /db/migrations --no-dump-schema migrate'
+            f'dbmate --url "{database_url}?sslmode=disable&search_path=public" --migrations-dir /db/migrations --no-dump-schema migrate'
         )
         if exit_code != 0:
             raise RuntimeError(
@@ -154,7 +158,7 @@ class PostgresContainer(DockerContainer):
 
 def _mark_database_as_template(postgres_container: PostgresContainer) -> None:
     """Fixture to ensure the template database is set up before tests run."""
-    database_url = postgres_container.get_connection_url('postgres')
+    database_url = postgres_container.get_external_superuser_database_url('postgres')
     template_db = PostgresContainer.POSTGRES_DB
     # Connect to default postgres database, as we can't be connected to the
     # template database when we mark it as a template
@@ -221,10 +225,16 @@ def postgres_container(
         container.start()
 
         try:
-            # Create required extensions before running migrations
-            container.create_extensions()
             # Run dbmate migrations inside the container to apply schema
             container.run_migrations()
+
+            # Create required extensions before running migrations
+            container.run_sql_statements(
+                [
+                    # Give metamist server login role
+                    f'ALTER ROLE "metamist_server" WITH LOGIN PASSWORD \'{PostgresContainer.POSTGRES_PASSWORD}\';'
+                ]
+            )
             _mark_database_as_template(container)
             yield container
         finally:
@@ -232,28 +242,39 @@ def postgres_container(
 
 
 @pytest.fixture
-def test_db_url(postgres_container: PostgresContainer) -> Generator[str]:
+def test_db_url(
+    request: pytest.FixtureRequest, postgres_container: PostgresContainer
+) -> Generator[str]:
     """
     Fixture that creates a fresh database for each test.
 
     This uses postges's template database functionality to make the creation of
     each database very fast.
     """
+
+    db_superuser_marker = request.node.get_closest_marker('db_superuser')
+    use_superuser: bool = bool(db_superuser_marker)
+
     # random database name
     db_name = f'test_{uuid.uuid4().hex[:12]}'
 
     # Create database from template
-    base_url = postgres_container.get_connection_url('postgres')
-
+    base_url = postgres_container.get_external_superuser_database_url('postgres')
+    template_db = PostgresContainer.POSTGRES_DB
     with psycopg.connect(base_url, autocommit=True) as conn:
-        conn.execute(
-            sql.SQL('CREATE DATABASE {db_name} TEMPLATE {template_db}').format(
-                db_name=sql.Identifier(db_name),
-                template_db=sql.Identifier(PostgresContainer.POSTGRES_DB),
-            ),
-        )
+        conn.execute(t"""
+            CREATE DATABASE {db_name:i} TEMPLATE {template_db:i}
+        """)
 
-    yield postgres_container.get_connection_url(db_name)
+        conn.execute(t"""
+            GRANT CONNECT ON DATABASE {db_name:i} TO metamist_connect
+        """)
+
+    yield (
+        postgres_container.get_external_superuser_database_url(db_name)
+        if use_superuser
+        else postgres_container.get_external_server_database_url(db_name)
+    )
 
     # Once tests are done, then drop the database
     _drop_database(base_url, db_name)
@@ -540,4 +561,8 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         'markers',
         'project_name(name: str): Specify the name of the test project in the seeded test db.',
+    )
+    config.addinivalue_line(
+        'markers',
+        'db_superuser: Use a database superuser rather than the server user.',
     )

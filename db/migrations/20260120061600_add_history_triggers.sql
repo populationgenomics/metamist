@@ -1,5 +1,8 @@
 -- migrate:up
+
 CREATE EXTENSION IF NOT EXISTS temporal_tables SCHEMA public;
+-- Allow users that can connect to the db to use the versioning function
+GRANT EXECUTE ON FUNCTION public.versioning TO metamist_connect;
 
 SET search_path TO history, main, public;
 
@@ -75,4 +78,4 @@ DROP TRIGGER IF EXISTS versioning_trigger ON sequencing_group_assay;
 DROP TRIGGER IF EXISTS versioning_trigger ON sequencing_group_comment;
 DROP TRIGGER IF EXISTS versioning_trigger ON sequencing_group_external_id;
 
-DROP EXTENSION IF EXISTS temporal_tables SCHEMA public;
+DROP EXTENSION IF EXISTS temporal_tables;

@@ -222,7 +222,7 @@ def cmd_up(database_url: str) -> int:
     print()
     print(f'Applying {len(pending)} pending migration(s)...')
 
-    result = run_dbmate(database_url, 'migrate', check=False)
+    result = run_dbmate(database_url, 'up', check=False)
 
     if result.returncode != 0:
         print('ERROR: Migration failed!')

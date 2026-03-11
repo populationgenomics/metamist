@@ -37,4 +37,3 @@ config:
     migrations:
       db_credentials_secret_name: metamist-migration-db-credentials
       github_token_secret_name: metamist-github-token
-

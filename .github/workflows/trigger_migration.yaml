@@ -95,13 +95,13 @@ jobs:
           echo "Repository: ${{ github.repository }}"
           echo "Ref: ${{ github.ref }}"
           echo "============================================"
-          
+
           # Build environment variable overrides
           ENV_VARS="MIGRATION_COMMAND=${{ github.event.inputs.command }}"
           ENV_VARS="$ENV_VARS,GITHUB_REPOSITORY=${{ github.repository }}"
           ENV_VARS="$ENV_VARS,GITHUB_REF=${{ github.ref }}"
-          
-          
+
+
           # Execute the Cloud Run job and capture output
           gcloud run jobs execute ${{ steps.set-variables.outputs.JOB_NAME }} \
             --region=${{ steps.set-variables.outputs.REGION }} \
@@ -116,17 +116,17 @@ jobs:
           echo "============================================"
           echo "Job execution logs (last 50 lines)"
           echo "============================================"
-          
+
           # Get the latest execution
           EXECUTION=$(gcloud run jobs executions list \
             --job=${{ steps.set-variables.outputs.JOB_NAME }} \
             --region=${{ steps.set-variables.outputs.REGION }} \
             --limit=1 \
             --format="value(name)")
-          
+
           echo "Execution: $EXECUTION"
           echo ""
-          
+
           # Fetch logs
           gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=${{ steps.set-variables.outputs.JOB_NAME }}" \
             --limit=50 \

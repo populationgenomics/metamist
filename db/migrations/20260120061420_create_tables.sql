@@ -1,8 +1,6 @@
 -- migrate:up
 
 
-CREATE SCHEMA IF NOT EXISTS main;
-
 SET search_path TO main;
 
 -- Create custom enum types
@@ -560,5 +558,3 @@ DROP TYPE IF EXISTS analysis_status;
 DROP TYPE IF EXISTS project_member_role;
 DROP TYPE IF EXISTS comment_status;
 DROP TYPE IF EXISTS cohort_status;
-
-DROP SCHEMA IF EXISTS main;

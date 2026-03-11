@@ -1,4 +1,5 @@
 -- migrate:up
+SET search_path TO main;
 
 INSERT INTO "group" (name) VALUES ('project-creators');
 INSERT INTO "group" (name) VALUES ('members-admin');
@@ -28,6 +29,9 @@ INSERT INTO analysis_type (id, name) VALUES ('web', 'web');
 INSERT INTO analysis_type (id, name) VALUES ('analysis-runner', 'analysis-runner');
 
 -- migrate:down
+
+SET search_path TO main;
+
 
 DELETE FROM "group" WHERE name IN ('project-creators', 'members-admin');
 DELETE FROM assay_type WHERE id = 'sequencing';
