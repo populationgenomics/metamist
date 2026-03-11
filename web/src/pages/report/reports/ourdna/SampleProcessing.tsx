@@ -203,7 +203,7 @@ function ProcessingTimesByAncestry(props: { project: string }) {
 }
 
 export default function ProcessingTimes({ project }: { project: string }) {
-    const [viabilityColour, setViabilityColour] = useState('processing_site')
+    const [viabilityColour, setViabilityColour] = useState('biobank')
 
     const handleColourChange = (event: SelectChangeEvent) => {
         setViabilityColour(event.target.value as string)
@@ -489,7 +489,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                             label="Colour by"
                             onChange={handleColourChange}
                         >
-                            <MenuItem value="processing_site">Processing Site</MenuItem>
+                            <MenuItem value="biobank">Biobank</MenuItem>
                             <MenuItem value="collection_lab">Collection Lab</MenuItem>
                             <MenuItem value="collection_event_type">Collection Event Type</MenuItem>
                         </Select>
@@ -510,7 +510,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                 SELECT
                                     try_strptime(s_parent.meta_collection_datetime, '%Y-%m-%dT%H:%M:%S') as collection_time,
                                     s_child.meta_percent_viability as percent_viability,
-                                    s_parent.meta_processing_site as processing_site,
+                                    s_parent.meta_processing_site as biobank,
                                     s_parent.meta_collection_lab as collection_lab,
                                     s_parent.meta_collection_event_type as collection_event_type
                                 FROM
@@ -528,16 +528,63 @@ export default function ProcessingTimes({ project }: { project: string }) {
                         y: { grid: true, label: 'Percent Viability' },
                         x: { grid: true, label: 'Collection Date' },
                         color: { legend: true },
-                        marginTop: 20,
-                        marginRight: 20,
                         marginBottom: 50,
-                        marginLeft: 50,
                         marks: [
                             Plot.dot(data, {
                                 x: 'collection_time',
                                 y: 'percent_viability',
                                 fill: viabilityColour,
                                 tip: true,
+                            }),
+                        ],
+                    })}
+                />
+            </ReportRow>
+            <ReportRow>
+                <ReportItemPlot
+                    height={ROW_HEIGHT}
+                    flexGrow={1}
+                    title="PBMC Viability by Processing Group"
+                    description="Box-and-whisker plot of PBMC sample viability, grouped by processing site, collection event type, and collection lab."
+                    project={project}
+                    query={[
+                        {
+                            name: 'result',
+                            query: `
+                                SELECT
+                                    s_child.meta_percent_viability as percent_viability,
+                                    s_parent.meta_processing_site || ' - ' || s_parent.meta_collection_event_type || ' - ' || s_parent.meta_collection_lab as grouping_combination
+                                FROM
+                                    sample AS s_child
+                                JOIN
+                                    sample AS s_parent ON s_child.sample_parent_id = s_parent.sample_id
+                                WHERE
+                                    s_child.type = 'pbmc'
+                                    AND s_child.meta_percent_viability IS NOT NULL
+                                    AND s_parent.meta_processing_site IS NOT NULL
+                                    AND s_parent.meta_collection_event_type IS NOT NULL
+                                    AND s_parent.meta_collection_lab IS NOT NULL
+                            `,
+                        },
+                    ]}
+                    plot={(data) => ({
+                        y: { grid: true, label: 'Percent Viability' },
+                        x: { label: 'Processing Group' },
+                        color: {
+                            scheme: 'RdYlGn',
+                            legend: true,
+                            reverse: true,
+                        },
+                        marks: [
+                            Plot.boxY(data, {
+                                x: 'grouping_combination',
+                                y: 'percent_viability',
+
+                            }),
+                            Plot.dot(data, {
+                                x: 'grouping_combination',
+                                y: 'percent_viability',
+                                strokeOpacity: 0.4
                             }),
                         ],
                     })}
