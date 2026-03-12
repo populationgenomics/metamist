@@ -538,7 +538,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                     height={ROW_HEIGHT}
                     flexGrow={1}
                     title="PBMC Viability by Processing Combination"
-                    description="Box-and-whisker plot of PBMC sample viability, grouped by their biobank, event-type, collection-centre combination."
+                    description="Box-and-whisker plot of PBMC sample viability, grouped by their biobank, event-type, collection-lab combination."
                     project={project}
                     query={[
                         {
@@ -592,7 +592,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                     flexGrow={1}
                     flexBasis={300}
                     title="PBMC Viability Statistics"
-                    description="Summary statistics for the box-and-whisker plot, showing the distribution of PBMC sample viability for each biobank, event-type, collection-centre combination."
+                    description="Summary statistics for the box-and-whisker plot, showing the distribution of PBMC sample viability for each biobank, event-type, collection-lab combination."
                     project={project}
                     showToolbar={true}
                     query={[
@@ -603,7 +603,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                     s_child.meta_percent_viability AS percent_viability,
                                     s_parent.meta_processing_site AS biobank,
                                     s_parent.meta_collection_event_type AS collection_event_type,
-                                    s_parent.meta_collection_lab AS collection_centre,
+                                    s_parent.meta_collection_lab AS collection_lab,
                                     s_parent.meta_processing_site 
                                         || ' - ' || 
                                         s_parent.meta_collection_event_type 
@@ -660,7 +660,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                 SELECT
                                     p.biobank AS "Biobank",
                                     p.collection_event_type AS "Collection Event Type",
-                                    p.collection_centre AS "Collection Centre",
+                                    p.collection_lab AS "Collection Lab",
                                     s.min_val AS "Minimum (No Outliers)",
                                     q.q1 AS "Q1",
                                     median(p.percent_viability) AS "Median (Q2)",
@@ -673,7 +673,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                 GROUP BY 
                                     biobank,
                                     collection_event_type,
-                                    collection_centre,
+                                    collection_lab,
                                     min_val,
                                     q1,
                                     q3,
@@ -681,7 +681,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                 ORDER BY
                                     biobank,
                                     collection_event_type,
-                                    collection_centre;
+                                    collection_lab;
                             `,
                         },
                     ]}
