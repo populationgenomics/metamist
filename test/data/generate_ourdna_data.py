@@ -4,12 +4,12 @@ This is a simple script to generate some participants and samples for testing ou
 Local Backend API needs to run prior executing this script
 
 """
-import os
-import sys
 
 import argparse
 import datetime
+import os
 import random
+import sys
 import uuid
 from collections.abc import Sequence
 

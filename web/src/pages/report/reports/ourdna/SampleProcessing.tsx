@@ -1,11 +1,4 @@
-import {
-    Box,
-    FormControl,
-    InputLabel,
-    MenuItem,
-    Select,
-    SelectChangeEvent,
-} from '@mui/material'
+import { Box, FormControl, InputLabel, MenuItem, Select, SelectChangeEvent } from '@mui/material'
 import * as Plot from '@observablehq/plot'
 import { useState } from 'react'
 import Report from '../../components/Report'
@@ -481,7 +474,14 @@ export default function ProcessingTimes({ project }: { project: string }) {
             </ReportRow>
             <ReportRow>
                 <Box>
-                    <FormControl sx={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2, minWidth: 200 }}>
+                    <FormControl
+                        sx={{
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            marginTop: 2,
+                            minWidth: 200,
+                        }}
+                    >
                         <InputLabel id="viability-colour-label">Colour by</InputLabel>
                         <Select
                             labelId="viability-colour-label"
@@ -579,12 +579,11 @@ export default function ProcessingTimes({ project }: { project: string }) {
                             Plot.boxY(data, {
                                 x: 'grouping_combination',
                                 y: 'percent_viability',
-
                             }),
                             Plot.dot(data, {
                                 x: 'grouping_combination',
                                 y: 'percent_viability',
-                                strokeOpacity: 0.4
+                                strokeOpacity: 0.4,
                             }),
                         ],
                     })}
