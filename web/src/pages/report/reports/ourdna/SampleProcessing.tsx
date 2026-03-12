@@ -603,7 +603,10 @@ export default function ProcessingTimes({ project }: { project: string }) {
                             name: 'pbmc_data',
                             query: `
                                 SELECT
-                                    s_child.meta_percent_viability as percent_viability,
+                                    s_child.meta_percent_viability AS percent_viability,
+                                    s_parent.meta_processing_site AS biobank,
+                                    s_parent.meta_collection_event_type AS collection_event_type,
+                                    s_parent.meta_collection_lab AS collection_centre,
                                     s_parent.meta_processing_site || ' - ' || s_parent.meta_collection_event_type || ' - ' || s_parent.meta_collection_lab as grouping_combination
                                 FROM
                                     sample AS s_child
@@ -622,8 +625,8 @@ export default function ProcessingTimes({ project }: { project: string }) {
                             query: `
                                 SELECT
                                     grouping_combination,
-                                    quantile_disc(percent_viability, 0.25) AS q1,
-                                    quantile_disc(percent_viability, 0.75) AS q3,
+                                    quantile_cont(percent_viability, 0.25) AS q1,
+                                    quantile_cont(percent_viability, 0.75) AS q3,
                                     q3 - q1 AS iqr
                                 FROM pbmc_data
                                 GROUP BY 1
@@ -652,7 +655,9 @@ export default function ProcessingTimes({ project }: { project: string }) {
                             name: 'result',
                             query: `
                                 SELECT
-                                    p.grouping_combination AS "Processing Combination",
+                                    p.biobank AS "Biobank",
+                                    p.collection_event_type AS "Collection Event Type",
+                                    p.collection_centre as "Collection Centre",
                                     s.min_val AS "Minimum (No Outliers)",
                                     q.q1 AS "Q1",
                                     median(p.percent_viability) AS "Median (Q2)",
@@ -662,8 +667,18 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                 FROM pbmc_data p
                                 JOIN quartiles q ON p.grouping_combination = q.grouping_combination
                                 JOIN stats_no_outliers s ON p.grouping_combination = s.grouping_combination
-                                GROUP BY 1, 2, 3, 5, 6
-                                ORDER BY 1
+                                GROUP BY 
+                                    biobank,
+                                    collection_event_type,
+                                    collection_centre,
+                                    min_val,
+                                    q1,
+                                    q3,
+                                    max_val
+                                ORDER BY
+                                    biobank,
+                                    collection_event_type,
+                                    collection_centre;
                             `,
                         },
                     ]}
