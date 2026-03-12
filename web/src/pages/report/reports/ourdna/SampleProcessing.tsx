@@ -553,7 +553,11 @@ export default function ProcessingTimes({ project }: { project: string }) {
                             query: `
                                 SELECT
                                     s_child.meta_percent_viability as percent_viability,
-                                    s_parent.meta_processing_site || ' - ' || s_parent.meta_collection_event_type || ' - ' || s_parent.meta_collection_lab as grouping_combination
+                                    s_parent.meta_processing_site 
+                                        || ' - ' || 
+                                        s_parent.meta_collection_event_type 
+                                        || ' - ' || 
+                                        s_parent.meta_collection_lab as grouping_combination
                                 FROM
                                     sample AS s_child
                                 JOIN
@@ -607,7 +611,11 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                     s_parent.meta_processing_site AS biobank,
                                     s_parent.meta_collection_event_type AS collection_event_type,
                                     s_parent.meta_collection_lab AS collection_centre,
-                                    s_parent.meta_processing_site || ' - ' || s_parent.meta_collection_event_type || ' - ' || s_parent.meta_collection_lab as grouping_combination
+                                    s_parent.meta_processing_site 
+                                        || ' - ' || 
+                                        s_parent.meta_collection_event_type 
+                                        || ' - ' || 
+                                        s_parent.meta_collection_lab as grouping_combination
                                 FROM
                                     sample AS s_child
                                 JOIN
@@ -629,7 +637,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                     quantile_cont(percent_viability, 0.75) AS q3,
                                     q3 - q1 AS iqr
                                 FROM pbmc_data
-                                GROUP BY 1
+                                GROUP BY grouping_combination
                             `,
                         },
                         {
@@ -641,6 +649,8 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                         p.percent_viability
                                     FROM pbmc_data p
                                     JOIN quartiles q ON p.grouping_combination = q.grouping_combination
+                                    -- Outlier criteria from
+                                    -- https://www.geeksforgeeks.org/data-visualization/what-is-box-plot-and-the-condition-of-outliers/
                                     WHERE p.percent_viability >= q.q1 - 1.5 * q.iqr AND p.percent_viability <= q.q3 + 1.5 * q.iqr
                                 )
                                 SELECT
@@ -648,7 +658,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                     MIN(percent_viability) as min_val,
                                     MAX(percent_viability) as max_val
                                 FROM non_outliers
-                                GROUP BY 1
+                                GROUP BY grouping_combination
                             `,
                         },
                         {
