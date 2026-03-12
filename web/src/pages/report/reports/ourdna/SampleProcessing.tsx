@@ -86,7 +86,7 @@ function ProcessingTimesByCollectionDay(props: {
                 marginRight: 0,
                 marginBottom: 40,
                 marginLeft: 0,
-                colour: {
+                color: {
                     scheme: 'RdYlGn',
                     legend: true,
                     reverse: true,
@@ -166,7 +166,7 @@ function ProcessingTimesByAncestry(props: { project: string }) {
                 marginRight: 100,
                 marginBottom: 40,
                 marginLeft: 100,
-                colour: {
+                color: {
                     scheme: 'RdYlGn',
                     legend: true,
                     reverse: true,
