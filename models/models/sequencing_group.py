@@ -95,7 +95,7 @@ class SequencingGroupUpsertInternal(SMBase):
     platform: str | None = None  # fk
     meta: dict[str, Any] | None = None
     sample_id: int | None = None
-    external_ids: dict[str, str] | None = None
+    external_ids: dict[str, str | None] | None = None
 
     assays: list[AssayUpsertInternal] | None = None
 

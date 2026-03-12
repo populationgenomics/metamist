@@ -258,7 +258,7 @@ class AssayTable(DbBase):
         self,
         sample_id: int,
         external_ids: dict[str, str] | None,
-        assay_type: str,
+        assay_type: str | None,
         meta: dict[str, Any] | None,
         project: int | None = None,
     ) -> int:

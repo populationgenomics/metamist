@@ -354,7 +354,7 @@ def last_loaded_day_filter() -> str:
     return 'day = TIMESTAMP(@last_loaded_day)'
 
 
-def convert_output(query_job_result):
+def convert_output(query_job_result) -> list[dict]:
     """Convert query result to json"""
     if not query_job_result or query_job_result.result().total_rows == 0:
         # return empty list if no record found

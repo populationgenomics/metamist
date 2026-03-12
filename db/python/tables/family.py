@@ -304,7 +304,7 @@ class FamilyTable(DbBase):
     async def insert_or_update_multiple_families(
         self,
         external_ids: list[str],
-        descriptions: list[str],
+        descriptions: list[str | None],
         coded_phenotypes: list[str | None],
         project: ProjectId | None = None,
         meta: list[dict[str, Any] | None] | None = None,

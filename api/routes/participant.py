@@ -119,7 +119,7 @@ async def update_many_participant_external_ids(
 )
 async def get_external_participant_id_to_sequencing_group_id(
     project: str,
-    sequencing_type: str = None,
+    sequencing_type: str | None = None,
     export_type: ExportType = ExportType.JSON,
     flip_columns: bool = False,
     connection: Connection = get_project_db_connection(ReadAccessRoles),

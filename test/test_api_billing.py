@@ -233,7 +233,7 @@ class TestApiBilling:
         self,
         api_function,
         mock_layer_function,
-        mock_get_billing_layer=None,
+        mock_get_billing_layer,
     ):
         """
         Common wrapper for all API calls, to avoid code duplication

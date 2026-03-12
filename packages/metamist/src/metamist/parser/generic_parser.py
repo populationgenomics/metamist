@@ -1272,7 +1272,7 @@ class GenericParser(CloudHelper):
         """Get read end type from row"""
         return self.default_read_end_type
 
-    def get_read_length(self, row: SingleRow) -> str | None:  # noqa: ARG002
+    def get_read_length(self, row: SingleRow) -> str | int | None:  # noqa: ARG002
         """Get read length from row"""
         return self.default_read_length
 

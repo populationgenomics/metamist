@@ -149,15 +149,12 @@ class ProjectInsightsDb(DbBase):
         return external_ids_value
 
     def parse_project_seqtype_technology_keyed_rows(
-        self, rows: list[dict[Any, Any]], value_field: str
+        self, rows: list[dict[str, Any]], value_field: str
     ) -> dict[ProjectSeqTypeTechnologyKey, Any]:
         """
         Parse rows that are keyed by project, sequencing type, and sequencing technology
         """
-        parsed_rows: dict[
-            ProjectSeqTypeTechnologyKey,
-            dict[str, Any] | list[SequencingGroupInternalId],
-        ] = {}
+        parsed_rows: dict[ProjectSeqTypeTechnologyKey, Any] = {}
         for row in rows:
             key = ProjectSeqTypeTechnologyKey(
                 row['project'],

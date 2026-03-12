@@ -468,7 +468,7 @@ class TestOutputFiles:
         )
 
         # Helper to view rows in a table
-        async def all_rows(table: str) -> int:
+        async def all_rows(table: str) -> list[dict[str, Any]]:
             cur = await connection_with_project.pg_connection.execute(
                 t'SELECT * FROM {table:i}'
             )

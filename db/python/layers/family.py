@@ -113,9 +113,9 @@ class FamilyLayer(BaseLayer):
     async def update_family(
         self,
         id_: int,
-        external_ids: dict[str, str] | None = None,
-        description: str = None,
-        coded_phenotype: str = None,
+        external_ids: dict[str, str | None] | None = None,
+        description: str | None = None,
+        coded_phenotype: str | None = None,
         meta: dict[str, Any] | None = None,
     ) -> bool:
         """Update fields on some family"""

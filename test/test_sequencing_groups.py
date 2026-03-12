@@ -806,7 +806,7 @@ class TestAssayMetaFiltersGraphQL:
         # Insert sample into test project, and get sample_id
         sample_layer = SampleLayer(connection_with_project)
 
-        def get_external_ids(number: int) -> dict[str, str]:
+        def get_external_ids(number: int) -> dict[str, str | None]:
             return {'default': f'SEQ{number:02d}', 'collaborator2': f'CBSEQ_{number}'}
 
         def get_assay_meta_for_read(read):
