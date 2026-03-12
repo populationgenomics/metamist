@@ -229,7 +229,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                         marginTop: 20,
                         marginRight: 20,
                         marginBottom: 40,
-                        colour: { legend: true },
+                        color: { legend: true },
 
                         marginLeft: 40,
                         marks: [
@@ -278,7 +278,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                         marginTop: 20,
                         marginRight: 20,
                         marginBottom: 40,
-                        colour: { legend: true },
+                        color: { legend: true },
 
                         marginLeft: 40,
                         marks: [
@@ -344,7 +344,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                     plot={(data) => ({
                         marginLeft: 100,
                         inset: 10,
-                        colour: {
+                        color: {
                             scheme: 'RdYlGn',
                             reverse: true,
                         },
@@ -388,7 +388,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                         marginLeft: 100,
                         marginRight: 100,
                         inset: 10,
-                        colour: {
+                        color: {
                             scheme: 'RdYlGn',
                             reverse: true,
                         },
