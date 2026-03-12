@@ -198,7 +198,7 @@ function ProcessingTimesByAncestry(props: { project: string }) {
 export default function ProcessingTimes({ project }: { project: string }) {
     const [viabilityColour, setViabilityColour] = useState('biobank')
 
-    const handleColourChange = (event: SelectChangeEvent) => {
+    const handleColouringChange = (event: SelectChangeEvent) => {
         setViabilityColour(event.target.value as string)
     }
 
@@ -474,20 +474,13 @@ export default function ProcessingTimes({ project }: { project: string }) {
             </ReportRow>
             <ReportRow>
                 <Box>
-                    <FormControl
-                        sx={{
-                            display: 'flex',
-                            justifyContent: 'flex-end',
-                            marginTop: 2,
-                            minWidth: 200,
-                        }}
-                    >
+                    <FormControl sx={{ marginTop: 2, minWidth: 200 }}>
                         <InputLabel id="viability-colour-label">Colour by</InputLabel>
                         <Select
                             labelId="viability-colour-label"
                             value={viabilityColour}
                             label="Colour by"
-                            onChange={handleColourChange}
+                            onChange={handleColouringChange}
                         >
                             <MenuItem value="biobank">Biobank</MenuItem>
                             <MenuItem value="collection_lab">Collection Lab</MenuItem>
@@ -508,11 +501,11 @@ export default function ProcessingTimes({ project }: { project: string }) {
                             name: 'result',
                             query: `
                                 SELECT
-                                    try_strptime(s_parent.meta_collection_datetime, '%Y-%m-%dT%H:%M:%S') as collection_time,
-                                    s_child.meta_percent_viability as percent_viability,
-                                    s_parent.meta_processing_site as biobank,
-                                    s_parent.meta_collection_lab as collection_lab,
-                                    s_parent.meta_collection_event_type as collection_event_type
+                                    try_strptime(s_parent.meta_collection_datetime, '%Y-%m-%dT%H:%M:%S') AS collection_time,
+                                    s_child.meta_percent_viability AS percent_viability,
+                                    s_parent.meta_processing_site AS biobank,
+                                    s_parent.meta_collection_lab AS collection_lab,
+                                    s_parent.meta_collection_event_type AS collection_event_type
                                 FROM
                                     sample AS s_child
                                 JOIN
@@ -552,12 +545,12 @@ export default function ProcessingTimes({ project }: { project: string }) {
                             name: 'result',
                             query: `
                                 SELECT
-                                    s_child.meta_percent_viability as percent_viability,
+                                    s_child.meta_percent_viability AS percent_viability,
                                     s_parent.meta_processing_site 
                                         || ' - ' || 
                                         s_parent.meta_collection_event_type 
                                         || ' - ' || 
-                                        s_parent.meta_collection_lab as grouping_combination
+                                        s_parent.meta_collection_lab AS grouping_combination
                                 FROM
                                     sample AS s_child
                                 JOIN
@@ -615,7 +608,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                         || ' - ' || 
                                         s_parent.meta_collection_event_type 
                                         || ' - ' || 
-                                        s_parent.meta_collection_lab as grouping_combination
+                                        s_parent.meta_collection_lab AS grouping_combination
                                 FROM
                                     sample AS s_child
                                 JOIN
@@ -655,8 +648,8 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                 )
                                 SELECT
                                     grouping_combination,
-                                    MIN(percent_viability) as min_val,
-                                    MAX(percent_viability) as max_val
+                                    MIN(percent_viability) AS min_val,
+                                    MAX(percent_viability) AS max_val
                                 FROM non_outliers
                                 GROUP BY grouping_combination
                             `,
@@ -667,7 +660,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                 SELECT
                                     p.biobank AS "Biobank",
                                     p.collection_event_type AS "Collection Event Type",
-                                    p.collection_centre as "Collection Centre",
+                                    p.collection_centre AS "Collection Centre",
                                     s.min_val AS "Minimum (No Outliers)",
                                     q.q1 AS "Q1",
                                     median(p.percent_viability) AS "Median (Q2)",
