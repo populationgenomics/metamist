@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+import urllib.parse
 from collections.abc import Iterable
 from contextlib import asynccontextmanager
 
@@ -313,7 +314,7 @@ class CredentialedDatabaseConfiguration:
         u_p = self.username
 
         if self.password:
-            u_p += f':{self.password}'
+            u_p += f':{urllib.parse.quote_plus(self.password)}'
         if self.port:
             _host += f':{self.port}'
 
