@@ -314,7 +314,7 @@ class CredentialedDatabaseConfiguration:
         u_p = self.username
 
         if self.password:
-            u_p += f':{urllib.parse.quote_plus(self.password)}'
+            u_p += f':{urllib.parse.quote(self.password)}'
         if self.port:
             _host += f':{self.port}'
 
