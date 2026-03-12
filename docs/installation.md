@@ -132,6 +132,7 @@ This script requires [openapi-generator](https://openapi-generator.tech/docs/ins
 ```bash
 uv run regenerate_api.py
 ```
+Run the command `npx @openapitools/openapi-generator-cli version` if you are prompted to do so.
 
 If you have installed openapi generator using a different method you can set the `OPENAPI_COMMAND` environment variable to configure the command to use.
 
