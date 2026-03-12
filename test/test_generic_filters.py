@@ -660,6 +660,7 @@ class TestGenericFilters:
 
 
 @pytest.mark.asyncio
+@pytest.mark.db_superuser
 class TestGenericDictFilters:
     """Test generic filters in a dictionary context against real database"""
 
