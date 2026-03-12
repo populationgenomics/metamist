@@ -86,13 +86,13 @@ jobs:
           uv run regenerate_api.py
           ls -lGh packages/metamist/src/metamist/
 
-      # - name: "build web front-end"
-      #   run: |
-      #     set -eo pipefail
-      #     pushd web
-      #     npm ci
-      #     npm run build
-      #     popd
+      - name: "build web front-end"
+        run: |
+          set -eo pipefail
+          pushd web
+          npm ci
+          npm run build
+          popd
 
 
       - name: Build python package
