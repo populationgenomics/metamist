@@ -398,7 +398,7 @@ class TestBillingBaseTable(BqTest):
             is_current_month=False,
             last_loaded_day=None,
             total_monthly={'C': {'ALL': 1000}, 'S': {'ALL': 2000}},
-            total_daily=None,
+            total_daily={},
             total_monthly_category={},
             total_daily_category={},
             results=[],

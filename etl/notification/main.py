@@ -108,7 +108,7 @@ def format_slack(message: dict[str, Any]) -> Any | None:
     return message_sections
 
 
-def decode_message(jbody: dict[str, Any]) -> Any | None:
+def decode_message(jbody: dict[str, Any] | None) -> Any | None:
     """
     Decode the message from payload
 

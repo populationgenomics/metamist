@@ -283,7 +283,7 @@ class SampleTable(DbBase):
     async def insert_sample(
         self,
         external_ids: dict[str, str],
-        sample_type: str,
+        sample_type: str | None,
         active: bool,
         meta: dict | None,
         participant_id: int | None,
@@ -731,7 +731,7 @@ class SampleTable(DbBase):
     # endregion HISTORY
 
     async def get_samples_with_missing_participants_by_internal_id(
-        self, project: ProjectId
+        self, project: ProjectId | None
     ) -> list[SampleInternal]:
         """Get samples with missing participants"""
         _, samples = await self.query(

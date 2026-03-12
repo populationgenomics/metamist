@@ -44,10 +44,10 @@ def get_sm_url():
 
 
 def configure_sync_client(
-    url: str = None,
-    schema: str = None,
-    auth_token: str = None,
-    force_recreate=False,
+    url: str | None = None,
+    schema: str | None = None,
+    auth_token: str | None = None,
+    force_recreate: bool = False,
     use_local_schema: bool = False,
 ):
     """Get sync gql Client"""
@@ -80,7 +80,10 @@ def configure_sync_client(
 
 
 async def configure_async_client(
-    url: str = None, schema: str = None, auth_token: str = None, force_recreate=False
+    url: str | None = None,
+    schema: str | None = None,
+    auth_token: str | None = None,
+    force_recreate: bool = False,
 ) -> Client:
     """Configure an async client for use with the Metamist GraphQL API"""
     global _async_client  # noqa: PLW0603

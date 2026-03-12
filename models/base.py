@@ -37,7 +37,7 @@ def parse_sql_dict(val: str | bytes | dict | None) -> dict | None:
     raise ValueError(f'Unknown type for meta: {type(val)}')
 
 
-def parse_sql_bool(val: str | int | bytes) -> bool | None:
+def parse_sql_bool(val: str | int | bytes | None) -> bool | None:
     """Parse a string from a sql bool"""
     if val is None:
         return None

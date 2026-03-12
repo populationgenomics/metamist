@@ -544,7 +544,7 @@ class AnalysisLayer(BaseLayer):
     async def create_analysis(
         self,
         analysis: AnalysisInternal,
-        project: ProjectId = None,
+        project: ProjectId | None = None,
     ) -> int:
         """Create a new analysis"""
 
@@ -596,7 +596,7 @@ class AnalysisLayer(BaseLayer):
         self,
         analysis_id: int,
         status: AnalysisStatus | None = None,
-        meta: dict[str, Any] = None,
+        meta: dict[str, Any] | None = None,
         output: str | None = None,
         outputs: RecursiveDict | None = None,
         active: bool | None = None,

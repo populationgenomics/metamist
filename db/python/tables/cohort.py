@@ -298,7 +298,7 @@ class CohortTable(DbBase):
 
 
 def _custom_matches_filter(
-    status: CohortStatus, filter_: GenericFilter[CohortStatus]
+    status: CohortStatus, filter_: GenericFilter[CohortStatus] | None
 ) -> bool:
     """
     Util method to filter based on cohort status

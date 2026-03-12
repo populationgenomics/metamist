@@ -53,7 +53,7 @@ class BqConnection:
 class BqDbBase:
     """Base class for big query database subclasses"""
 
-    def __init__(self, connection: BqConnection):
+    def __init__(self, connection: BqConnection | None):
         if connection is None:
             raise InternalError(
                 f'No connection was provided to the table {self.__class__.__name__!r}'

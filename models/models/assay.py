@@ -80,7 +80,7 @@ class AssayUpsert(SMBase):
 
     id: int | OpenApiGenNoneType = None
     type: str | OpenApiGenNoneType = None
-    external_ids: dict[str, str] | OpenApiGenNoneType = None
+    external_ids: dict[str, str | OpenApiGenNoneType] | OpenApiGenNoneType = None
     sample_id: str | OpenApiGenNoneType = None
     meta: dict[str, Any] | OpenApiGenNoneType = None
 

@@ -94,7 +94,7 @@ class SampleLayer(BaseLayer):
     async def get_sample_id_map_by_external_ids(
         self,
         external_ids: list[str],
-        project: ProjectId,
+        project: ProjectId | None = None,
         allow_missing=False,
     ) -> dict[str, int]:
         """Get map of samples {(any) external_id: internal_id}"""
@@ -276,16 +276,14 @@ class SampleLayer(BaseLayer):
                     for assay in sample.non_sequencing_assays:
                         assay.sample_id = sample.id
                     if process_assays:
-                        await alayer.upsert_assays(
-                            sample.non_sequencing_assays, open_transaction=False
-                        )
+                        await alayer.upsert_assays(sample.non_sequencing_assays)
 
         return sample
 
     async def upsert_samples(
         self,
         samples: list[SampleUpsertInternal],
-        project: ProjectId = None,
+        project: ProjectId | None = None,
     ) -> list[SampleUpsertInternal]:
         """Batch upsert a list of samples with sequences"""
         seqglayer: SequencingGroupLayer = SequencingGroupLayer(self.connection)
@@ -321,7 +319,7 @@ class SampleLayer(BaseLayer):
             ]
             if assays:
                 alayer = AssayLayer(self.connection)
-                await alayer.upsert_assays(assays, open_transaction=False)
+                await alayer.upsert_assays(assays)
 
         return samples
 

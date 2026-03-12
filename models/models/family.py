@@ -53,7 +53,7 @@ class FamilySimple(SMBase):
 class Family(SMBase):
     """Family model"""
 
-    id: int | None
+    id: int
     external_ids: dict[str, str]
     project: int
     description: str | None = None

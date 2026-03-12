@@ -122,7 +122,7 @@ class SeqrLayer(BaseLayer):
         sync_individual_metadata: bool = True,
         sync_individuals: bool = True,
         sync_es_index: bool = True,
-        es_index_types: list[SeqrDatasetType] = None,
+        es_index_types: list[SeqrDatasetType] | None = None,
         sync_saved_variants: bool = True,
         sync_cram_map: bool = True,
         post_slack_notification: bool = True,

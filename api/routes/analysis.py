@@ -337,7 +337,7 @@ async def get_proportionate_map(
     projects: list[str],
     temporal_methods: list[ProportionalDateTemporalMethod],
     sequencing_types: list[str] | None = None,
-    end: str = None,
+    end: str | None = None,
     connection: Connection = get_projectless_db_connection,
 ):
     """

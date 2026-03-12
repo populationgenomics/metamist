@@ -324,7 +324,7 @@ class ParticipantTable:
 
     async def create_participant(
         self,
-        external_ids: dict[str, str | None],
+        external_ids: dict[str, str],
         reported_sex: int | None,
         reported_gender: str | None,
         karyotype: str | None,

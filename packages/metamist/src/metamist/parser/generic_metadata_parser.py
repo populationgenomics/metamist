@@ -577,7 +577,7 @@ class GenericMetadataParser(GenericParser):
         if not key_map or not row:
             return {}
 
-        def unstring_value(value: Any) -> bool:
+        def unstring_value(value: Any) -> Any:
             """Convert strings to boolean or number if possible"""
             if not isinstance(value, str):
                 return value

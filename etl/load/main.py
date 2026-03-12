@@ -83,7 +83,7 @@ def call_parser(parser_obj, row_json) -> tuple[str, str]:
 
 
 def process_rows(
-    bq_row: bq.table.Row,
+    bq_row: bq.Row,
     delivery_attempt: int | None,
     request_id: str,
     bq_client: bq.Client,
@@ -290,7 +290,7 @@ def process_request(
     }, 400
 
 
-def extract_request_id(jbody: dict[str, Any]) -> tuple[int | None, str | None]:
+def extract_request_id(jbody: dict[str, Any] | None) -> tuple[int | None, str | None]:
     """
     Unwrapp request id from the payload
 

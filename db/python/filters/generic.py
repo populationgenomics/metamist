@@ -1,6 +1,6 @@
 import dataclasses
 import datetime
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from enum import Enum
 from string.templatelib import Template
 from typing import Any, TypeVar
@@ -326,7 +326,7 @@ class GenericFilterModel:
 
     def to_sql(
         self,
-        field_overrides: dict[str, str] | None = None,
+        field_overrides: Mapping[str, str | Template] | None = None,
         only: list[str] | None = None,
         exclude: list[str] | None = None,
     ) -> Template | None:

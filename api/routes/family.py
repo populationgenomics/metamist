@@ -30,7 +30,7 @@ class FamilyUpdateModel(BaseModel):
     """Model for updating a family"""
 
     id: int
-    external_ids: dict[str, str] | None = None
+    external_ids: dict[str, str | None] | None = None
     description: str | None = None
     coded_phenotype: str | None = None
     meta: dict[str, Any] | None = None

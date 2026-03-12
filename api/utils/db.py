@@ -217,7 +217,7 @@ async def dependable_get_bq_connection(author: str = Depends(authenticate)):
 
 
 async def dependable_get_pubsub_connection(
-    author: str = Depends(authenticate), topic: str = None
+    author: str = Depends(authenticate), topic: str | None = None
 ):
     """FastAPI handler for getting connection withOUT project"""
     return await PubSubConnection.get_connection_no_project(author, topic)
