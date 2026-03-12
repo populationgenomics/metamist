@@ -33,7 +33,7 @@ config:
       gcp_bq_billing_view: billing-admin-290403.billing.gcp_billing_daily_cost
       gcp_bq_batches_view: billing-admin-290403.billing_aggregate.aggregate_job_details
       metamist_gcp_project: sample-metadata
-      oauth_audience: /projects/774248915715/global/backendServices/4615543739767186396
+      oauth_audience: /projects/313488420322/global/backendServices/821834740960839202
     migrations:
       db_credentials_secret_name: metamist-migration-db-credentials
       github_token_secret_name: metamist-github-token
