@@ -79,7 +79,7 @@ jobs:
             --region="$REGION" \
             --format="value(status.url)")
 
-          ID_TOKEN=$(gcloud auth print-identity-token)
+          ID_TOKEN=$(gcloud auth print-identity-token --impersonate-service-account="${{ vars.WORKLOAD_IDENTITY_SA }}" --audiences="$SERVICE_URL" --include-email)
 
           JSON_DATA=$(jq -n --arg cmd "$COMMAND" --arg ref "$REF" '{command: $cmd, github_ref: $ref}')
 
