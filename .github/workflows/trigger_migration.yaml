@@ -83,9 +83,6 @@ jobs:
 
           JSON_DATA=$(jq -n --arg cmd "$COMMAND" --arg ref "$REF" '{command: $cmd, github_ref: $ref}')
 
-
-          echo $JSON_DATA
-
           HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" -X POST "$SERVICE_URL/migrate" \
             -H "Authorization: Bearer $ID_TOKEN" \
             -H "Content-Type: application/json" \
