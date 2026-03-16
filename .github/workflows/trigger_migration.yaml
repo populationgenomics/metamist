@@ -63,6 +63,7 @@ jobs:
           REGION: ${{ steps.set-variables.outputs.REGION }}
           REPOSITORY: ${{ github.repository }}
           REF: ${{ github.ref }}
+          SERVICE_ACCOUNT: ${{ vars.WORKLOAD_IDENTITY_SA }}
         run: |
           echo "============================================"
           echo "Running: $COMMAND"
@@ -76,7 +77,7 @@ jobs:
             --region="$REGION" \
             --format="value(status.url)")
 
-          ID_TOKEN=$(gcloud auth print-identity-token --impersonate-service-account="${{ vars.WORKLOAD_IDENTITY_SA }}" --audiences="$SERVICE_URL" --include-email)
+          ID_TOKEN=$(gcloud auth print-identity-token --impersonate-service-account="$SERVICE_ACCOUNT" --audiences="$SERVICE_URL" --include-email)
 
           JSON_DATA=$(jq -n --arg cmd "$COMMAND" --arg ref "$REF" '{command: $cmd, github_ref: $ref}')
 
