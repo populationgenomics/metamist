@@ -46,6 +46,8 @@ class MigrationsConfig(BaseModel):
 
     db_credentials_secret_name: str
     github_token_secret_name: str
+    allowed_repository: str
+    allowed_branch: str | None = None
 
 
 class InfraConfig(BaseModel):

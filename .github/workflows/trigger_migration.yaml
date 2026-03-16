@@ -6,14 +6,6 @@ on:
   #     - SET-1017-set-up-metamist-postgres-deployment
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Target environment'
-        required: true
-        default: 'development'
-        type: choice
-        options:
-          - development
-          - production
       command:
         description: 'Migration command'
         required: true
@@ -27,35 +19,13 @@ on:
 permissions: {}
 
 jobs:
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Validate production runs from main only
-        if: github.event.inputs.environment == 'production' && github.ref != 'refs/heads/SET-1017-set-up-metamist-postgres-deployment'
-        run: |
-          echo "::error::Production migrations can only be triggered from the main branch"
-          echo ""
-          echo "You are on branch: ${{ github.ref }}"
-          echo "Production migrations require: refs/heads/main"
-          exit 1
-
-      - name: Validate rollback has confirmation
-        if: github.event.inputs.command == 'down' && github.event.inputs.confirm_migration == ''
-        run: |
-          echo "::error::Rollback requires confirmation"
-          echo ""
-          echo "To rollback a migration:"
-          echo "1. First run with command=status to see current state"
-          echo "2. Then run with command=down and paste the migration name in confirm_migration"
-          exit 1
 
   run-migration:
-    needs: validate
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
-    environment: ${{ github.event.inputs.environment == 'production' && 'pg-production' || 'pg-development' }}
+    environment: ${{ github.ref == 'refs/heads/SET-1017-set-up-metamist-postgres-deployment' && 'pg-production' || 'pg-development' }}
     env:
       CLOUDSDK_CORE_DISABLE_PROMPTS: 1
     steps:
@@ -76,60 +46,81 @@ jobs:
 
       - id: 'set-variables'
         name: 'Set environment-specific variables'
+        env:
+          ENVIRONMENT: ${{ vars.SM_ENVIRONMENT }}
         run: |
-          if [ "${{ github.event.inputs.environment }}" == "production" ]; then
-            echo "JOB_NAME=metamist-migration-production" >> $GITHUB_OUTPUT
-            echo "REGION=australia-southeast1" >> $GITHUB_OUTPUT
+          if [ "$ENVIRONMENT" == "production" ]; then
+            echo "SERVICE_NAME=metamist-migration-production" >> "$GITHUB_OUTPUT"
+            echo "REGION=australia-southeast1" >> "$GITHUB_OUTPUT"
           else
-            echo "JOB_NAME=metamist-migration-development" >> $GITHUB_OUTPUT
-            echo "REGION=australia-southeast1" >> $GITHUB_OUTPUT
+            echo "SERVICE_NAME=metamist-migration-development" >> "$GITHUB_OUTPUT"
+            echo "REGION=australia-southeast1" >> "$GITHUB_OUTPUT"
           fi
 
       - id: 'run-migration'
-        name: 'Execute migration job'
+        name: 'Execute migration service'
+        env:
+          COMMAND: ${{ github.event.inputs.command }}
+          ENVIRONMENT: ${{ vars.SM_ENVIRONMENT }}
+          SERVICE_NAME: ${{ steps.set-variables.outputs.SERVICE_NAME }}
+          REGION: ${{ steps.set-variables.outputs.REGION }}
+          REPOSITORY: ${{ github.repository }}
+          REF: ${{ github.ref }}
         run: |
           echo "============================================"
-          echo "Running: ${{ github.event.inputs.command }}"
-          echo "Environment: ${{ github.event.inputs.environment }}"
-          echo "Job: ${{ steps.set-variables.outputs.JOB_NAME }}"
-          echo "Repository: ${{ github.repository }}"
-          echo "Ref: ${{ github.ref }}"
+          echo "Running: $COMMAND"
+          echo "Environment: $ENVIRONMENT"
+          echo "Service: $SERVICE_NAME"
+          echo "Repository: $REPOSITORY"
+          echo "Ref: $REF"
           echo "============================================"
 
-          # Build environment variable overrides
-          ENV_VARS="MIGRATION_COMMAND=${{ github.event.inputs.command }}"
-          ENV_VARS="$ENV_VARS,GITHUB_REPOSITORY=${{ github.repository }}"
-          ENV_VARS="$ENV_VARS,GITHUB_REF=${{ github.ref }}"
+          SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" \
+            --region="$REGION" \
+            --format="value(status.url)")
 
+          ID_TOKEN=$(gcloud auth print-identity-token)
 
-          # Execute the Cloud Run job and capture output
-          gcloud run jobs execute ${{ steps.set-variables.outputs.JOB_NAME }} \
-            --region=${{ steps.set-variables.outputs.REGION }} \
-            --update-env-vars="$ENV_VARS" \
-            --wait
+          JSON_DATA=$(jq -n --arg cmd "$COMMAND" --arg ref "$REF" '{command: $cmd, github_ref: $ref}')
 
-      - id: 'show-logs'
-        name: 'Show execution logs'
-        if: always()
-        run: |
+          HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" -X POST "$SERVICE_URL/migrate" \
+            -H "Authorization: Bearer $ID_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$JSON_DATA")
+
           echo ""
           echo "============================================"
-          echo "Job execution logs (last 50 lines)"
+          echo "Job execution logs"
           echo "============================================"
 
-          # Get the latest execution
-          EXECUTION=$(gcloud run jobs executions list \
-            --job=${{ steps.set-variables.outputs.JOB_NAME }} \
-            --region=${{ steps.set-variables.outputs.REGION }} \
-            --limit=1 \
-            --format="value(name)")
+          if jq -e . >/dev/null 2>&1 < response.json; then
+            echo "Repository: $(jq -r '.github_repository // "N/A"' response.json)"
+            echo "Ref: $(jq -r '.github_ref // "N/A"' response.json)"
+            echo "--------------------------------------------"
 
-          echo "Execution: $EXECUTION"
+            DBMATE_OUTPUT=$(jq -r '.dbmate_output // empty' response.json)
+            if [ -n "$DBMATE_OUTPUT" ] && [ "$DBMATE_OUTPUT" != "null" ]; then
+              echo "Database Output:"
+              echo "$DBMATE_OUTPUT"
+              echo "--------------------------------------------"
+            fi
+
+            ERROR_MSG=$(jq -r '.error_message // empty' response.json)
+            if [ -n "$ERROR_MSG" ] && [ "$ERROR_MSG" != "null" ]; then
+              echo "Error Message:"
+              echo "$ERROR_MSG"
+              echo "--------------------------------------------"
+            fi
+
+            SUCCESS=$(jq -r '.success // "false"' response.json)
+          else
+            cat response.json
+            SUCCESS="false"
+          fi
+
           echo ""
 
-          # Fetch logs
-          gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=${{ steps.set-variables.outputs.JOB_NAME }}" \
-            --limit=50 \
-            --format="value(textPayload)" \
-            --order=asc \
-            2>/dev/null || echo "Could not fetch logs (may take a moment to appear)"
+          if [ "$SUCCESS" != "true" ] || [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "::error::Migration failed with status $HTTP_STATUS"
+            exit 1
+          fi

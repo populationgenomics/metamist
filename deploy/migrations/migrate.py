@@ -3,48 +3,46 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "pygithub",
+#     "fastapi",
+#     "uvicorn",
+#     "pydantic",
 # ]
 # ///
-"""
-Database Migration Runner for Cloud Run Job
-
-Commands:
-    status  - Show current migration status
-    up      - Apply all pending migrations
-
-Required environment variables:
-    DATABASE_URL_SECRET  - PostgreSQL connection string (value injected from Secret Manager)
-    GITHUB_REPOSITORY    - GitHub repository (e.g., populationgenomics/metamist)
-    GITHUB_REF           - Git ref to fetch migrations from (e.g., main, refs/heads/dev)
-    GITHUB_TOKEN_SECRET  - GitHub token for API access (value injected from Secret Manager)
-
-Optional environment variables:
-    MIGRATION_COMMAND    - Command to run: status, up, down (default: status)
-    MIGRATIONS_PATH      - Path to migrations in repo (default: db/migrations)
-"""
 
 import os
-import re
 import subprocess
-import sys
 from pathlib import Path
+from typing import Literal
 
+import uvicorn
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from github import Auth, Github
+from pydantic import BaseModel
 
 
+LISTEN_PORT = 8080
 MIGRATIONS_DIR = Path('/db/migrations')
 
-
-def print_header(title: str) -> None:
-    """Print a formatted header."""
-    print('=' * 44)
-    print(title)
-    print('=' * 44)
+app = FastAPI(title='Metamist db migrations')
 
 
-def print_separator() -> None:
-    """Print a separator line."""
-    print('-' * 44)
+class MigrationRequest(BaseModel):
+    """Request structure for triggering migration"""
+
+    command: Literal['status', 'up']
+    github_ref: str
+    migrations_path: str = 'db/migrations'
+
+
+class MigrationResponse(BaseModel):
+    """Response structure for migration results"""
+
+    success: bool
+    github_repository: str | None = None
+    github_ref: str
+    dbmate_output: str | None = None
+    error_message: str | None = None
 
 
 def download_migrations_from_github(
@@ -53,75 +51,46 @@ def download_migrations_from_github(
     token: str,
     migrations_path: str = 'db/migrations',
 ) -> int:
-    """
-    Download migration files from GitHub using PyGithub.
+    """Get migration files from github"""
 
-    Args:
-        repository: GitHub repository in format owner/repo
-        ref: Git ref (branch, tag, or commit SHA)
-        token: GitHub token for API access
-        migrations_path: Path to migrations directory in the repository
-
-    Returns:
-        Number of migration files downloaded
-    """
-    print('Downloading migrations from GitHub...')
-    print(f'Repository: {repository}')
-    print(f'Ref: {ref}')
-    print(f'Path: {migrations_path}')
-
-    # Clean up ref (remove refs/heads/ prefix if present)
+    # Extract the actual branch/tag name
+    clean_ref = ref
     if ref.startswith('refs/heads/'):
-        ref = ref[len('refs/heads/') :]
+        clean_ref = ref.removeprefix('refs/heads/')
     elif ref.startswith('refs/tags/'):
-        ref = ref[len('refs/tags/') :]
+        clean_ref = ref.removeprefix('refs/tags/')
 
-    # Initialize GitHub client
+    # Validate against ALLOWED_BRANCH if set
+    allowed_branch = os.environ.get('ALLOWED_BRANCH')
+    if allowed_branch and clean_ref != allowed_branch:
+        raise ValueError(
+            f'Migration on ref "{ref}" is not allowed. '
+            f'This service is restricted to the "{allowed_branch}" branch.'
+        )
+
     auth = Auth.Token(token)
     gh = Github(auth=auth)
     repo = gh.get_repo(repository)
 
-    try:
-        contents = repo.get_contents(migrations_path, ref=ref)
-    except Exception as e:
-        print(f'ERROR: Failed to fetch migrations: {e}')
-        return 0
+    contents = repo.get_contents(migrations_path, ref=ref)
 
     if not isinstance(contents, list):
-        print('ERROR: Expected a directory but got a file')
-        return 0
+        raise ValueError(f'Expected a directory at {migrations_path}, but got a file.')
 
     downloaded = 0
     for item in contents:
         if item.type == 'file' and item.name.endswith('.sql'):
             local_path = MIGRATIONS_DIR / item.name
-
-            # Fetch and decode file content
             content = item.decoded_content.decode('utf-8')
             local_path.write_text(content)
-
-            print(f'  {item.name}')
             downloaded += 1
 
     gh.close()
-    print(f'\nDownloaded {downloaded} migration files')
     return downloaded
 
 
-def run_dbmate(
-    database_url: str, *args: str, check: bool = True
-) -> subprocess.CompletedProcess:
-    """
-    Run a dbmate command.
-
-    Args:
-        database_url: Database connection URL
-        *args: Arguments to pass to dbmate
-        check: Whether to raise on non-zero exit code
-
-    Returns:
-        CompletedProcess result
-    """
+def run_dbmate(database_url: str, *args: str) -> subprocess.CompletedProcess[str]:
+    """Execute a dbmate command"""
     cmd = [
         'dbmate',
         '--url',
@@ -130,185 +99,100 @@ def run_dbmate(
         str(MIGRATIONS_DIR),
         *args,
     ]
-    return subprocess.run(cmd, capture_output=True, text=True, check=check)
+    return subprocess.run(cmd, capture_output=True, text=True, check=True)
 
 
-def get_migration_status(database_url: str) -> tuple[list[str], list[str]]:
-    """
-    Get the current migration status.
-
-    Args:
-        database_url: Database connection URL
-
-    Returns:
-        Tuple of (applied_migrations, pending_migrations)
-    """
-    result = run_dbmate(database_url, 'status', check=False)
-
-    applied = []
-    pending = []
-
-    for line in result.stdout.splitlines():
-        # Applied migrations: [X] migration_name
-        if match := re.match(r'^\[X\]\s+(\S+)', line):
-            applied.append(match.group(1))
-        # Pending migrations: [ ] migration_name
-        elif match := re.match(r'^\[ \]\s+(\S+)', line):
-            pending.append(match.group(1))
-
-    return applied, pending
-
-
-def show_status(database_url: str) -> tuple[list[str], list[str]]:
-    """
-    Show current migration status and return the status data.
-
-    Args:
-        database_url: Database connection URL
-
-    Returns:
-        Tuple of (applied_migrations, pending_migrations)
-    """
-    print()
-    print('Current migration status:')
-    print_separator()
-
-    result = run_dbmate(database_url, 'status', check=False)
-    if result.stdout:
-        print(result.stdout)
-    if result.stderr:
-        print(f'stderr: {result.stderr}')
-    if result.returncode != 0:
-        print(f'dbmate exited with code {result.returncode}')
-
-    print_separator()
-
-    return get_migration_status(database_url)
-
-
-def cmd_status(database_url: str) -> int:
-    """
-    Handle the 'status' command.
-
-    Args:
-        database_url: Database connection URL
-
-    Returns:
-        Exit code
-    """
-    show_status(database_url)
-    print()
-    print('Status check complete. No changes made.')
-    return 0
-
-
-def cmd_up(database_url: str) -> int:
-    """
-    Handle the 'up' command - apply all pending migrations.
-
-    Args:
-        database_url: Database connection URL
-
-    Returns:
-        Exit code
-    """
-    _, pending = show_status(database_url)
-
-    if not pending:
-        print()
-        print('No pending migrations. Database is up to date.')
-        return 0
-
-    print()
-    print(f'Applying {len(pending)} pending migration(s)...')
-
-    result = run_dbmate(database_url, 'up', check=False)
-
-    if result.returncode != 0:
-        print('ERROR: Migration failed!')
-        print(result.stderr)
-        return 1
-
-    print(result.stdout)
-    print()
-    print('Migrations applied successfully.')
-    show_status(database_url)
-    return 0
-
-
-def main() -> int:
-    """
-    Main entrypoint.
-
-    Returns:
-        Exit code
-    """
-    # Get required environment variables
+def run_migrations(
+    github_ref: str,
+    migrations_path: str,
+    migration_command: Literal['status', 'up'],
+):
+    """Run the migrations for the given repository and ref"""
     database_url_secret = os.environ.get('DATABASE_URL_SECRET')
     if not database_url_secret:
-        print('ERROR: DATABASE_URL_SECRET environment variable is required')
-        return 1
-
-    github_repository = os.environ.get('GITHUB_REPOSITORY')
-    if not github_repository:
-        print('ERROR: GITHUB_REPOSITORY environment variable is required')
-        return 1
-
-    github_ref = os.environ.get('GITHUB_REF')
-    if not github_ref:
-        print('ERROR: GITHUB_REF environment variable is required')
-        return 1
+        raise ValueError('DATABASE_URL_SECRET environment variable is required')
 
     github_token_secret = os.environ.get('GITHUB_TOKEN_SECRET')
     if not github_token_secret:
-        print('ERROR: GITHUB_TOKEN_SECRET environment variable is required')
-        return 1
+        raise ValueError('GITHUB_TOKEN_SECRET environment variable is required')
 
-    # Get optional environment variables
-    migration_command = os.environ.get('MIGRATION_COMMAND', 'status')
-    migrations_path = os.environ.get('MIGRATIONS_PATH', 'db/migrations')
+    github_repository = os.environ.get('ALLOWED_REPOSITORY')
+    if not github_repository:
+        raise ValueError('ALLOWED_REPOSITORY environment variable is required')
 
-    # Print header
-    print_header('Database Migration Runner')
-    print(f'Command: {migration_command}')
-    print(f'Repository: {github_repository}')
-    print(f'Ref: {github_ref}')
-    print()
-
-    # Ensure migrations directory exists
     MIGRATIONS_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Use secret values directly from environment
-    # (Cloud Run injects them from Secret Manager)
-    database_url = database_url_secret
-    github_token = github_token_secret
-    print()
-
-    # Download migrations from GitHub
     downloaded = download_migrations_from_github(
         repository=github_repository,
         ref=github_ref,
-        token=github_token,
+        token=github_token_secret,
         migrations_path=migrations_path,
     )
+
     if downloaded == 0:
-        print('ERROR: No migration files found!')
-        return 1
+        raise ValueError(
+            f'No migration files found in {migrations_path} for {github_repository}@{github_ref}'
+        )
 
-    # Execute the command
-    if migration_command == 'status':
-        exit_code = cmd_status(database_url)
-    elif migration_command == 'up':
-        exit_code = cmd_up(database_url)
+    dbmate_output: str = ''
+    if migration_command not in ['status', 'up']:
+        raise ValueError(f'Unsupported migration command: {migration_command}')
+    try:
+        cmd_result = run_dbmate(database_url_secret, migration_command)
+    except subprocess.CalledProcessError as e:
+        dbmate_output = (e.stdout or '') + '\n' + (e.stderr or '')
+        success = False
     else:
-        print(f"ERROR: Unknown command '{migration_command}'")
-        print('Supported commands: status, up, down')
-        return 1
+        dbmate_output = (cmd_result.stdout or '') + '\n' + (cmd_result.stderr or '')
+        success = True
 
-    print()
-    print('Done.')
-    return exit_code
+    response = MigrationResponse(
+        success=success,
+        github_repository=github_repository,
+        github_ref=github_ref,
+        dbmate_output=dbmate_output,
+    )
+
+    return response
+
+
+@app.post('/migrate', response_model=MigrationResponse)
+def migrate(request: MigrationRequest):
+    """Migration route handler"""
+
+    response: MigrationResponse | None = None
+    status_code = 200
+    github_repository = os.environ.get('ALLOWED_REPOSITORY')
+
+    try:
+        response = run_migrations(
+            github_ref=request.github_ref,
+            migrations_path=request.migrations_path,
+            migration_command=request.command,
+        )
+
+    except ValueError as ve:
+        response = MigrationResponse(
+            success=False,
+            github_repository=github_repository,
+            github_ref=request.github_ref,
+            error_message=str(ve),
+        )
+        status_code = 400
+
+    except Exception as e:  # noqa: BLE001 - we want to catch everything here
+        error_message = f'Migration failed: {str(e)}'
+        response = MigrationResponse(
+            success=False,
+            github_repository=github_repository,
+            github_ref=request.github_ref,
+            error_message=error_message,
+        )
+        status_code = 500
+
+    return JSONResponse(status_code=status_code, content=response.model_dump())
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    port = int(os.environ.get('PORT', LISTEN_PORT))
+    uvicorn.run(app, host='0.0.0.0', port=port)

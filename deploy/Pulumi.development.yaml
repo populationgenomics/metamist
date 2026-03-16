@@ -33,3 +33,4 @@ config:
     migrations:
       db_credentials_secret_name: metamist-dev-migration-db-credentials
       github_token_secret_name: metamist-dev-github-token
+      allowed_repository: populationgenomics/metamist

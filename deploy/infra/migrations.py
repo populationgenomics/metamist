@@ -12,7 +12,7 @@ from .config import InfraConfig
 class MigrationResources:
     """Useful pieces of migration infra"""
 
-    job: gcp.cloudrunv2.Job
+    service: gcp.cloudrunv2.Service
 
 
 def create_migration_resources(
@@ -39,7 +39,7 @@ def create_migration_resources(
         opts=pulumi.ResourceOptions(depends_on=[image_repository]),
     )
 
-    # Service account for migration job
+    # Service account for migration service
     migration_service_account = gcp.serviceaccount.Account(
         'metamist-migration-service-account',
         account_id=f'metamist-migration-{config.stack}',
@@ -66,72 +66,77 @@ def create_migration_resources(
         ),
     )
 
-    # Cloud Run Job for migrations
-    migration_job = gcp.cloudrunv2.Job(
-        'metamist-migration-job',
+    # Cloud Run Service for migrations
+    migration_service = gcp.cloudrunv2.Service(
+        'metamist-migration-service',
         name=f'metamist-migration-{config.stack}',
         location=config.region,
-        template=gcp.cloudrunv2.JobTemplateArgs(
-            task_count=1,
-            template=gcp.cloudrunv2.JobTemplateTemplateArgs(
-                service_account=migration_service_account.email,
-                timeout='600s',
-                max_retries=0,  # Don't retry migrations automatically
-                vpc_access=(
-                    gcp.cloudrunv2.JobTemplateTemplateVpcAccessArgs(
-                        network_interfaces=[
-                            gcp.cloudrunv2.JobTemplateTemplateVpcAccessNetworkInterfaceArgs(
-                                network=config.common.vpc_network,
-                                subnetwork=config.common.vpc_subnet,
-                            )
-                        ],
-                        egress='PRIVATE_RANGES_ONLY',
-                    )
-                    if config.common.vpc_network is not None
-                    and config.common.vpc_subnet is not None
-                    else None
-                ),
-                containers=[
-                    gcp.cloudrunv2.JobTemplateTemplateContainerArgs(
-                        image=migration_image.repo_digest,
-                        resources=gcp.cloudrunv2.JobTemplateTemplateContainerResourcesArgs(
-                            limits={
-                                'memory': '512Mi',
-                                'cpu': '1',
-                            },
-                        ),
-                        envs=[
-                            gcp.cloudrunv2.JobTemplateTemplateContainerEnvArgs(
-                                name='DATABASE_URL_SECRET',
-                                value_source=gcp.cloudrunv2.JobTemplateTemplateContainerEnvValueSourceArgs(
-                                    secret_key_ref=gcp.cloudrunv2.JobTemplateTemplateContainerEnvValueSourceSecretKeyRefArgs(
-                                        secret=config.migrations.db_credentials_secret_name,
-                                        version='latest',
-                                    )
-                                ),
-                            ),
-                            gcp.cloudrunv2.JobTemplateTemplateContainerEnvArgs(
-                                name='MIGRATION_COMMAND',
-                                value='status',  # Default to showing status (safe)
-                            ),
-                            gcp.cloudrunv2.JobTemplateTemplateContainerEnvArgs(
-                                name='GITHUB_TOKEN_SECRET',
-                                value_source=gcp.cloudrunv2.JobTemplateTemplateContainerEnvValueSourceArgs(
-                                    secret_key_ref=gcp.cloudrunv2.JobTemplateTemplateContainerEnvValueSourceSecretKeyRefArgs(
-                                        secret=config.migrations.github_token_secret_name,
-                                        version='latest',
-                                    )
-                                ),
-                            ),
-                            # GITHUB_REPOSITORY and GITHUB_REF are passed at
-                            # execution time via workflow env var overrides
-                        ],
-                    ),
-                ],
+        template=gcp.cloudrunv2.ServiceTemplateArgs(
+            service_account=migration_service_account.email,
+            timeout='600s',
+            scaling=gcp.cloudrunv2.ServiceTemplateScalingArgs(
+                min_instance_count=0,
+                max_instance_count=1,  # We only need one instance for migrations to avoid concurrency issues
             ),
+            vpc_access=(
+                gcp.cloudrunv2.ServiceTemplateVpcAccessArgs(
+                    network_interfaces=[
+                        gcp.cloudrunv2.ServiceTemplateVpcAccessNetworkInterfaceArgs(
+                            network=config.common.vpc_network,
+                            subnetwork=config.common.vpc_subnet,
+                        )
+                    ],
+                    egress='PRIVATE_RANGES_ONLY',
+                )
+                if config.common.vpc_network is not None
+                and config.common.vpc_subnet is not None
+                else None
+            ),
+            containers=[
+                gcp.cloudrunv2.ServiceTemplateContainerArgs(
+                    image=migration_image.repo_digest,
+                    resources=gcp.cloudrunv2.ServiceTemplateContainerResourcesArgs(
+                        limits={
+                            'memory': '512Mi',
+                            'cpu': '1',
+                        },
+                    ),
+                    envs=[
+                        gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name='DATABASE_URL_SECRET',
+                            value_source=gcp.cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
+                                secret_key_ref=gcp.cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
+                                    secret=config.migrations.db_credentials_secret_name,
+                                    version='latest',
+                                )
+                            ),
+                        ),
+                        gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name='GITHUB_TOKEN_SECRET',
+                            value_source=gcp.cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
+                                secret_key_ref=gcp.cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
+                                    secret=config.migrations.github_token_secret_name,
+                                    version='latest',
+                                )
+                            ),
+                        ),
+                        gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name='ALLOWED_REPOSITORY',
+                            value=config.migrations.allowed_repository,
+                        ),
+                        gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name='ALLOWED_BRANCH',
+                            value=config.migrations.allowed_branch or '',
+                        ),
+                    ],
+                    ports=gcp.cloudrunv2.ServiceTemplateContainerPortsArgs(
+                        container_port=8080,
+                    ),
+                ),
+            ],
         ),
     )
 
     return MigrationResources(
-        job=migration_job,
+        service=migration_service,
     )

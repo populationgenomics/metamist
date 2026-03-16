@@ -15,4 +15,4 @@ migrations = create_migration_resources(config, common.image_repository)
 
 # Export key resource identifiers
 pulumi.export('load balancer ip', server.ip_address.address)
-pulumi.export('migration job name', migrations.job.name)
+pulumi.export('migration service name', migrations.service.name)
