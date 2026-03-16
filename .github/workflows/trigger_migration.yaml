@@ -60,7 +60,7 @@ jobs:
       - id: 'run-migration'
         name: 'Execute migration service'
         env:
-          COMMAND: ${{ github.event.inputs.command }}
+          COMMAND: 'up'
           ENVIRONMENT: ${{ vars.SM_ENVIRONMENT }}
           SERVICE_NAME: ${{ steps.set-variables.outputs.SERVICE_NAME }}
           REGION: ${{ steps.set-variables.outputs.REGION }}
