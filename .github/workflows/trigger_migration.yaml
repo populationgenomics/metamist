@@ -1,9 +1,6 @@
 name: Run Database Migrations
 
 on:
-  push:
-    branches:
-      - pg-main
   workflow_dispatch:
     inputs:
       command:
@@ -60,7 +57,7 @@ jobs:
       - id: 'run-migration'
         name: 'Execute migration service'
         env:
-          COMMAND: 'up'
+          COMMAND: ${{ github.event.inputs.command }}
           ENVIRONMENT: ${{ vars.SM_ENVIRONMENT }}
           SERVICE_NAME: ${{ steps.set-variables.outputs.SERVICE_NAME }}
           REGION: ${{ steps.set-variables.outputs.REGION }}
