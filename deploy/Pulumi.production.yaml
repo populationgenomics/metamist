@@ -38,4 +38,4 @@ config:
       db_credentials_secret_name: metamist-migration-db-credentials
       github_token_secret_name: metamist-github-token
       allowed_repository: populationgenomics/metamist
-      allowed_branch: SET-1017-set-up-metamist-postgres-deployment
+      allowed_branch: pg-main

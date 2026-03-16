@@ -1,15 +1,14 @@
-name: Deploy
+name: Deploy PG
 on:
   # Building on manual dispatch, and pushes to dev / main.
   workflow_dispatch:
   push:
     branches:
-      - main
-      - SET-1017-set-up-metamist-postgres-deployment
-      - dev
+      - pg-main
+      - pg-dev
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/SET-1017-set-up-metamist-postgres-deployment' && 'pg-production' || 'pg-development' }}
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/pg-main' && 'pg-production' || 'pg-development' }}
   cancel-in-progress: false
 
 permissions: {}
@@ -28,7 +27,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    environment: ${{ github.ref == 'refs/heads/SET-1017-set-up-metamist-postgres-deployment' && 'pg-production' || 'pg-development' }}
+    environment: ${{ github.ref == 'refs/heads/pg-main' && 'pg-production' || 'pg-development' }}
     env:
       CLOUDSDK_CORE_DISABLE_PROMPTS: 1
       SM_ENVIRONMENT: ${{ vars.SM_ENVIRONMENT }}
