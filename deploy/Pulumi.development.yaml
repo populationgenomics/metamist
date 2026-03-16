@@ -7,6 +7,9 @@ config:
   gcp:region: australia-southeast1
 
   metamist:
+    common:
+      vpc_network: metamist-db
+      vpc_subnet: cloud-run-access
     server:
       web_domain: metamist-dev.populationgenomics.org.au
       oauth_client_config_secret_name: metamist-dev-oauth-client-config
@@ -29,7 +32,7 @@ config:
       gcp_bq_billing_view: billing-admin-290403.billing.gcp_billing_daily_cost
       gcp_bq_batches_view: billing-admin-290403.billing_aggregate.aggregate_job_details
       metamist_gcp_project: sample-metadata
-      oauth_audience: /projects/774248915715/global/backendServices/2616078258375810936
+      oauth_audience: /projects/113399547094/global/backendServices/4970338725840695074
     migrations:
       db_credentials_secret_name: metamist-dev-migration-db-credentials
       github_token_secret_name: metamist-dev-github-token
