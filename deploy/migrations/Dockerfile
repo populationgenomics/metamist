@@ -13,7 +13,7 @@ COPY deploy/migrations/migrate.py /migrate.py
 COPY deploy/migrations/migrate.py.lock /migrate.py.lock
 
 # Sync script dependencies (uses the lockfile)
-RUN uv sync --script /migrate.py
+RUN uv sync --frozen --script /migrate.py
 
 # Default environment variables
 ENV DBMATE_NO_DUMP_SCHEMA=true
