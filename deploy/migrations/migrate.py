@@ -135,22 +135,24 @@ def run_migrations(
         )
 
     dbmate_output: str = ''
+    error_message: str | None = None
     if migration_command not in ['status', 'up']:
         raise ValueError(f'Unsupported migration command: {migration_command}')
     try:
         cmd_result = run_dbmate(database_url_secret, migration_command)
+        dbmate_output = (cmd_result.stdout or '') + '\n' + (cmd_result.stderr or '')
+        success = True
     except subprocess.CalledProcessError as e:
         dbmate_output = (e.stdout or '') + '\n' + (e.stderr or '')
         success = False
-    else:
-        dbmate_output = (cmd_result.stdout or '') + '\n' + (cmd_result.stderr or '')
-        success = True
+        error_message = str(e)
 
     response = MigrationResponse(
         success=success,
         github_repository=github_repository,
         github_ref=github_ref,
         dbmate_output=dbmate_output,
+        error_message=error_message,
     )
 
     return response
