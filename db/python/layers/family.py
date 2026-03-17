@@ -173,17 +173,19 @@ class FamilyLayer(BaseLayer):
             family_ids = list(set(r.family_id for r in rows if r.family_id is not None))
             fmap = await self.ftable.get_id_map_by_internal_ids(list(family_ids))
 
+        def pmap_lookup(internal_id: int | None) -> str | int | None:
+            if internal_id is None:
+                return empty_participant_value
+            return pmap.get(internal_id, internal_id) or empty_participant_value
+
         mapped_rows: list[dict[str, str | int | None]] = []
         for r in rows:
             mapped_rows.append(
                 {
                     'family_id': fmap.get(r.family_id, str(r.family_id)),
-                    'individual_id': pmap.get(r.individual_id, r.individual_id)
-                    or empty_participant_value,
-                    'paternal_id': pmap.get(r.paternal_id, r.paternal_id)
-                    or empty_participant_value,
-                    'maternal_id': pmap.get(r.maternal_id, r.maternal_id)
-                    or empty_participant_value,
+                    'individual_id': pmap_lookup(r.individual_id),
+                    'paternal_id': pmap_lookup(r.paternal_id),
+                    'maternal_id': pmap_lookup(r.maternal_id),
                     'sex': r.sex,
                     'affected': r.affected,
                     'notes': r.notes,
@@ -281,6 +283,7 @@ class FamilyLayer(BaseLayer):
                         )
                     )
                     pid = upserted_participant.id
+                    assert pid  # Upserted participant id is always set
                     external_participant_ids_map[row.individual_id] = pid
 
             for external_family_id in missing_external_family_ids:
@@ -297,8 +300,12 @@ class FamilyLayer(BaseLayer):
                 PedRowInternal(
                     family_id=external_family_id_map[row.family_id],
                     individual_id=external_participant_ids_map[row.individual_id],
-                    paternal_id=external_participant_ids_map.get(row.paternal_id),
-                    maternal_id=external_participant_ids_map.get(row.maternal_id),
+                    paternal_id=external_participant_ids_map.get(row.paternal_id)
+                    if row.paternal_id
+                    else None,
+                    maternal_id=external_participant_ids_map.get(row.maternal_id)
+                    if row.maternal_id
+                    else None,
                     affected=row.affected,
                     notes=row.notes,
                     sex=row.sex,
