@@ -20,7 +20,7 @@ cd metamist
 ### Install python requirements
 
 Make sure [uv](https://docs.astral.sh/uv/getting-started/installation/) is locally installed.
-The following commands will create a virtual env, install python version 3.11 (as specified in `pyproject.toml`) and install dependencies:
+The following commands will create a virtual env, install python version 3.14 (as specified in `pyproject.toml`) and install dependencies:
 ```bash
 uv venv --seed
 uv sync
