@@ -306,13 +306,6 @@ async def seeded_db(
 
     async with db_pool.connection() as conn:
         async with conn.cursor(row_factory=dict_row) as cur:
-            # Create groups for project creators and members admin
-            await cur.execute("""
-                INSERT INTO "group" (name)
-                VALUES ('project-creators'), ('members-admin')
-                RETURNING id
-            """)
-
             # Add test user to project-creators group
             await cur.execute(
                 """

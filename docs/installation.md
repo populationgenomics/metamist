@@ -21,6 +21,7 @@ cd metamist
 
 Make sure [uv](https://docs.astral.sh/uv/getting-started/installation/) is locally installed.
 The following commands will create a virtual env, install python version 3.14 (as specified in `pyproject.toml`) and install dependencies:
+
 ```bash
 uv venv --seed
 uv sync
@@ -29,16 +30,19 @@ uv sync
 ### Database setup
 
 #### Running Postgres
+
 Metamist uses a Postgres database. Docker is the easiest way to run the Metamist Postgres database locally.
 We have found that [OrbStack](https://orbstack.dev/) is faster and easier to use than [Docker Desktop](https://docs.docker.com/desktop/) but either should work fine.
 
 Setup the Postgres container with docker:
+
 ```bash
 cd db
 docker compose up -d
 ```
 
 Then run the database migrations:
+
 ```bash
 docker compose exec postgres dbmate up
 ```
@@ -48,10 +52,12 @@ At this point, the database will be sufficiently setup to run the unit tests.
 ### Running the API
 
 #### Setting environment variables
-To run the API you'll need to set some environment variables. You can either add these to your bash/zsh profile, or if you use vscode you can set up a `.vscode/launch.json` file to make it easy to run and debug the API in vscode. 
+
+To run the API you'll need to set some environment variables. You can either add these to your bash/zsh profile, or if you use vscode you can set up a `.vscode/launch.json` file to make it easy to run and debug the API in vscode.
 Make sure to choose a username for the `SM_LOCALONLY_DEFAULTUSER` variable, this is the username that will be used for all local operations, it can take any format that you like.
 
 In `.bashrc` or `.zshrc`, add the following lines:
+
 ```bash
 export SM_LOCALONLY_DEFAULTUSER="<localusername>"
 export SM_ENVIRONMENT="local"
@@ -67,6 +73,7 @@ export SM_DEV_DB_PORT="5432"
 > These variables are used in scripts we will run later in the setup, and will not be inherited from your `launch.json` file, *so ensure that the values are the same*.
 
 In your `.vscode/launch.json`, create the following configuration:
+
 ```json
 {
     "version": "0.2.0",
@@ -113,6 +120,7 @@ INSERT INTO group_member(group_id, member)
 SELECT id, '<localusername>'
 FROM "group" WHERE name IN ('project-creators', 'members-admin');
 ```
+
 > [!NOTE]
 > Make sure that the `<localusername>` is identical to what you set in the `SM_LOCALONLY_DEFAULTUSER` environment variable.
 
@@ -132,6 +140,7 @@ This script requires [openapi-generator](https://openapi-generator.tech/docs/ins
 ```bash
 uv run regenerate_api.py
 ```
+
 Run the command `npx @openapitools/openapi-generator-cli version` if you are prompted to do so.
 
 If you have installed openapi generator using a different method you can set the `OPENAPI_COMMAND` environment variable to configure the command to use.
