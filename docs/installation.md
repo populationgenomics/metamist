@@ -1,9 +1,9 @@
+
 # Installation
 
 This document will walk you through the steps required for setting up a local installation of Metamist.
 
 **Note** this is a Metamist Developer guide, not a Metamist user guide. These steps are only required if you need to test a script on a local version of Metamist or work on contributions to the Metamist code base. If you just need to access and work with Metamist data see [the instructions here](/README.md#usage)
-
 
 ## Clone the codebase
 
@@ -20,113 +20,63 @@ cd metamist
 ### Install python requirements
 
 Make sure [uv](https://docs.astral.sh/uv/getting-started/installation/) is locally installed.
-
+The following commands will create a virtual env, install python version 3.14 (as specified in `pyproject.toml`) and install dependencies:
 
 ```bash
-# creates virtual env, install python version (3.11 as specified in pyproject.toml) and install dependencies
 uv venv --seed
 uv sync
 ```
 
 ### Database setup
 
-#### Running MariaDB
+#### Running Postgres
 
-Metamist uses a MariaDB 11 database. Docker is the easiest way to run the Metamist MariaDB database locally.
-
+Metamist uses a Postgres database. Docker is the easiest way to run the Metamist Postgres database locally.
 We have found that [OrbStack](https://orbstack.dev/) is faster and easier to use than [Docker Desktop](https://docs.docker.com/desktop/) but either should work fine.
 
-If you would prefer to not use Docker, you could also install MariaDB standalone using [homebrew](brew.sh) or another package manager.
 
-To start the database, run:
-
-```bash
-docker run --name mariadb-p3306 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -p 3306:3306 -d docker.io/library/mariadb:11.7.2
-```
-
-If port 3306 is already in use, you can specify a different port in the mapping. For example:
-
-```bash
-docker run --name mariadb-p3307 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 -p 3307:3306 -d docker.io/library/mariadb:11.7.2
-```
-
-#### Note on OrbStack
-
+> [!NOTE]
 > If you do use OrbStack for the docker mariadb database, make sure that the following setting is enabled. OrbStack > Settings > System > Environment > Use admin privileges for enhanced features
 
-#### Setting up the database and permissions
-
-1. Connect to the running container:
-
-```bash
-docker exec -it mariadb-p3306 bash
-```
-
-2. In the container shell, run the MariaDB CLI to create the database, user, and roles:
-
-```bash
-mariadb -u root --execute "
-  CREATE DATABASE sm_dev;
-  CREATE USER sm_api@'%';
-  CREATE USER sm_api@localhost;
-  CREATE ROLE sm_api_role;
-  GRANT sm_api_role TO sm_api@'%';
-  GRANT sm_api_role TO sm_api@localhost;
-  SET DEFAULT ROLE sm_api_role FOR sm_api@'%';
-  SET DEFAULT ROLE sm_api_role FOR sm_api@localhost;
-  GRANT ALL PRIVILEGES ON sm_dev.* TO sm_api_role;
-"
-```
-
-Once that is done you can disconnect from the container.
-
-
-#### Running database migrations
-
-Metamist uses liquibase to manage database migrations. To create the Metamist database tables you will need to run the migrations.
-
-Start by installing liquibase:
-
-```bash
-brew install liquibase
-```
-
-Then in the `db` folder, run the migrations:
+Setup the Postgres container with docker:
 
 ```bash
 cd db
-
-liquibase \
-    --changeLogFile project.xml \
-    --url jdbc:mariadb://127.0.0.1:3306/sm_dev \
-    --driver org.mariadb.jdbc.Driver \
-    --username root \
-    update
+docker compose up -d
 ```
 
-This should create all the necessary tables.
+Then run the database migrations:
 
+```bash
+docker compose exec postgres dbmate up
+```
 
-### Setting environment variables
+At this point, the database will be sufficiently setup to run the unit tests.
 
-To run the API you'll need to set some environment variables. You can either add these to your bash/zsh profile, or if you use vscode you can set up a `.vscode/launch.json` file to make it easy to run and debug the API in vscode. Make sure to choose a username for the `SM_LOCALONLY_DEFAULTUSER` variable, this is the username that will be used for all local operations, it can take any format that you like.
+### Running the API
 
+#### Setting environment variables
 
-in `.bashrc` or `.zshrc`
+To run the API you'll need to set some environment variables. You can either add these to your bash/zsh profile, or if you use vscode you can set up a `.vscode/launch.json` file to make it easy to run and debug the API in vscode.
+Make sure to choose a username for the `SM_LOCALONLY_DEFAULTUSER` variable, this is the username that will be used for all local operations, it can take any format that you like.
+
+In `.bashrc` or `.zshrc`, add the following lines:
 
 ```bash
 export SM_LOCALONLY_DEFAULTUSER="<localusername>"
-export SM_URL="http://localhost:8000"
 export SM_ENVIRONMENT="local"
 
-export SM_DEV_DB_USER="sm_api"
-export SM_DEV_DB_PORT="3306"
+export SM_DEV_DB_NAME="metamist_db"
+export SM_DEV_DB_USER="metamist"
+export SM_DEV_DB_PASSWORD="metamist_password"
+export SM_DEV_DB_PORT="5432"
 ```
 
+> [!NOTE]
+> If you are using VSCode to run the API, you should still set the first two variables from the above snippet in your bash/zsh profile.
+> These variables are used in scripts we will run later in the setup, and will not be inherited from your `launch.json` file, *so ensure that the values are the same*.
 
-If you do go down the route of setting the variables in your project's vscode `launch.json`, it is still a good idea to set the first 3 environment variables above in your bash/zsh profile. These variables are used by some of the scripts below, for example to generate the Metamist API. If they aren't set then your generated API will point to the production Metamist.
-
-in `.vscode/launch.json`
+In your `.vscode/launch.json`, create the following configuration:
 
 ```json
 {
@@ -139,41 +89,32 @@ in `.vscode/launch.json`
             "module": "api.server",
             "justMyCode": false,
             "env": {
-                "SM_URL": "http://localhost:8000",
                 "SM_LOCALONLY_DEFAULTUSER": "<localusername>",
                 "SM_ENVIRONMENT": "local",
-                "SM_DEV_DB_USER": "sm_api",
-                "SM_DEV_DB_PORT": "3306"
-
+                "SM_DEV_DB_NAME": "metamist_db",
+                "SM_DEV_DB_USER": "metamist",
+                "SM_DEV_DB_PASSWORD": "metamist_password",
+                "SM_DEV_DB_PORT": "5432",
             }
         }
     ]
 }
 ```
 
+#### Giving yourself project creator permissions
 
-
-### Giving yourself project creator permissions
-
-To bootstrap the database with some data, your local user will need permissions. To provide these you will need to connect to the database again.
-
+To bootstrap the database with some data, your local user will need permissions. To provide these you will need to connect to the database.
 
 Start a shell in the container:
 
 ```bash
-docker exec -it mariadb-p3306 bash
+docker exec -it metamist_postgres bash
 ```
 
-Enter the mariadb command prompt
+Enter the Postgres command prompt
 
 ```bash
-mariadb
-```
-
-Switch your database to sm_dev
-
-```sql
-USE sm_dev;
+psql "postgresql://metamist:metamist_password@localhost:5432/metamist_db?options=--search_path%3Dmain"
 ```
 
 Add your local username to the `project-creators` and `members-admin` groups:
@@ -181,14 +122,16 @@ Add your local username to the `project-creators` and `members-admin` groups:
 ```sql
 INSERT INTO group_member(group_id, member)
 SELECT id, '<localusername>'
-FROM `group` WHERE name IN('project-creators', 'members-admin');
-
+FROM "group" WHERE name IN ('project-creators', 'members-admin');
 ```
 
-You can now exit the mariadb prompt and the container.
+> [!NOTE]
+> Make sure that the `<localusername>` is identical to what you set in the `SM_LOCALONLY_DEFAULTUSER` environment variable.
+
+You can now exit the Postgres prompt and the container.
 
 
-### Building and installing the local python client
+#### Building and installing the local python client
 
 Next up, we need to run the API generator to create the python client, which will then be used to load some test data into the database.
 
@@ -196,15 +139,19 @@ This is handled by the `regenerate_api.py` script.
 
 This script requires [openapi-generator](https://openapi-generator.tech/docs/installation/) to be installed, this is included as part of Metamist's python dev requirements, so you shouldn't need to install anything additional.
 
+**Firstly**, ensure that your virtual environment is activated. Then run the following:
+
 ```bash
 uv run regenerate_api.py
 ```
+
+Run the command `npx @openapitools/openapi-generator-cli version` if you are prompted to do so.
 
 If you have installed openapi generator using a different method you can set the `OPENAPI_COMMAND` environment variable to configure the command to use.
 
 The API will be generated in the directory `packages/metamist/src/metamist` and you can build the API for packaging using the `pyproject.toml` file in the `packages/metamist/` directory.
 
-### Starting the API
+#### Starting the API
 
 Now that everything is set up, you can start the api server. If you are using vscode you can do this with the debugger, by first setting up the `launch.json` as described [above](#setting-environment-variables), and then running the API with "Run API" under the *Run and Debug* tab (⌘⇧D) or (Ctrl+Shift+D). F5 is the default shortcut to run the current launch config.
 
@@ -217,7 +164,7 @@ uv run uvicorn --port 8000 --host 0.0.0.0 api.server:app
 ```
 
 
-### Generating some data
+#### Generating some data
 
 To add some data to your database, you can run the `test/data/generate_data.py` script. Make sure you have your virtualenv activated and the `SM_ENVIRONMENT` and `SM_LOCALONLY_DEFAULTUSER` environment variables set before running this, otherwise the Metamist python client will try to add the data to production Metamist.
 
@@ -227,7 +174,7 @@ uv run test/data/generate_data.py
 ```
 
 
-### Conclusion
+#### Conclusion
 
 At this point, your API should be fully functional. You can test scripts by setting the `SM_ENVIRONMENT` variable to `local` so that the Metamist python client points to your local installation. You can also work on developing backend features.
 
@@ -240,7 +187,7 @@ To set up the Metamist web client, read on.
 
 ## Web Client Setup
 
-The Metamist web client is a React single page application that calls the Metamist apis and displays metadata in a user interface.
+The Metamist web client is a React single page application that calls the Metamist APIs and displays metadata in a user interface.
 
 To get up and running you will need [nodejs](https://nodejs.org/en) installed, there are a few options for managing node versions but we recommend [fnm](https://github.com/Schniz/fnm) as it is lightweight, simple and provides a similar api to `nvm` while being much much faster.
 
