@@ -29,7 +29,7 @@ INSERT INTO analysis_type (id, name) VALUES ('analysis-runner', 'analysis-runner
 
 -- migrate:down
 
-DELEtE FROM "group" WHERE name IN ('project-creators', 'members-admin');
+DELETE FROM "group" WHERE name IN ('project-creators', 'members-admin');
 DELETE FROM assay_type WHERE id = 'sequencing';
 DELETE FROM sample_type WHERE id IN ('blood', 'saliva');
 DELETE FROM sequencing_type WHERE id IN ('genome', 'exome', 'transcriptome', 'mtseq', 'chip');
