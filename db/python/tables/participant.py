@@ -477,7 +477,7 @@ class ParticipantTable:
             updates.append(t'karyotype = {karyotype}' if karyotype else None)
             meta_value = Jsonb(meta or {})
             updates.append(
-                t'meta = JSON_MERGE_PATCH(COALESCE(meta, "{{}}"), {meta_value})'
+                t"meta = JSON_MERGE_PATCH(COALESCE(meta, '{{}}'), {meta_value})"
                 if meta
                 else None
             )
