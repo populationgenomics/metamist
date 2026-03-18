@@ -173,6 +173,10 @@ def create_server_resources(
                             value=config.server.oauth_audience,
                         ),
                         gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name='SM_LEGACY_PROXY_SA',
+                            value=config.server.sm_legacy_proxy_sa,
+                        ),
+                        gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name='SM_DBCREDS',
                             value_source=gcp.cloudrunv2.ServiceTemplateContainerEnvValueSourceArgs(
                                 secret_key_ref=gcp.cloudrunv2.ServiceTemplateContainerEnvValueSourceSecretKeyRefArgs(
