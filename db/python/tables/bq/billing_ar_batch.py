@@ -116,25 +116,26 @@ class BillingArBatchTable(BillingBaseTable):
         Get min timestamp by sequencing groups
         """
         # Find the minimum day when samples has been added
-        # using FOR SYSTEM_TIME ALL gives us full history
-        _query = """
+        # Using history.sequencing_group to get previous states
+        _query = t"""
         SELECT sg.id, MIN(l.timestamp) as start_date
-        FROM sequencing_group FOR SYSTEM_TIME ALL sg
+        FROM (
+            SELECT id, audit_log_id FROM sequencing_group
+            UNION ALL
+            SELECT id, audit_log_id FROM history.sequencing_group
+        ) sg
         LEFT JOIN audit_log l on l.id = sg.audit_log_id
-        WHERE sg.id IN :seq_groups
+        WHERE sg.id = ANY({sequencing_groups_as_ids})
         GROUP BY sg.id
         """
-        info_record = await connection.connection.fetch_all(
-            _query,
-            {
-                'seq_groups': list(sequencing_groups_as_ids),
-            },
-        )
+        info_record = await (await connection.pg_connection.execute(_query)).fetchall()
 
         # Map sequencing group IDs to their first record date
         # if audit log not present, use current datetime
         first_seq_record_date = {
-            seq_id_map[row.id]: row.start_date if row.start_date else datetime.now()
+            seq_id_map[row['id']]: row['start_date']
+            if row['start_date']
+            else datetime.now()
             for row in info_record
         }
         return first_seq_record_date
@@ -145,18 +146,13 @@ class BillingArBatchTable(BillingBaseTable):
         """
         Get number of sequencing groups for the given projects
         """
-        _query = """
+        _query = t"""
             SELECT COUNT(distinct sg.id) as cnt
             FROM sample s
             INNER JOIN sequencing_group sg ON sg.sample_id = s.id
-            WHERE s.project IN :projects
+            WHERE s.project = ANY({[project_id]})
         """
-        info_record = await connection.connection.fetch_one(
-            _query,
-            {
-                'projects': [project_id],
-            },
-        )
+        info_record = await (await connection.pg_connection.execute(_query)).fetchone()
         return dict(info_record).get('cnt', 0)
 
     async def get_total_crams_info(
@@ -165,21 +161,16 @@ class BillingArBatchTable(BillingBaseTable):
         """
         Get the cram size per project, total size and count cram files
         """
-        _query = """
+        _query = t"""
             SELECT sum(f.size) as total_crams_size
             FROM output_file f
             INNER JOIN analysis_outputs o ON o.file_id = f.id
             INNER JOIN analysis a ON a.id = o.analysis_id
             where a.type = 'CRAM'
             AND a.status = 'COMPLETED'
-            and a.project IN :projects
+            and a.project = ANY({[project_id]})
         """
-        info_record = await connection.connection.fetch_one(
-            _query,
-            {
-                'projects': [project_id],
-            },
-        )
+        info_record = await (await connection.pg_connection.execute(_query)).fetchone()
 
         total_cram_info = dict(info_record)
         total_crams_size = float(total_cram_info.get('total_crams_size') or 0)
@@ -200,23 +191,17 @@ class BillingArBatchTable(BillingBaseTable):
         """
         Get CRAM files information for the given sequencing groups
         """
-        _query = """
+        _query = t"""
             SELECT sg.id, sum(f.size) as crams_size
             FROM sequencing_group sg
             LEFT JOIN analysis_sequencing_group asg ON asg.sequencing_group_id = sg.id
-            LEFT JOIN analysis a ON asg.analysis_id = a.id AND a.type = 'CRAM' AND a.status = 'COMPLETED' AND a.project = :project
+            LEFT JOIN analysis a ON asg.analysis_id = a.id AND a.type = 'CRAM' AND a.status = 'COMPLETED' AND a.project = {project_id}
             LEFT JOIN analysis_outputs o ON a.id = o.analysis_id
             LEFT JOIN output_file f ON o.file_id = f.id
-            WHERE sg.id IN :seq_groups
+            WHERE sg.id = ANY({sequencing_groups_as_ids})
             GROUP BY sg.id
         """
-        records = await connection.connection.fetch_all(
-            _query,
-            {
-                'project': project_id,
-                'seq_groups': list(sequencing_groups_as_ids),
-            },
-        )
+        records = await (await connection.pg_connection.execute(_query)).fetchall()
         sg_storage_cost: list[dict] = []
         cram_sizes = dict(  # noqa: C402
             (row['id'], float(row['crams_size'] if row['crams_size'] else 0))
@@ -359,20 +344,15 @@ class BillingArBatchTable(BillingBaseTable):
         """
         Create map project to sequencing groups and project names
         """
-        _query = """
-            SELECT s.project, GROUP_CONCAT(sg.id ORDER BY sg.id ASC SEPARATOR ',') as seq_grps
+        _query = t"""
+            SELECT s.project, ARRAY_AGG(sg.id ORDER BY sg.id ASC) as seq_grps
             FROM sequencing_group sg
             INNER JOIN sample s ON s.id = sg.sample_id
-            WHERE sg.id in :sequencing_group_ids
+            WHERE sg.id = ANY({sequencing_groups_as_ids})
             GROUP BY s.project
         """
-        rows = await connection.connection.fetch_all(
-            _query, {'sequencing_group_ids': sequencing_groups_as_ids}
-        )
-        projects = {
-            row.project: [int(seq_id) for seq_id in row.seq_grps.split(',')]
-            for row in rows
-        }
+        rows = await (await connection.pg_connection.execute(_query)).fetchall()
+        projects = {row['project']: row['seq_grps'] for row in rows}
         if not projects:
             return (None, None)
 
@@ -389,23 +369,19 @@ class BillingArBatchTable(BillingBaseTable):
         Get sequencing groups per sample ids
         Return map of Sample id -> seq group
         """
-        query = """
-            SELECT sample_id, GROUP_CONCAT(id ORDER BY id ASC SEPARATOR ',') as seq_grps
+        query = t"""
+            SELECT sample_id, ARRAY_AGG(id ORDER BY id ASC) as seq_grps
             FROM sequencing_group
             WHERE
-                sample_id IN :sample_ids
+                sample_id = ANY({sample_ids})
                 AND NOT archived
             GROUP BY sample_id
         """
-        sample_seq_records = await connection.connection.fetch_all(
-            query,
-            {
-                'sample_ids': sample_ids,
-            },
-        )
+        sample_seq_records = await (
+            await connection.pg_connection.execute(query)
+        ).fetchall()
         sample_to_seq_groups = {
-            row.sample_id: [int(seq_id) for seq_id in row.seq_grps.split(',')]
-            for row in sample_seq_records
+            row['sample_id']: row['seq_grps'] for row in sample_seq_records
         }
         return sample_to_seq_groups
 

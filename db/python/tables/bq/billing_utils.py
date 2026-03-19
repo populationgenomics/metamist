@@ -92,9 +92,11 @@ async def get_topic_to_project_map(
 
     # run the SQL to get all topics and their projects
     _query = """select id as project_id, dataset from project;"""
-    _query_results = await connection.connection.fetch_all(
-        _query,
-    )
+    _query_results = await (
+        await connection.pg_connection.execute(
+            _query,
+        )
+    ).fetchall()
 
     for row in _query_results:
         result[row['dataset']] = row['project_id']
