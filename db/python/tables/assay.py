@@ -394,9 +394,9 @@ class AssayTable(DbBase):
                     _assay_eid_update_before_delete = t"""
                     UPDATE assay_external_id
                     SET audit_log_id = {audit_log_id}
-                    WHERE assay_id = {assay_id} AND name = ANY({to_delete})
+                    WHERE assay_id = {assay_id} AND LOWER(name) = ANY({to_delete})
                     """
-                    _delete_query = t'DELETE FROM assay_external_id WHERE assay_id = {assay_id} AND name = ANY({to_delete})'
+                    _delete_query = t'DELETE FROM assay_external_id WHERE assay_id = {assay_id} AND LOWER(name) = ANY({to_delete})'
                     await conn.execute(_assay_eid_update_before_delete)
                     await conn.execute(_delete_query)
                 if to_update:
