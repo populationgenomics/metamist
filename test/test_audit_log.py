@@ -25,7 +25,7 @@ class TestChangelog:
         )
 
         cur = await connection_with_project.pg_connection.execute(
-            'SELECT audit_log_id FROM sample WHERE id = %(sid)s', {'sid': sample.id}
+            t'SELECT audit_log_id FROM sample WHERE id = {sample.id}'
         )
         row = await cur.fetchone()
         sample_cl_id = row['audit_log_id']
