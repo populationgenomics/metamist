@@ -198,7 +198,7 @@ class ProjectPermissionsTable:
             )
         fields_str = sql.SQL(',').join(setters)
 
-        _query = t'UPDATE project SET {fields_str:q} WHERE name = {project_name}'
+        _query = t'UPDATE project SET {fields_str:q} WHERE LOWER(name) = {project_name.lower()}'
 
         conn = self.connection.pg_connection
         await conn.execute(_query)
