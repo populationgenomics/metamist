@@ -454,7 +454,7 @@ class ParticipantTable:
                                 MERGE INTO participant_external_id AS target
                                 USING (VALUES (%(project)s, %(participant_id)s, %(name)s, %(external_id)s, %(audit_log_id)s))
                                     AS source (project, participant_id, name, external_id, audit_log_id)
-                                ON target.name = source.name
+                                ON LOWER(target.name) = LOWER(source.name)
                                     AND target.participant_id = source.participant_id
                                 WHEN MATCHED THEN
                                     UPDATE SET external_id = source.external_id, audit_log_id = source.audit_log_id
