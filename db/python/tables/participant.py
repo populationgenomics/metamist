@@ -417,13 +417,13 @@ class ParticipantTable:
                     _audit_update_query = t"""
                         UPDATE participant_external_id
                         SET audit_log_id = {audit_log_id}
-                        WHERE participant_id = {participant_id} AND name = ANY({to_delete})
+                        WHERE participant_id = {participant_id} AND LOWER(name) = ANY({to_delete})
                     """
                     await conn.execute(_audit_update_query)
 
                     _delete_query = t"""
                         DELETE FROM participant_external_id
-                        WHERE participant_id = {participant_id} AND name = ANY({to_delete})
+                        WHERE participant_id = {participant_id} AND LOWER(name) = ANY({to_delete})
                     """
                     await conn.execute(_delete_query)
 
@@ -591,14 +591,14 @@ class ParticipantTable:
             UPDATE participant_external_id
             SET external_id = %(external_id)s, audit_log_id = %(audit_log_id)s
             WHERE participant_id = %(participant_id)s
-            AND name = %(name)s
+            AND LOWER(name) = %(name)s
         """
 
         updates = [
             {
                 'external_id': external_id,
                 'participant_id': participant_id,
-                'name': PRIMARY_EXTERNAL_ORG,
+                'name': PRIMARY_EXTERNAL_ORG.lower(),
                 'audit_log_id': audit_log_id,
             }
             for participant_id, external_id in internal_to_external_id.items()

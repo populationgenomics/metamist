@@ -212,11 +212,11 @@ class FamilyTable(DbBase):
                 # Set audit_log_id to this transaction before deleting the rows
                 await cur.execute(t"""
                      UPDATE family_external_id SET audit_log_id = {audit_log_id}
-                     WHERE family_id = {id_} AND name = ANY({to_delete})
+                     WHERE family_id = {id_} AND LOWER(name) = ANY({to_delete})
                 """)
 
                 await cur.execute(
-                    t'DELETE FROM family_external_id WHERE family_id = {id_} AND name = ANY({to_delete})'
+                    t'DELETE FROM family_external_id WHERE family_id = {id_} AND LOWER(name) = ANY({to_delete})'
                 )
 
             if to_update:
