@@ -22,11 +22,12 @@ from graphql import DocumentNode  # type: ignore
 from requests.exceptions import HTTPError
 
 import metamist.configuration
-from cpg_utils.cloud import get_google_identity_token
+from metamist.metamist_config import get_config
 
 
 _sync_client: Client | None = None
 _async_client: Client | None = None
+_metamist_config = get_config()
 
 
 def get_local_schema() -> str:
@@ -64,9 +65,7 @@ def configure_sync_client(
     if env == 'local':
         transport = RequestsHTTPTransport(url=url or get_sm_url())
     else:
-        token = auth_token or get_google_identity_token(
-            target_audience=metamist.configuration.sm_url
-        )
+        token = auth_token or _metamist_config.get_google_identity_token()
         transport = RequestsHTTPTransport(
             url=url or get_sm_url(),
             headers={'Authorization': f'Bearer {token}'},
@@ -93,9 +92,7 @@ async def configure_async_client(
     if env == 'local':
         transport = AIOHTTPTransport(url=url or get_sm_url())
     else:
-        token = auth_token or get_google_identity_token(
-            target_audience=metamist.configuration.sm_url
-        )
+        token = auth_token or _metamist_config.get_google_identity_token()
         transport = AIOHTTPTransport(
             url=url or get_sm_url(),
             headers={'Authorization': f'Bearer {token}'},
