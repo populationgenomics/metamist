@@ -153,7 +153,8 @@ class BillingArBatchTable(BillingBaseTable):
             WHERE s.project = ANY({[project_id]})
         """
         info_record = await (await connection.pg_connection.execute(_query)).fetchone()
-        return dict(info_record).get('cnt', 0)
+        assert info_record
+        return info_record.get('cnt', 0)
 
     async def get_total_crams_info(
         self, connection: Connection, project_id: int
@@ -172,8 +173,8 @@ class BillingArBatchTable(BillingBaseTable):
         """
         info_record = await (await connection.pg_connection.execute(_query)).fetchone()
 
-        total_cram_info = dict(info_record)
-        total_crams_size = float(total_cram_info.get('total_crams_size') or 0)
+        assert info_record
+        total_crams_size = float(info_record.get('total_crams_size') or 0)
         return total_crams_size
 
     async def calculate_storage_cost_using_cram_files_info(
