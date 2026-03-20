@@ -119,8 +119,8 @@ class ProjectPermissionsTable:
             SELECT gm.member, g.name
             FROM "group" g
             JOIN group_member gm ON g.id = gm.group_id
-            WHERE g.name = {group_name}
-            AND gm.member = {member}
+            WHERE LOWER(g.name) = {group_name.lower()}
+            AND LOWER(gm.member) = {member.lower()}
             LIMIT 1
         """
 
