@@ -505,11 +505,13 @@ class ParticipantTable:
 
         if len(external_participant_ids) == 0:
             return {}
+        
+        eids_case_insensitive = [eid.lower() for eid in external_participant_ids]
 
         _query = t"""
             SELECT external_id, participant_id AS id
             FROM participant_external_id
-            WHERE external_id = ANY({external_participant_ids}) AND project = {project}
+            WHERE LOWER(external_id) = ANY({eids_case_insensitive}) AND project = {project}
         """
 
         conn = self.connection.pg_connection
@@ -641,7 +643,7 @@ class ParticipantTable:
         """
         wheres = [t'p.project = {project}']
         if sequencing_type:
-            wheres.append(t'sg.type = {sequencing_type}')
+            wheres.append(t'LOWER(sg.type) = {sequencing_type.lower()}')
 
         where_str = sql.SQL(' AND ').join(wheres) if wheres else t''
 
