@@ -223,12 +223,20 @@ class FamilyTable(DbBase):
                 await cur.execute(t'SELECT project FROM family WHERE id = {id_}')
                 project = await cur.fetchone()
 
-                _update_query = """INSERT INTO family_external_id (project, family_id, name, external_id, audit_log_id)
-                VALUES (%(project)s, %(id)s, %(name)s, %(external_id)s, %(audit_log_id)s)
-                ON CONFLICT (family_id, name)
-                DO UPDATE SET
-                external_id = EXCLUDED.external_id,
-                audit_log_id = EXCLUDED.audit_log_id"""
+                # Use MERGE to handle both the primary key (family_id, name) and
+                # the unique index (project, external_id) conflicts.
+                # Mimics MariaDB ON DUPLICATE KEY UPDATE behavior.
+                _update_query = """MERGE INTO family_external_id AS target
+                USING (SELECT %(project)s AS project, %(id)s AS family_id, %(name)s AS name,
+                              %(external_id)s AS external_id, %(audit_log_id)s AS audit_log_id) AS source
+                ON (target.family_id = source.family_id AND target.name = source.name)
+                   OR (target.project = source.project AND target.external_id = source.external_id)
+                WHEN MATCHED THEN
+                    UPDATE SET external_id = source.external_id,
+                               audit_log_id = source.audit_log_id
+                WHEN NOT MATCHED THEN
+                    INSERT (project, family_id, name, external_id, audit_log_id)
+                    VALUES (source.project, source.family_id, source.name, source.external_id, source.audit_log_id)"""
 
                 _update_values = [
                     {

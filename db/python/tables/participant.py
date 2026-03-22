@@ -448,14 +448,17 @@ class ParticipantTable:
                     ]
 
                     # Batch update
+                    # Use MERGE to handle both the primary key (participant_id, name) and
+                    # the unique index (project, external_id) conflicts.
+                    # Mimics MariaDB ON DUPLICATE KEY UPDATE behavior.
                     async with conn.cursor() as cur:
                         await cur.executemany(
                             """
                                 MERGE INTO participant_external_id AS target
                                 USING (VALUES (%(project)s, %(participant_id)s, %(name)s, %(external_id)s, %(audit_log_id)s))
                                     AS source (project, participant_id, name, external_id, audit_log_id)
-                                ON target.name = source.name
-                                    AND target.participant_id = source.participant_id
+                                ON (target.participant_id = source.participant_id AND target.name = source.name)
+                                   OR (target.project = source.project AND target.external_id = source.external_id)
                                 WHEN MATCHED THEN
                                     UPDATE SET external_id = source.external_id, audit_log_id = source.audit_log_id
                                 WHEN NOT MATCHED THEN

@@ -1,15 +1,15 @@
-import unittest
 from io import StringIO
 from unittest.mock import patch
 
+import pytest
+
 from scripts.process_ont_products import OntProductParser
-from test.testbase import run_as_sync
 
 
-class TestOntSampleSheetParser(unittest.TestCase):
+class TestOntSampleSheetParser:
     """Test the TestOntSampleSheetParser"""
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.apis.SampleApi.get_sample_id_map_by_external')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
@@ -51,4 +51,4 @@ class TestOntSampleSheetParser(unittest.TestCase):
             delimiter=',',
         )
 
-        self.assertEqual(4, len(analyses))
+        assert len(analyses) == 4

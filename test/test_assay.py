@@ -6,6 +6,7 @@ import pytest
 from psycopg.errors import UniqueViolation
 
 from db.python.connect import Connection
+from db.python.enum_tables.assay_type import AssayTypeTable
 from db.python.filters import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.sample import SampleLayer
@@ -30,64 +31,26 @@ DEFAULT_SEQUENCING_META = {
 async def sample_id(
     connection_with_project: Connection,
 ) -> int:
-    """
-    Create a sample directly in the database for testing assays.
-    This is a temporary fixture until sample layer is migrated.
-    @TODO replace this when ready
-    """
-    project_id = connection_with_project.project_id
-
-    conn = connection_with_project.pg_connection
-    # Create audit_log entry first
-    cur = await conn.execute(
-        t"""
-        INSERT INTO audit_log (author, auth_project)
-        VALUES ('test', {project_id})
-        RETURNING id
-        """
+    """Create a sample for testing assays using SampleLayer."""
+    slayer = SampleLayer(connection_with_project)
+    sample = await slayer.upsert_sample(
+        SampleUpsertInternal(
+            external_ids={PRIMARY_EXTERNAL_ORG: 'TESTING001'},
+            type='blood',
+            active=True,
+            meta={'Testing': 'test_assay'},
+        )
     )
-    row = await cur.fetchone()
-    assert row is not None
-    audit_log_id = row['id']
-
-    cur = await conn.execute(
-        t"""
-        INSERT INTO sample (project, type, active, meta, author, audit_log_id)
-        VALUES ({project_id}, 'blood', true, '{{"Testing": "test_assay"}}', 'test', {audit_log_id})
-        RETURNING id
-        """
-    )
-    row = await cur.fetchone()
-    assert row is not None
-    sample_id = row['id']
-
-    # Insert the external ID
-    await conn.execute(
-        t"""
-        INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
-        VALUES ({project_id}, {sample_id}, 'default', 'TESTING001', {audit_log_id})
-        """
-    )
-
-    return sample_id
+    return sample.id
 
 
 @pytest.fixture
 async def metabolomics_assay_type(
     connection_with_project: Connection,
 ) -> None:
-    """
-    Create the 'metabolomics' assay type in the database.
-    This is a temporary fixture until the enum tables are migrated
-    @TODO replace this when ready
-    """
-    await connection_with_project.pg_connection.execute(
-        """
-        INSERT INTO assay_type (id, name, audit_log_id)
-        VALUES ('metabolomics', 'Metabolomics', 1)
-        ON CONFLICT (id) DO NOTHING
-        """
-    )
+    """Create the 'metabolomics' assay type in the database using AssayTypeTable."""
+    assay_type_table = AssayTypeTable(connection_with_project)
+    await assay_type_table.insert('metabolomics')
 
 
 @pytest.mark.asyncio
@@ -285,38 +248,17 @@ class TestAssay:
         assay_layer = AssayLayer(connection_with_project)
         project_id = connection_with_project.project_id
 
-        # Create sample directly for this test
-        # @TODO remove this once we can create with sample layer
-        conn = connection_with_project.pg_connection
-        # Create audit_log entry first
-        cur = await conn.execute(
-            t"""
-            INSERT INTO audit_log (author, auth_project)
-            VALUES ('test', {project_id})
-            RETURNING id
-            """
+        # Create sample using SampleLayer
+        slayer = SampleLayer(connection_with_project)
+        sample = await slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'SAM_TEST_QUERY'},
+                type='blood',
+                active=True,
+                meta={'collection-year': '2022'},
+            )
         )
-        row = await cur.fetchone()
-        assert row is not None
-        audit_log_id = row['id']
-
-        cur = await conn.execute(
-            t"""
-            INSERT INTO sample (project, type, active, meta, author, audit_log_id)
-            VALUES ({project_id}, 'blood', true, '{{"collection-year": "2022"}}', 'test', {audit_log_id})
-            RETURNING id
-            """
-        )
-        row = await cur.fetchone()
-        assert row is not None
-        sample_id_for_test = row['id']
-
-        await conn.execute(
-            t"""
-            INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
-            VALUES ({project_id}, {sample_id_for_test}, 'default', 'SAM_TEST_QUERY', {audit_log_id})
-            """
-        )
+        sample_id_for_test = sample.id
 
         seqs = await assay_layer.upsert_assays(
             [
@@ -362,22 +304,20 @@ class TestAssay:
         )
 
         # seq_meta
-        # @TODO renable once meta filters are fixed
-        # assert {seq2_id} == await search_result_to_ids(
-        #     AssayFilter(meta={'unique': GenericFilter(eq='b')})
-        # )
-        # assert {seq1_id, seq2_id} == await search_result_to_ids(
-        #     AssayFilter(meta={'common': GenericFilter(eq='common')})
-        # )
+        assert {seq2_id} == await search_result_to_ids(
+            AssayFilter(meta={'unique': GenericFilter(eq='b')})
+        )
+        assert {seq1_id, seq2_id} == await search_result_to_ids(
+            AssayFilter(meta={'common': GenericFilter(eq='common')})
+        )
 
         # sample meta
-        # @TODO renable once meta filters are fixed
-        # assert {seq1_id, seq2_id} == await search_result_to_ids(
-        #     AssayFilter(sample_meta={'collection-year': GenericFilter(eq='2022')})
-        # )
-        # assert set() == await search_result_to_ids(
-        #     AssayFilter(sample_meta={'unknown_key': GenericFilter(eq='2022')})
-        # )
+        assert {seq1_id, seq2_id} == await search_result_to_ids(
+            AssayFilter(sample_meta={'"collection-year"': GenericFilter(eq='2022')})
+        )
+        assert set() == await search_result_to_ids(
+            AssayFilter(sample_meta={'unknown_key': GenericFilter(eq='2022')})
+        )
 
         # assay types
         assert {seq1_id, seq2_id} == await search_result_to_ids(
@@ -385,13 +325,12 @@ class TestAssay:
         )
 
         # combination
-        # @TODO renable once meta filters are fixed
-        # assert {seq2_id} == await search_result_to_ids(
-        #     AssayFilter(
-        #         sample_meta={'collection-year': GenericFilter(eq='2022')},
-        #         external_id=GenericFilter(in_=['SEQ02']),
-        #     )
-        # )
+        assert {seq2_id} == await search_result_to_ids(
+            AssayFilter(
+                sample_meta={'"collection-year"': GenericFilter(eq='2022')},
+                external_id=GenericFilter(in_=['SEQ02']),
+            )
+        )
         assert {seq1_id} == await search_result_to_ids(
             AssayFilter(
                 external_id=GenericFilter(in_=['SEQ01']),
@@ -399,9 +338,7 @@ class TestAssay:
             )
         )
 
-    @pytest.mark.skip(
-        reason='Requires sequencing group layer which is not yet migrated'
-    )
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_query_by_sg_ids(
         self,
         connection_with_project: Connection,
@@ -578,9 +515,7 @@ class TestAssay:
         assert row is not None
         assert row['type'] == 'metabolomics'
 
-    @pytest.mark.skip(
-        reason='Requires sequencing group layer which is not yet migrated'
-    )
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_batch_statistics(
         self,
         connection_with_project: Connection,

@@ -197,8 +197,6 @@ query MyQuery($project: String!) {
         assert len(participants[0]['samples'][0]['sequencingGroups'][0]['assays']) == 1
         assert p.samples[0].sequencing_groups[0].assays[0].id, assays[0]['id']
 
-    # TODO: adding marker to revisit this test case
-    @pytest.mark.skip(reason='Querying JSON keys is not implemented')
     @pytest.mark.asyncio
     async def test_query_sample_by_meta(self, graphql_query: GraphQLQueryFunction):
         """Test querying a participant"""
@@ -238,10 +236,8 @@ query MyQuery($project: String!) {
         )
 
         assert values2
-        assert len(values2['project']['participants'][0]['samples']) == 0
+        assert len(values2['data']['project']['participants'][0]['samples']) == 0
 
-    # TODO: adding marker to revisit this test case
-    @pytest.mark.skip(reason='Output file migration yet to merge')
     @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
     async def test_sg_analyses_query(self, graphql_query: GraphQLQueryFunction):
@@ -274,6 +270,7 @@ query MyQuery($sg_id: String!, $project: String!) {
             q,
             {'sg_id': sequencing_group_id_format(sg_id), 'project': self.project_name},
         )
+        resp = resp['data']
         assert 'sequencingGroups' in resp
         assert len(resp['sequencingGroups']) == 1
         assert 'analyses' in resp['sequencingGroups'][0]
@@ -283,8 +280,6 @@ query MyQuery($sg_id: String!, $project: String!) {
         assert 'meta' in analyses[0]
         assert 'output' in analyses[0]
 
-    # TODO: adding marker to revisit this test case
-    @pytest.mark.skip(reason='Querying JSON keys is not implemented at the moment')
     @pytest.mark.asyncio
     async def test_project_analyses_query_with_meta(
         self, graphql_query: GraphQLQueryFunction
@@ -320,6 +315,7 @@ query MyQuery($project: String!) {{
                 'meta_value': test_meta_val,
             },
         )
+        resp = resp['data']
         assert 'project' in resp
         assert 'analyses' in resp['project']
         assert len(resp['project']['analyses']) == 1
@@ -327,7 +323,7 @@ query MyQuery($project: String!) {{
         analysis_resp = resp['project']['analyses'][0]
         assert 'id' in analysis_resp
         assert 'meta' in analysis_resp
-        assert a_id in analysis_resp['id']
+        assert a_id == analysis_resp['id']
         assert analysis_resp['meta'] == {test_meta_key: test_meta_val}
 
     @pytest.mark.asyncio
@@ -449,8 +445,6 @@ query MyQuery($project: String!) {
             },
         ]
 
-    # TODO: adding marker to revisit this test case
-    @pytest.mark.skip(reason='Querying JSON keys is not implemented at the moment')
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
     async def test_query_family_by_meta(self, graphql_query: GraphQLQueryFunction):
@@ -495,9 +489,11 @@ query MyQuery($project: String!) {
         assert families[0]['meta']['study'] == 'study_a'
 
         # Filter by priority=low - should return only family 2
-        values2 = await graphql_query(
-            q, {'project': self.project_name, 'meta': {'priority': 'low'}}
-        )
+        values2 = (
+            await graphql_query(
+                q, {'project': self.project_name, 'meta': {'priority': 'low'}}
+            )
+        )['data']
         assert values2
 
         families2 = values2['project']['families']
@@ -505,15 +501,15 @@ query MyQuery($project: String!) {
         assert fid2 == families2[0]['id']
 
         # Filter by non-existent meta - should return empty
-        values3 = await graphql_query(
-            q, {'project': self.project_name, 'meta': {'nonexistent': 'value'}}
-        )
+        values3 = (
+            await graphql_query(
+                q, {'project': self.project_name, 'meta': {'nonexistent': 'value'}}
+            )
+        )['data']
         assert values3
 
         assert len(values3['project']['families']) == 0
 
-    # TODO: adding marker to revisit this test case
-    @pytest.mark.skip(reason='Output file migration yet to merge')
     @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
     async def test_get_project_name_from_analysis(
@@ -545,7 +541,9 @@ query MyQuery($sg_id: String!) {
   }
 }"""
 
-        resp = await graphql_query(q, {'sg_id': sequencing_group_id_format(sg_id)})
+        resp = (await graphql_query(q, {'sg_id': sequencing_group_id_format(sg_id)}))[
+            'data'
+        ]
         assert 'sequencingGroups' in resp
         project_name = resp['sequencingGroups'][0]['analyses'][0]['project']['name']
         assert self.project_name == project_name

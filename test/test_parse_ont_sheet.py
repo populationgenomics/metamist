@@ -1,6 +1,8 @@
 from io import StringIO
 from unittest.mock import patch
 
+import pytest
+
 from metamist.parser.generic_parser import ParsedParticipant
 
 from db.python.layers import ParticipantLayer
@@ -10,15 +12,18 @@ from models.models import (
     SampleUpsertInternal,
 )
 from scripts.parse_ont_sheet import OntParser
-from test.testbase import DbIsolatedTest, run_as_sync
+from test.conftest import make_graphql_query_mock
 
 
-class TestOntSampleSheetParser(DbIsolatedTest):
+class TestOntSampleSheetParser:
     """Test the TestOntSampleSheetParser"""
 
-    @run_as_sync
+    @pytest.mark.project_roles(['reader', 'writer'])
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_simple_sheet(self, mock_graphql_query):
+    async def test_simple_sheet(
+        self, mock_graphql_query, connection_with_project, graphql_query
+    ):
         """
         Test importing a two rows, forms objects and checks response
         - MOCKS:
@@ -27,7 +32,7 @@ class TestOntSampleSheetParser(DbIsolatedTest):
             - get_sequence_ids_for_sample_ids_by_type
         """
 
-        player = ParticipantLayer(self.connection)
+        player = ParticipantLayer(connection_with_project)
         await player.upsert_participants(
             [
                 ParticipantUpsertInternal(
@@ -41,7 +46,7 @@ class TestOntSampleSheetParser(DbIsolatedTest):
             ]
         )
 
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         rows = [
             'Sequencing_date,Experiment name,Sample ID,Protocol,Flow cell,Barcoding,Device,Flowcell ID,MUX total,Basecalling,Fail FASTQ filename,Pass FASTQ filename',
@@ -51,7 +56,7 @@ class TestOntSampleSheetParser(DbIsolatedTest):
         parser = OntParser(
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
         )
 
         parser.skip_checking_gcs_objects = True
@@ -77,12 +82,12 @@ class TestOntSampleSheetParser(DbIsolatedTest):
         sequencing_to_add = summary.assays.insert
         sequencing_to_update = summary.assays.update
 
-        self.assertEqual(1, participants_to_add)
-        self.assertEqual(1, participants_to_update)
-        self.assertEqual(1, samples_to_add)
-        self.assertEqual(2, sequencing_to_add)
-        self.assertEqual(1, samples_to_update)
-        self.assertEqual(0, sequencing_to_update)
+        assert participants_to_add == 1
+        assert participants_to_update == 1
+        assert samples_to_add == 1
+        assert sequencing_to_add == 2
+        assert samples_to_update == 1
+        assert sequencing_to_update == 0
 
         meta_dict = {
             'barcoding': 'None',
@@ -124,7 +129,6 @@ class TestOntSampleSheetParser(DbIsolatedTest):
                 ]
             ],
         }
-        self.maxDiff = None
         sequencing_group = participants[0].samples[0].sequencing_groups[0]
-        self.assertDictEqual(seqgroup_meta, sequencing_group.meta)
-        self.assertDictEqual(meta_dict, sequencing_group.assays[0].meta)
+        assert seqgroup_meta == sequencing_group.meta
+        assert meta_dict == sequencing_group.assays[0].meta

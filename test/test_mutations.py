@@ -1,6 +1,7 @@
-from graphql.error import GraphQLError
+import pytest
 
 from api.graphql.mutations.analysis import AnalysisStatusType
+from db.python.connect import Connection
 from db.python.filters.generic import GenericFilter
 from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.assay import AssayLayer
@@ -25,7 +26,7 @@ from models.models.project import ProjectMemberRole
 from models.utils.cohort_template_id_format import cohort_template_id_transform_to_raw
 from models.utils.sample_id_format import sample_id_transform_to_raw
 from models.utils.sequencing_group_id_format import sequencing_group_id_transform_to_raw
-from test.testbase import DbIsolatedTest, run_as_sync
+from test.conftest import GraphQLQueryFunction
 
 
 GROUP_NAME_PROJECT_CREATORS = 'project-creators'
@@ -430,37 +431,76 @@ def get_test_sample() -> SampleUpsertInternal:
     )
 
 
-class TestMutations(DbIsolatedTest):
+class TestMutations:
     """Test sample class"""
 
-    # pylint: disable=too-many-instance-attributes
-
-    @run_as_sync
-    async def setUp(self) -> None:
-        # don't need to await because it's tagged @run_as_sync
-        super().setUp()  # type: ignore [call-arg]
-        self.cl = CohortLayer(self.connection)
-        self.sl = SampleLayer(self.connection)
-        self.sgl = SequencingGroupLayer(self.connection)
-        self.asl = AssayLayer(self.connection)
-        self.al = AnalysisLayer(self.connection)
-        self.pl = ParticipantLayer(self.connection)
-        self.fl = FamilyLayer(self.connection)
-        self.ppt = ProjectPermissionsTable(self.connection)
+    @pytest.fixture(autouse=True)
+    async def setup(self, connection_with_project: Connection):
+        self.cl = CohortLayer(connection_with_project)
+        self.sl = SampleLayer(connection_with_project)
+        self.sgl = SequencingGroupLayer(connection_with_project)
+        self.asl = AssayLayer(connection_with_project)
+        self.al = AnalysisLayer(connection_with_project)
+        self.pl = ParticipantLayer(connection_with_project)
+        self.fl = FamilyLayer(connection_with_project)
+        self.ppt = ProjectPermissionsTable(connection_with_project)
 
         self.family_id = await self.fl.create_family(external_ids={'forg': 'FAM01'})
         self.family_id_2 = await self.fl.create_family(external_ids={'forg': 'FAM02'})
 
-        sample = await self.sl.upsert_sample(get_test_sample())
+        sample = await self.sl.upsert_sample(
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
+                type='blood',
+                meta={'meta': 'meta ;)'},
+                active=True,
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={},
+                        sample_id=None,
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta={
+                                    'sequencing_type': 'genome',
+                                    'sequencing_technology': 'short-read',
+                                    'sequencing_platform': 'illumina',
+                                },
+                            )
+                        ],
+                    ),
+                    SequencingGroupUpsertInternal(
+                        type='exome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={},
+                        sample_id=None,
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta={
+                                    'sequencing_type': 'exome',
+                                    'sequencing_technology': 'short-read',
+                                    'sequencing_platform': 'illumina',
+                                },
+                            )
+                        ],
+                    ),
+                ],
+            )
+        )
         self.sample_id = sample.id
         self.external_sample_id = sample.to_external().id
         self.genome_sequencing_group_id = sample.sequencing_groups[0].id  # type: ignore [arg-type]
         self.genome_sequencing_group_id_external = (
             sample.sequencing_groups[0].to_external().id  # type: ignore [arg-type]
         )
-        self.exome_sequencing_group_id = sample.sequencing_groups[self.project_id].id  # type: ignore [arg-type]
+        self.exome_sequencing_group_id = sample.sequencing_groups[1].id  # type: ignore [arg-type]
         self.exome_sequencing_group_id_external = (
-            sample.sequencing_groups[self.project_id].to_external().id  # type: ignore [arg-type]
+            sample.sequencing_groups[1].to_external().id  # type: ignore [arg-type]
         )
         self.participant = await self.pl.upsert_participant(
             ParticipantUpsertInternal(
@@ -495,31 +535,27 @@ class TestMutations(DbIsolatedTest):
             maternal_id=self.mat_id,
             affected=2,
         )
-
-        await self.connection.connection.execute(
-            f"""
-            INSERT INTO group_member(group_id, member)
-            SELECT id, '{self.author}'
-            FROM `group` WHERE name IN('project-creators', 'members-admin')
-            """
-        )
+        self.project_id = connection_with_project.project_id
+        self.project_name = connection_with_project.project.name
+        self.connection = connection_with_project
 
     # region ANALYSIS TESTS
 
-    @run_as_sync
-    async def test_create_analysis(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_create_analysis(self, graphql_query: GraphQLQueryFunction):
         """Test creating an analysis using the mutation and the API"""
-        mutation_result = (
-            await self.run_graphql_query_async(
-                CREATE_ANALYSIS_MUTATION,
-                variables={
-                    'project': self.project_name,
-                    'sequencingGroupIds': [self.genome_sequencing_group_id_external],
-                    'status': AnalysisStatusType.UNKNOWN.name,
-                    'type': 'analysis-runner',
-                },
-            )
-        )['analysis']['createAnalysis']
+        res = await graphql_query(
+            CREATE_ANALYSIS_MUTATION,
+            variables={
+                'project': self.project_name,
+                'sequencingGroupIds': [self.genome_sequencing_group_id_external],
+                'status': AnalysisStatusType.UNKNOWN.name,
+                'type': 'analysis-runner',
+            },
+        )
+        assert not res.get('errors')
+        mutation_result = res['data']['analysis']['createAnalysis']
 
         aid = await self.al.create_analysis(
             project=self.project_id,
@@ -533,25 +569,16 @@ class TestMutations(DbIsolatedTest):
 
         api_result = (await self.al.get_analysis_by_id(aid)).to_external()
 
-        self.assertEqual(
-            api_result.type,
-            mutation_result['type'],
-        )
-        self.assertEqual(
-            api_result.status.name,
-            mutation_result['status'],
-        )
-        self.assertEqual(
-            api_result.sequencing_group_ids,
-            [s['id'] for s in mutation_result['sequencingGroups']],
-        )
-        self.assertEqual(
-            api_result.meta,
-            mutation_result['meta'],
-        )
+        assert api_result.type == mutation_result['type']
+        assert api_result.status.name == mutation_result['status']
+        assert api_result.sequencing_group_ids == [
+            s['id'] for s in mutation_result['sequencingGroups']
+        ]
+        assert api_result.meta == mutation_result['meta']
 
-    @run_as_sync
-    async def test_update_analysis(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_update_analysis(self, graphql_query: GraphQLQueryFunction):
         """Test updating an analysis using the mutation and the API"""
 
         analysis = await self.al.create_analysis(
@@ -563,16 +590,16 @@ class TestMutations(DbIsolatedTest):
                 sequencing_group_ids=[self.genome_sequencing_group_id],  # type: ignore [arg-type]
             ),
         )
-        mutation_result = (
-            await self.run_graphql_query_async(
-                UPDATE_ANALYSIS_MUTATION,
-                variables={
-                    'analysisId': analysis,
-                    'status': AnalysisStatusType.COMPLETED.name,
-                    'meta': {'test': 'test'},
-                },
-            )
-        )['analysis']['updateAnalysis']
+        res = await graphql_query(
+            UPDATE_ANALYSIS_MUTATION,
+            variables={
+                'analysisId': analysis,
+                'status': AnalysisStatusType.COMPLETED.name,
+                'meta': {'test': 'test'},
+            },
+        )
+        assert not res.get('errors')
+        mutation_result = res['data']['analysis']['updateAnalysis']
 
         await self.al.update_analysis(
             analysis_id=analysis,
@@ -582,32 +609,32 @@ class TestMutations(DbIsolatedTest):
 
         api_result = (await self.al.get_analysis_by_id(analysis)).to_external()
 
-        self.assertEqual(api_result.status.name, mutation_result['status'])
-        self.assertEqual(api_result.meta, mutation_result['meta'])
+        assert api_result.status.name == mutation_result['status']
+        assert api_result.meta == mutation_result['meta']
 
     # endregion ANALYSIS TESTS
 
     # region ASSAY TESTS
-    @run_as_sync
-    async def test_create_assay(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_create_assay(self, graphql_query: GraphQLQueryFunction):
         """Test creating an assay using the mutation and the API"""
         default_sequencing_meta = {
             'sequencing_type': 'genome',
             'sequencing_platform': 'short-read',
             'sequencing_technology': 'illumina',
         }
-        mutation_result = (
-            await self.run_graphql_query_async(
-                CREATE_ASSAY_MUTATION,
-                variables={
-                    'project': self.project_name,
-                    'externalIds': {'test1': 'test1'},
-                    'sampleId': self.external_sample_id,
-                    'type': 'sequencing',
-                    'meta': {'test': 'test', **default_sequencing_meta},
-                },
-            )
-        )['assay']['createAssay']
+        res = await graphql_query(
+            CREATE_ASSAY_MUTATION,
+            variables={
+                'type': 'sequencing',
+                'meta': {'test': 'test', **default_sequencing_meta},
+                'externalIds': {'test1': 'test1'},
+                'sampleId': self.external_sample_id,
+            },
+        )
+        assert not res.get('errors')
+        mutation_result = res['data']['assay']['createAssay']
 
         api_result = (
             await self.asl.upsert_assay(
@@ -620,21 +647,13 @@ class TestMutations(DbIsolatedTest):
             )
         ).to_external()
 
-        self.assertEqual(
-            api_result.type,
-            mutation_result['type'],
-        )
-        self.assertEqual(
-            api_result.meta,
-            mutation_result['meta'],
-        )
-        self.assertEqual(
-            api_result.sample_id,
-            mutation_result['sample']['id'],
-        )
+        assert api_result.type == mutation_result['type']
+        assert api_result.meta == mutation_result['meta']
+        assert api_result.sample_id == mutation_result['sample']['id']
 
-    @run_as_sync
-    async def test_update_assay(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_update_assay(self, graphql_query: GraphQLQueryFunction):
         """Test updating an assay using the mutation and the API"""
 
         default_sequencing_meta = {
@@ -658,17 +677,18 @@ class TestMutations(DbIsolatedTest):
             .id
         )
 
-        mutation_result = (
-            await self.run_graphql_query_async(
-                UPDATE_ASSAY_MUTATION,
-                variables={
-                    'project': self.project_name,
-                    'assayId': assay_id,
-                    'type': 'sequencing',
-                    'meta': {'test': 'test2', **default_sequencing_meta},
-                },
-            )
-        )['assay']['updateAssay']
+        res = await graphql_query(
+            UPDATE_ASSAY_MUTATION,
+            variables={
+                'assayId': assay_id,
+                'type': 'sequencing',
+                'meta': {'test': 'test2', **default_sequencing_meta},
+                'externalIds': None,
+                'sampleId': None,
+            },
+        )
+        assert not res.get('errors')
+        mutation_result = res['data']['assay']['updateAssay']
 
         await self.asl.upsert_assay(
             AssayUpsertInternal(
@@ -680,41 +700,45 @@ class TestMutations(DbIsolatedTest):
 
         api_result = (await self.asl.get_assay_by_id(assay_id)).to_external()  # type: ignore [arg-type]
 
-        self.assertEqual(api_result.type, mutation_result['type'])
-        self.assertEqual(api_result.meta, mutation_result['meta'])
-        self.assertEqual(api_result.sample_id, mutation_result['sample']['id'])
-        self.assertEqual(api_result.external_ids, mutation_result['externalIds'])
+        assert api_result.type == mutation_result['type']
+        assert api_result.meta == mutation_result['meta']
+        assert api_result.sample_id == mutation_result['sample']['id']
+        assert api_result.external_ids == mutation_result['externalIds']
 
     # endregion ASSAY TESTS
 
     # region COHORT TESTS
-    @run_as_sync
-    async def test_create_cohort_from_criteria(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_create_cohort_from_criteria(
+        self, graphql_query: GraphQLQueryFunction
+    ):
         """Test creating a cohort from criteria using the mutation and the API"""
 
-        mutation_result = (
-            await self.run_graphql_query_async(
-                CREATE_COHORT_FROM_CRITERIA_MUTATION,
-                variables={
-                    'project': self.project_name,
-                    'cohortSpec': {
-                        'name': 'TestCohort1',
-                        'description': 'TestCohortDescription',
-                        # 'templateId': cohort_template_id_format(tid),
-                    },
-                    'cohortCriteria': {
-                        'projects': [self.project_name],
-                        'excludedSgsInternal': [
-                            self.exome_sequencing_group_id_external
-                        ],
-                        'sgTechnology': ['short-read'],
-                        'sgPlatform': ['illumina'],
-                        'sgType': ['genome'],
-                        'sampleType': ['blood'],
-                    },
+        res = await graphql_query(
+            CREATE_COHORT_FROM_CRITERIA_MUTATION,
+            variables={
+                'project': self.project_name,
+                'cohortSpec': {
+                    'name': 'TestCohort1',
+                    'description': 'TestCohortDescription',
+                    # 'templateId': cohort_template_id_format(tid),
                 },
-            )
-        )['cohort']['createCohortFromCriteria']['createdCohort']
+                'cohortCriteria': {
+                    'projects': [self.project_name],
+                    'excludedSgsInternal': [self.exome_sequencing_group_id_external],
+                    'sgTechnology': ['short-read'],
+                    'sgPlatform': ['illumina'],
+                    'sgType': ['genome'],
+                    'sampleType': ['blood'],
+                },
+            },
+        )
+        assert not res.get('errors')
+        mutation_result = res['data']['cohort']['createCohortFromCriteria'][
+            'createdCohort'
+        ]
+
         cohort = await self.cl.create_cohort_from_criteria(
             project_to_write=self.project_id,
             description='TestCohortDescription',
@@ -732,35 +756,37 @@ class TestMutations(DbIsolatedTest):
         api_result = (
             await self.cl.query(CohortFilter(id=GenericFilter(eq=cohort.cohort_id)))
         )[0]
-        self.assertEqual(api_result.description, mutation_result['description'])
-        self.assertEqual(api_result.author, mutation_result['author'])
+        assert api_result.description == mutation_result['description']
+        assert api_result.author == mutation_result['author']
 
-    @run_as_sync
-    async def test_create_cohort_template(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_create_cohort_template(self, graphql_query: GraphQLQueryFunction):
         """Test creating a cohort template"""
 
-        mutation_result = (
-            await self.run_graphql_query_async(
-                CREATE_COHORT_TEMPLATE_MUTATION,
-                variables={
-                    'project': self.project_name,
-                    'template': {
-                        'name': 'TestTemplate',
-                        'description': 'TestCohortTemplateDescription',
-                        'criteria': {
-                            'projects': [self.project_name],
-                            'excludedSgsInternal': [
-                                self.exome_sequencing_group_id_external
-                            ],
-                            'sgTechnology': ['short-read'],
-                            'sgPlatform': ['illumina'],
-                            'sgType': ['genome'],
-                            'sampleType': ['blood'],
-                        },
+        res = await graphql_query(
+            CREATE_COHORT_TEMPLATE_MUTATION,
+            variables={
+                'project': self.project_name,
+                'template': {
+                    'name': 'TestTemplate',
+                    'description': 'TestCohortTemplateDescription',
+                    'criteria': {
+                        'projects': [self.project_name],
+                        'excludedSgsInternal': [
+                            self.exome_sequencing_group_id_external
+                        ],
+                        'sgTechnology': ['short-read'],
+                        'sgPlatform': ['illumina'],
+                        'sgType': ['genome'],
+                        'sampleType': ['blood'],
                     },
                 },
-            )
-        )['cohort']['createCohortTemplate']
+            },
+        )
+        assert not res.get('errors')
+        mutation_result = res['data']['cohort']['createCohortTemplate']
+
         template_id = await self.cl.create_cohort_template(
             project=self.project_id,
             cohort_template=CohortTemplateInternal(
@@ -783,42 +809,42 @@ class TestMutations(DbIsolatedTest):
                 CohortTemplateFilter(id=GenericFilter(eq=template_id))
             )
         )[0]
-        self.assertEqual(api_result.description, mutation_result['description'])
-        self.assertEqual(
-            api_result.criteria.sample_type, mutation_result['criteria']['sample_type']
+        assert api_result.description == mutation_result['description']
+        assert (
+            api_result.criteria.sample_type
+            == mutation_result['criteria']['sample_type']
         )
-        self.assertEqual(
-            api_result.criteria.sg_platform, mutation_result['criteria']['sg_platform']
+        assert (
+            api_result.criteria.sg_platform
+            == mutation_result['criteria']['sg_platform']
         )
-        self.assertEqual(
-            api_result.criteria.sg_technology,
-            mutation_result['criteria']['sg_technology'],
+        assert (
+            api_result.criteria.sg_technology
+            == mutation_result['criteria']['sg_technology']
         )
-        self.assertEqual(
-            api_result.criteria.sg_type, mutation_result['criteria']['sg_type']
-        )
-        self.assertEqual(api_result.name, mutation_result['name'])
+        assert api_result.criteria.sg_type == mutation_result['criteria']['sg_type']
+        assert api_result.name == mutation_result['name']
 
     # endregion COHORT TESTS
 
     # region FAMILY TESTS
-    @run_as_sync
-    async def test_update_family(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_update_family(self, graphql_query: GraphQLQueryFunction):
         """Test updating a family using the mutation and the API"""
-        mutation_result = (
-            await self.run_graphql_query_async(
-                UPDATE_FAMILY_MUTATION,
-                variables={
-                    'project': self.project_name,
-                    'family': {
-                        'id': self.family_id,
-                        'externalIds': {PRIMARY_EXTERNAL_ORG: 'test'},
-                        'description': 'test_family',
-                        'codedPhenotype': 'test_family_phenotype',
-                    },
+        res = await graphql_query(
+            UPDATE_FAMILY_MUTATION,
+            variables={
+                'family': {
+                    'id': self.family_id,
+                    'externalIds': {PRIMARY_EXTERNAL_ORG: 'test'},
+                    'description': 'test_family',
+                    'codedPhenotype': 'test_family_phenotype',
                 },
-            )
-        )['family']['updateFamily']
+            },
+        )
+        assert not res.get('errors')
+        mutation_result = res['data']['family']['updateFamily']
 
         await self.fl.update_family(
             id_=self.family_id,
@@ -831,40 +857,40 @@ class TestMutations(DbIsolatedTest):
             await self.fl.get_family_by_internal_id(self.family_id)
         ).to_external()  # type: ignore [arg-type]
 
-        self.assertEqual(api_result.external_ids, mutation_result['externalIds'])
-        self.assertEqual(api_result.description, mutation_result['description'])
-        self.assertEqual(api_result.coded_phenotype, mutation_result['codedPhenotype'])
+        assert api_result.external_ids == mutation_result['externalIds']
+        assert api_result.description == mutation_result['description']
+        assert api_result.coded_phenotype == mutation_result['codedPhenotype']
 
     # endregion FAMILY TESTS
 
     # region PARTICIPANT TESTS
-    @run_as_sync
-    async def test_update_participant(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_update_participant(self, graphql_query: GraphQLQueryFunction):
         """Test updating a participant using the mutation and the API"""
-        mutation_result = (
-            await self.run_graphql_query_async(
-                UPDATE_PARTICIPANT_MUTATION,
-                variables={
-                    'project': self.project_name,
-                    'participantId': self.participant.id,
-                    'participant': {
-                        'id': self.participant.id,
-                        'externalIds': {PRIMARY_EXTERNAL_ORG: 'test'},
-                        'reportedSex': 2,
-                        'reportedGender': 'female',
-                        'karyotype': 'test_karyotype',
-                        'samples': [
-                            {
-                                'id': self.external_sample_id,
-                                'type': 'blood',
-                                'meta': {'test': 'test'},
-                                'externalIds': {'test': 'test'},
-                            }
-                        ],
-                    },
+        res = await graphql_query(
+            UPDATE_PARTICIPANT_MUTATION,
+            variables={
+                'participantId': self.participant.id,
+                'participant': {
+                    'id': self.participant.id,
+                    'externalIds': {PRIMARY_EXTERNAL_ORG: 'test'},
+                    'reportedSex': 2,
+                    'reportedGender': 'female',
+                    'karyotype': 'test_karyotype',
+                    'samples': [
+                        {
+                            'id': self.external_sample_id,
+                            'type': 'blood',
+                            'meta': {'test': 'test'},
+                            'externalIds': {'test': 'test'},
+                        }
+                    ],
                 },
-            )
-        )['participant']['updateParticipant']
+            },
+        )
+        assert not res.get('errors')
+        mutation_result = res['data']['participant']['updateParticipant']
 
         api_result = (
             await self.pl.upsert_participant(
@@ -886,54 +912,55 @@ class TestMutations(DbIsolatedTest):
             )
         ).to_external()
 
-        self.assertEqual(api_result.external_ids, mutation_result['externalIds'])
-        self.assertEqual(api_result.reported_sex, mutation_result['reportedSex'])
-        self.assertEqual(api_result.reported_gender, mutation_result['reportedGender'])
-        self.assertEqual(api_result.karyotype, mutation_result['karyotype'])
-        self.assertEqual(api_result.samples[0].id, mutation_result['samples'][0]['id'])  # type: ignore [arg-type]
+        assert api_result.external_ids == mutation_result['externalIds']
+        assert api_result.reported_sex == mutation_result['reportedSex']
+        assert api_result.reported_gender == mutation_result['reportedGender']
+        assert api_result.karyotype == mutation_result['karyotype']
+        assert api_result.samples[0].id == mutation_result['samples'][0]['id']  # type: ignore [arg-type]
 
-    @run_as_sync
-    async def test_upsert_participants(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_upsert_participants(self, graphql_query: GraphQLQueryFunction):
         """Test upserting a list of participants using the mutation and the API. This inserts a new participant and updates an existing one."""
-        mutation_result = (
-            await self.run_graphql_query_async(
-                UPSERT_PARTICIPANTS_MUTATION,
-                variables={
-                    'project': self.project_name,
-                    'participants': [
-                        {
-                            'id': self.participant.id,
-                            'externalIds': {PRIMARY_EXTERNAL_ORG: 'EX01'},
-                            'reportedSex': 2,
-                            'reportedGender': 'female',
-                            'karyotype': 'test_karyotype',
-                            'samples': [
-                                {
-                                    'id': self.external_sample_id,
-                                    'type': 'blood',
-                                    'meta': {'test': 'test'},
-                                    'externalIds': {'test': 'test'},
-                                }
-                            ],
-                        },
-                        {
-                            'externalIds': {PRIMARY_EXTERNAL_ORG: 'EX02_pat'},
-                            'reportedSex': 1,
-                            'reportedGender': 'female',
-                            'karyotype': 'test_karyotype',
-                            'samples': [
-                                {
-                                    'id': self.external_sample_id,
-                                    'type': 'blood',
-                                    'meta': {'test': 'test'},
-                                    'externalIds': {'test': 'test'},
-                                }
-                            ],
-                        },
-                    ],
-                },
-            )
-        )['participant']['upsertParticipants']
+        res = await graphql_query(
+            UPSERT_PARTICIPANTS_MUTATION,
+            variables={
+                'project': self.project_name,
+                'participants': [
+                    {
+                        'id': self.participant.id,
+                        'externalIds': {PRIMARY_EXTERNAL_ORG: 'EX01'},
+                        'reportedSex': 2,
+                        'reportedGender': 'female',
+                        'karyotype': 'test_karyotype',
+                        'samples': [
+                            {
+                                'id': self.external_sample_id,
+                                'type': 'blood',
+                                'meta': {'test': 'test'},
+                                'externalIds': {'test': 'test'},
+                            }
+                        ],
+                    },
+                    {
+                        'externalIds': {PRIMARY_EXTERNAL_ORG: 'EX02_pat'},
+                        'reportedSex': 1,
+                        'reportedGender': 'female',
+                        'karyotype': 'test_karyotype',
+                        'samples': [
+                            {
+                                'id': self.external_sample_id,
+                                'type': 'blood',
+                                'meta': {'test': 'test'},
+                                'externalIds': {'test': 'test'},
+                            }
+                        ],
+                    },
+                ],
+            },
+        )
+        assert not res.get('errors')
+        mutation_result = res['data']['participant']['upsertParticipants']
 
         api_result = await self.pl.upsert_participants(
             [
@@ -971,58 +998,60 @@ class TestMutations(DbIsolatedTest):
         )
 
         api_result = [p.to_external() for p in api_result]
-        self.assertEqual(api_result[0].id, mutation_result[0]['id'])
-        self.assertEqual(api_result[0].external_ids, mutation_result[0]['externalIds'])
-        self.assertEqual(api_result[0].reported_sex, mutation_result[0]['reportedSex'])
-        self.assertEqual(
-            api_result[0].reported_gender, mutation_result[0]['reportedGender']
-        )
-        self.assertEqual(api_result[0].karyotype, mutation_result[0]['karyotype'])
+        assert api_result[0].id == mutation_result[0]['id']
+        assert api_result[0].external_ids == mutation_result[0]['externalIds']
+        assert api_result[0].reported_sex == mutation_result[0]['reportedSex']
+        assert api_result[0].reported_gender == mutation_result[0]['reportedGender']
+        assert api_result[0].karyotype == mutation_result[0]['karyotype']
 
-        self.assertEqual(api_result[1].reported_sex, mutation_result[1]['reportedSex'])
-        self.assertEqual(
-            api_result[1].reported_gender, mutation_result[1]['reportedGender']
-        )
-        self.assertEqual(api_result[1].karyotype, mutation_result[1]['karyotype'])
+        assert api_result[1].reported_sex == mutation_result[1]['reportedSex']
+        assert api_result[1].reported_gender == mutation_result[1]['reportedGender']
+        assert api_result[1].karyotype == mutation_result[1]['karyotype']
 
-    @run_as_sync
-    async def test_update_participant_family(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_update_participant_family(self, graphql_query: GraphQLQueryFunction):
         """Test updating a participants family data"""
-        mutation_result = (
-            await self.run_graphql_query_async(
-                UPDATE_PARTICIPANT_FAMILY_MUTATION,
-                variables={
-                    'project': self.project_name,
-                    'participantId': self.participant.id,
-                    'oldFamilyId': self.family_id,
-                    'newFamilyId': self.family_id_2,
-                },
-            )
-        )['participant']['updateParticipantFamily']
+        res = await graphql_query(
+            UPDATE_PARTICIPANT_FAMILY_MUTATION,
+            variables={
+                'participantId': self.participant.id,
+                'oldFamilyId': self.family_id,
+                'newFamilyId': self.family_id_2,
+            },
+        )
+        assert not res.get('errors')
+        mutation_result = res['data']['participant']['updateParticipantFamily']
 
         api_result = (
             await self.fl.get_family_participants_by_family_ids([self.family_id_2])
         )[self.family_id_2][0]
 
-        self.assertEqual(api_result.individual_id, mutation_result['participantId'])
-        self.assertEqual(api_result.family_id, mutation_result['familyId'])
+        assert api_result.individual_id == mutation_result['participantId']
+        assert api_result.family_id == mutation_result['familyId']
 
     # endregion PARTICIPANT TESTS
 
     # region PROJECT TESTS
-    @run_as_sync
-    async def test_create_project(self):
+    @pytest.mark.asyncio
+    @pytest.mark.admin_groups(['project-creators', 'members-admin'])
+    @pytest.mark.project_roles(['writer'])
+    async def test_create_project(self, graphql_query: GraphQLQueryFunction):
         """Test creating a project using the mutation and the API"""
-        mutation_result = (
-            await self.run_graphql_query_async(
-                CREATE_PROJECT_MUTATION,
-                variables={
-                    'name': 'test_project',
-                    'dataset': 'test_dataset',
-                    'createTestProject': True,
-                },
-            )
-        )['project']['createProject']
+        res = await graphql_query(
+            CREATE_PROJECT_MUTATION,
+            variables={
+                'name': 'test_project',
+                'dataset': 'test_dataset',
+                'createTestProject': True,
+            },
+        )
+        assert not res.get('errors')
+        mutation_result = res['data']['project']['createProject']
+
+        # projects need to refresh on connection as it is a different connection
+        # to the one used by graphql
+        await self.connection.refresh_projects()
 
         api_result = list(
             self.connection.get_and_check_access_to_projects_for_names(
@@ -1034,39 +1063,41 @@ class TestMutations(DbIsolatedTest):
             )
         )
 
-        self.assertEqual(api_result[0].name, mutation_result['name'])
-        self.assertEqual(api_result[0].dataset, mutation_result['dataset'])
-        self.assertEqual(api_result[0].meta, mutation_result['meta'])
+        assert api_result[0].name == mutation_result['name']
+        assert api_result[0].dataset == mutation_result['dataset']
+        assert api_result[0].meta == mutation_result['meta']
 
-        self.assertEqual(api_result[1].name, mutation_result['name'] + '-test')
-        self.assertEqual(api_result[1].dataset, mutation_result['dataset'])
-        self.assertEqual(api_result[1].meta, mutation_result['meta'])
+        assert api_result[1].name == mutation_result['name'] + '-test'
+        assert api_result[1].dataset == mutation_result['dataset']
+        assert api_result[1].meta == mutation_result['meta']
 
-    @run_as_sync
-    async def test_update_project(self):
+    @pytest.mark.asyncio
+    @pytest.mark.admin_groups(['project-creators', 'members-admin'])
+    @pytest.mark.project_roles(['writer'])
+    async def test_update_project(self, graphql_query: GraphQLQueryFunction):
         """Test updating a project using the mutation and the API"""
-        create_project_result = (
-            await self.run_graphql_query_async(
-                CREATE_PROJECT_MUTATION,
-                variables={
-                    'name': 'new_test_project',
-                    'dataset': 'test_dataset',
-                    'createTestProject': False,
-                },
-            )
-        )['project']['createProject']
+        res = await graphql_query(
+            CREATE_PROJECT_MUTATION,
+            variables={
+                'name': 'new_test_project',
+                'dataset': 'test_dataset',
+                'createTestProject': False,
+            },
+        )
+        assert not res.get('errors')
+        create_project_result = res['data']['project']['createProject']
 
-        mutation_result = (
-            await self.run_graphql_query_async(
-                UPDATE_PROJECT_MUTATION,
-                variables={
-                    'project': create_project_result['name'],
-                    'projectUpdateModel': {
-                        'meta': {'test': 'test'},
-                    },
+        res2 = await graphql_query(
+            UPDATE_PROJECT_MUTATION,
+            variables={
+                'project': create_project_result['name'],
+                'projectUpdateModel': {
+                    'meta': {'test': 'test'},
                 },
-            )
-        )['project']['updateProject']
+            },
+        )
+        assert not res2.get('errors')
+        mutation_result = res2['data']['project']['updateProject']
 
         await self.connection.refresh_projects()
 
@@ -1080,38 +1111,44 @@ class TestMutations(DbIsolatedTest):
             )
         )[0]
 
-        self.assertEqual(api_result.name, mutation_result['name'])
-        self.assertEqual(api_result.dataset, mutation_result['dataset'])
-        self.assertEqual(api_result.meta, {'test': 'test'})
+        assert api_result.name == mutation_result['name']
+        assert api_result.dataset == mutation_result['dataset']
+        assert api_result.meta == {'test': 'test'}
 
-    @run_as_sync
-    async def test_update_project_members(self):
+    @pytest.mark.asyncio
+    @pytest.mark.admin_groups(['project-creators', 'members-admin'])
+    @pytest.mark.project_roles(['writer'])
+    async def test_update_project_members(self, graphql_query: GraphQLQueryFunction):
         """Test updating project members using the mutation and the API"""
-        create_project_result = (
-            await self.run_graphql_query_async(
-                CREATE_PROJECT_MUTATION,
-                variables={
-                    'name': 'new_test_project2',
-                    'dataset': 'test_dataset',
-                    'createTestProject': False,
-                },
-            )
-        )['project']['createProject']
+        res = await graphql_query(
+            CREATE_PROJECT_MUTATION,
+            variables={
+                'name': 'new_test_project2',
+                'dataset': 'test_dataset',
+                'createTestProject': False,
+            },
+        )
+        assert not res.get('errors')
+        create_project_result = res['data']['project']['createProject']
 
-        mutation_result = (
-            await self.run_graphql_query_async(
-                UPDATE_PROJECT_MEMBERS_MUTATION,
-                variables={
-                    'project': create_project_result['name'],
-                    'members': [
-                        {
-                            'member': 'testuser',
-                            'roles': ['reader', 'writer'],
-                        }
-                    ],
-                },
-            )
-        )['project']['updateProjectMembers']
+        res2 = await graphql_query(
+            UPDATE_PROJECT_MEMBERS_MUTATION,
+            variables={
+                'project': create_project_result['name'],
+                'members': [
+                    {
+                        'member': 'testuser',
+                        'roles': ['reader', 'writer'],
+                    }
+                ],
+            },
+        )
+        assert not res2.get('errors')
+        mutation_result = res2['data']['project']['updateProjectMembers']
+
+        # projects need to refresh on connection as it is a different connection
+        # to the one used by graphql
+        await self.connection.refresh_projects()
 
         api_result = list(
             self.connection.get_and_check_access_to_projects_for_names(
@@ -1122,212 +1159,167 @@ class TestMutations(DbIsolatedTest):
             )
         )[0]
 
-        self.assertEqual(api_result.name, mutation_result['name'])
-        self.assertEqual(api_result.dataset, mutation_result['dataset'])
-        self.assertEqual(api_result.meta, mutation_result['meta'])
-        self.assertEqual(
-            [role.value for role in api_result.roles], mutation_result['roles']
-        )
+        assert api_result.name == mutation_result['name']
+        assert api_result.dataset == mutation_result['dataset']
+        assert api_result.meta == mutation_result['meta']
+        assert [role.value for role in api_result.roles] == mutation_result['roles']
 
     # endregion PROJECT TESTS
 
     # region SAMPLE TESTS
-    @run_as_sync
-    async def test_create_sample(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_create_sample(self, graphql_query: GraphQLQueryFunction):
         """Test creating a sample using the mutation and the API"""
-        mutation_result = (
-            await self.run_graphql_query_async(
-                CREATE_SAMPLE_MUTATION,
-                variables={
-                    'project': self.project_name,
-                    'sample': {
-                        'type': 'blood',
-                        'meta': {'test': 'test'},
-                        'externalIds': {PRIMARY_EXTERNAL_ORG: 'Test10'},
-                        'active': True,
-                    },
+        res = await graphql_query(
+            CREATE_SAMPLE_MUTATION,
+            variables={
+                'project': self.project_name,
+                'sample': {
+                    'type': 'blood',
+                    'meta': {'test': 'test'},
+                    'externalIds': {PRIMARY_EXTERNAL_ORG: 'Test10'},
+                    'active': True,
                 },
-            )
-        )['sample']['createSample']
+            },
+        )
+        assert not res.get('errors')
+        mutation_result = res['data']['sample']['createSample']
 
         api_result = await self.sl.get_sample_by_id(
             sample_id_transform_to_raw(mutation_result['id'])
         )
 
-        self.assertEqual(
-            api_result.type,
-            'blood',
-        )
-        self.assertEqual(
-            api_result.meta,
-            {'test': 'test'},
-        )
-        self.assertEqual(
-            api_result.external_ids,
-            {PRIMARY_EXTERNAL_ORG: 'Test10'},
-        )
-        self.assertEqual(
-            api_result.active,
-            True,
-        )
+        assert api_result.type == 'blood'
+        assert api_result.meta == {'test': 'test'}
+        assert api_result.external_ids == {PRIMARY_EXTERNAL_ORG: 'Test10'}
+        assert api_result.active is True
 
-    @run_as_sync
-    async def test_upsert_samples(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_upsert_samples(self, graphql_query: GraphQLQueryFunction):
         """Test upserting a list of samples using the mutation and the API. This inserts a new sample and updates an existing one."""
-        mutation_result = (
-            await self.run_graphql_query_async(
-                UPSERT_SAMPLES_MUTATION,
-                variables={
-                    'project': self.project_name,
-                    'samples': [
-                        {
-                            'id': self.external_sample_id,
-                            'type': 'blood',
-                            'meta': {'test': 'test'},
-                            'externalIds': {PRIMARY_EXTERNAL_ORG: 'Test10'},
-                            'active': True,
-                        },
-                        {
-                            'externalIds': {PRIMARY_EXTERNAL_ORG: 'Test11'},
-                            'type': 'saliva',
-                            'meta': {'test': 'test'},
-                            'active': True,
-                        },
-                    ],
-                },
-            )
-        )['sample']['upsertSamples']
+        res = await graphql_query(
+            UPSERT_SAMPLES_MUTATION,
+            variables={
+                'project': self.project_name,
+                'samples': [
+                    {
+                        'id': self.external_sample_id,
+                        'type': 'blood',
+                        'meta': {'test': 'test'},
+                        'externalIds': {PRIMARY_EXTERNAL_ORG: 'Test10'},
+                        'active': True,
+                    },
+                    {
+                        'externalIds': {PRIMARY_EXTERNAL_ORG: 'Test11'},
+                        'type': 'saliva',
+                        'meta': {'test': 'test'},
+                        'active': True,
+                    },
+                ],
+            },
+        )
+        assert not res.get('errors')
+        mutation_result = res['data']['sample']['upsertSamples']
 
         api_result = await self.sl.get_samples_by(
             sample_ids=[sample_id_transform_to_raw(s['id']) for s in mutation_result]
         )
 
-        self.assertEqual(len(api_result), 2)
-        self.assertEqual(
-            api_result[0].type,
-            'blood',
-        )
-        self.assertEqual(
-            api_result[0].external_ids,
-            {PRIMARY_EXTERNAL_ORG: 'Test10'},
-        )
-        self.assertEqual(
-            api_result[0].active,
-            True,
-        )
-        self.assertEqual(
-            api_result[1].type,
-            'saliva',
-        )
-        self.assertEqual(
-            api_result[1].meta,
-            {'test': 'test'},
-        )
-        self.assertEqual(
-            api_result[1].external_ids,
-            {PRIMARY_EXTERNAL_ORG: 'Test11'},
-        )
-        self.assertEqual(
-            api_result[1].active,
-            True,
-        )
+        assert len(api_result) == 2
+        assert api_result[0].type == 'blood'
+        assert api_result[0].external_ids == {PRIMARY_EXTERNAL_ORG: 'Test10'}
+        assert api_result[0].active is True
+        assert api_result[1].type == 'saliva'
+        assert api_result[1].meta == {'test': 'test'}
+        assert api_result[1].external_ids == {PRIMARY_EXTERNAL_ORG: 'Test11'}
+        assert api_result[1].active is True
 
-    @run_as_sync
-    async def test_update_sample(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_update_sample(self, graphql_query: GraphQLQueryFunction):
         """Test updating a sample using the mutation and the API"""
-        create_sample_result = (
-            await self.run_graphql_query_async(
-                CREATE_SAMPLE_MUTATION,
-                variables={
-                    'project': self.project_name,
-                    'sample': {
-                        'type': 'blood',
-                        'meta': {'test': 'test'},
-                        'externalIds': {PRIMARY_EXTERNAL_ORG: 'Test10'},
-                        'active': True,
-                    },
+        res = await graphql_query(
+            CREATE_SAMPLE_MUTATION,
+            variables={
+                'project': self.project_name,
+                'sample': {
+                    'type': 'blood',
+                    'meta': {'test': 'test'},
+                    'externalIds': {PRIMARY_EXTERNAL_ORG: 'Test10'},
+                    'active': True,
                 },
-            )
-        )['sample']['createSample']
+            },
+        )
+        assert not res.get('errors')
+        create_sample_result = res['data']['sample']['createSample']
 
-        mutation_result = (
-            await self.run_graphql_query_async(
-                UPDATE_SAMPLE_MUTATION,
-                variables={
-                    'sample': {
-                        'id': create_sample_result['id'],
-                        'type': 'saliva',
-                        'meta': {'test': 'test'},
-                        'externalIds': {PRIMARY_EXTERNAL_ORG: 'Test11'},
-                        'active': True,
-                    },
+        res2 = await graphql_query(
+            UPDATE_SAMPLE_MUTATION,
+            variables={
+                'sample': {
+                    'id': create_sample_result['id'],
+                    'type': 'saliva',
+                    'meta': {'test': 'test'},
+                    'externalIds': {PRIMARY_EXTERNAL_ORG: 'Test11'},
+                    'active': True,
                 },
-            )
-        )['sample']['updateSample']
+            },
+        )
+        assert not res2.get('errors')
+        mutation_result = res2['data']['sample']['updateSample']
 
         api_result = await self.sl.get_sample_by_id(
             sample_id_transform_to_raw(mutation_result['id'])
         )
 
-        self.assertEqual(
-            api_result.type,
-            'saliva',
-        )
-        self.assertEqual(
-            api_result.meta,
-            {'test': 'test'},
-        )
-        self.assertEqual(
-            api_result.external_ids,
-            {PRIMARY_EXTERNAL_ORG: 'Test11'},
-        )
-        self.assertEqual(
-            api_result.active,
-            True,
-        )
+        assert api_result.type == 'saliva'
+        assert api_result.meta == {'test': 'test'}
+        assert api_result.external_ids == {PRIMARY_EXTERNAL_ORG: 'Test11'}
+        assert api_result.active is True
 
     # endregion SAMPLE TESTS
 
     # region SEQUENCING GROUP TESTS
-    @run_as_sync
-    async def test_update_sequencing_group(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_update_sequencing_group(self, graphql_query: GraphQLQueryFunction):
         """Test updating a sequencing group using the mutation and the API"""
-        mutation_result = (
-            await self.run_graphql_query_async(
-                UPDATE_SEQUENCING_GROUP_MUTATION,
-                variables={
-                    'project': self.project_name,
-                    'sequencingGroup': {
-                        'id': self.genome_sequencing_group_id_external,
-                        'meta': {'test': 'test'},
-                    },
+        res = await graphql_query(
+            UPDATE_SEQUENCING_GROUP_MUTATION,
+            variables={
+                'project': self.project_name,
+                'sequencingGroup': {
+                    'id': self.genome_sequencing_group_id_external,
+                    'meta': {'test': 'test'},
                 },
-            )
-        )['sequencingGroup']['updateSequencingGroup']
+            },
+        )
+        assert not res.get('errors')
+        mutation_result = res['data']['sequencingGroup']['updateSequencingGroup']
 
         api_result = await self.sgl.get_sequencing_group_by_id(
             sequencing_group_id_transform_to_raw(mutation_result['id'])
         )
-        self.assertEqual(
-            api_result.meta,
-            {'test': 'test'},
-        )
+        assert api_result.meta == {'test': 'test'}
 
     # endregion SEQUENCING GROUP TESTS
 
 
-class TestCohortMutations(DbIsolatedTest):
+class TestCohortMutations:
     """Test class for new cohort mutations"""
 
     # pylint: disable=too-many-instance-attributes
 
-    @run_as_sync
-    async def setUp(self) -> None:
-        super().setUp()
-        self.sl = SampleLayer(self.connection)
-        self.cl = CohortLayer(self.connection)
-        self.sgl = SequencingGroupLayer(self.connection)
+    @pytest.fixture(autouse=True)
+    async def setUp(self, connection_with_project: Connection) -> None:
+        self.sl = SampleLayer(connection_with_project)
+        self.cl = CohortLayer(connection_with_project)
+        self.sgl = SequencingGroupLayer(connection_with_project)
         self.sample = await self.sl.upsert_sample(get_test_sample())
+        self.project_id = connection_with_project.project_id
+        self.project_name = connection_with_project.project.name
         self.genome_sequencing_group_id_1 = self.sample.sequencing_groups[0].id
         self.genome_sequencing_group_id_external_1 = (
             self.sample.sequencing_groups[0].to_external().id
@@ -1337,11 +1329,14 @@ class TestCohortMutations(DbIsolatedTest):
             self.sample.sequencing_groups[1].to_external().id
         )
 
-    @run_as_sync
-    async def test_create_cohort_from_sequencing_group_list(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_create_cohort_from_sequencing_group_list(
+        self, graphql_query: GraphQLQueryFunction
+    ):
         """Test mutation and API to create a cohort from sequencing group criteria"""
         mutation_cohort = (
-            await self.run_graphql_query_async(
+            await graphql_query(
                 CREATE_COHORT_FROM_CRITERIA_MUTATION,
                 variables={
                     'project': self.project_name,
@@ -1354,7 +1349,7 @@ class TestCohortMutations(DbIsolatedTest):
                     },
                 },
             )
-        )['cohort']['createCohortFromCriteria']['createdCohort']
+        )['data']['cohort']['createCohortFromCriteria']['createdCohort']
 
         api_cohort = await self.cl.create_cohort_from_criteria(
             project_to_write=self.project_id,
@@ -1368,18 +1363,21 @@ class TestCohortMutations(DbIsolatedTest):
         api_result = (
             await self.cl.query(CohortFilter(id=GenericFilter(eq=api_cohort.cohort_id)))
         )[0]
-        self.assertEqual(api_result.description, mutation_cohort['description'])
-        self.assertEqual(api_result.author, mutation_cohort['author'])
-        self.assertTrue(api_result.name != mutation_cohort['name'])
-        self.assertTrue(api_result.id != mutation_cohort['id'])
+        assert api_result.description == mutation_cohort['description']
+        assert api_result.author == mutation_cohort['author']
+        assert api_result.name != mutation_cohort['name']
+        assert api_result.id != mutation_cohort['id']
 
-    @run_as_sync
-    async def test_create_cohort_from_criteria_with_archived_sg_and_exclude_true(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_create_cohort_from_criteria_with_archived_sg_and_exclude_true(
+        self, graphql_query: GraphQLQueryFunction
+    ):
         """Test mutation and API to create a cohort from sequencing group criteria with archived sgs and exclude archived sgs set to true"""
         await self.sgl.archive_sequencing_group(self.genome_sequencing_group_id_1)
 
         graphql_response = (
-            await self.run_graphql_query_async(
+            await graphql_query(
                 CREATE_COHORT_FROM_CRITERIA_MUTATION_WITH_EXCLUDE,
                 variables={
                     'project': self.project_name,
@@ -1396,7 +1394,7 @@ class TestCohortMutations(DbIsolatedTest):
                     },
                 },
             )
-        )['cohort']['createCohortFromCriteria']
+        )['data']['cohort']['createCohortFromCriteria']
 
         mutation_cohort = graphql_response['createdCohort']
         excluded_ineligible_sg_ids_internal = graphql_response[
@@ -1416,42 +1414,47 @@ class TestCohortMutations(DbIsolatedTest):
                 ]
             ),
         )
-        self.assertTrue(mutation_cohort['sequencingGroups'])
-        self.assertTrue(api_cohort.sequencing_group_ids)
-        self.assertTrue(excluded_ineligible_sg_ids_internal)
-        self.assertTrue(
+        assert mutation_cohort['sequencingGroups']
+        assert api_cohort.sequencing_group_ids
+        assert excluded_ineligible_sg_ids_internal
+        assert (
             excluded_ineligible_sg_ids_internal[0]
             == self.genome_sequencing_group_id_external_1
         )
 
-    @run_as_sync
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
     async def test_create_cohort_from_criteria_fail_when_sg_archived_and_exclude_not_set(
-        self,
+        self, graphql_query: GraphQLQueryFunction
     ):
         """
         Test mutation and API to create a cohort from sequencing group criteria when sgs are archived
         (and exclude archived sgs not set)"""
         await self.sgl.archive_sequencing_group(self.genome_sequencing_group_id_1)
 
-        with self.assertRaises(GraphQLError):
-            await self.run_graphql_query_async(
-                CREATE_COHORT_FROM_CRITERIA_MUTATION,
-                variables={
-                    'project': self.project_name,
-                    'cohortSpec': {
-                        'name': 'TestCohort1',
-                        'description': 'Create cohort with an archived sequencing group',
-                    },
-                    'cohortCriteria': {
-                        'sgIdsInternal': [
-                            self.genome_sequencing_group_id_external_1,
-                            self.genome_sequencing_group_id_external_2,
-                        ],
-                    },
+        result = await graphql_query(
+            CREATE_COHORT_FROM_CRITERIA_MUTATION,
+            variables={
+                'project': self.project_name,
+                'cohortSpec': {
+                    'name': 'TestCohort1',
+                    'description': 'Create cohort with an archived sequencing group',
                 },
-            )
+                'cohortCriteria': {
+                    'sgIdsInternal': [
+                        self.genome_sequencing_group_id_external_1,
+                        self.genome_sequencing_group_id_external_2,
+                    ],
+                },
+            },
+        )
 
-        with self.assertRaises(ValueError):
+        assert (
+            'Contains sequencing groups which are not active'
+            in result['errors'][0]['message']
+        )
+
+        with pytest.raises(ValueError):
             await self.cl.create_cohort_from_criteria(
                 project_to_write=self.project_id,
                 cohort_name='TestCohort2',
@@ -1465,28 +1468,33 @@ class TestCohortMutations(DbIsolatedTest):
                 ),
             )
 
-    @run_as_sync
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
     async def test_create_cohort_criteria_fail_when_sg_other_criteria(
-        self,
+        self, graphql_query: GraphQLQueryFunction
     ):
         """Test mutation and API to create a cohort from sequencing group criteria when other criteria are provided"""
-        with self.assertRaises(GraphQLError):
-            await self.run_graphql_query_async(
-                CREATE_COHORT_FROM_CRITERIA_MUTATION,
-                variables={
-                    'project': self.project_name,
-                    'cohortSpec': {
-                        'name': 'TestCohort1',
-                        'description': 'Create cohort with an sg list and other criteria',
-                    },
-                    'cohortCriteria': {
-                        'sgIdsInternal': [self.genome_sequencing_group_id_external_1],
-                        'projects': [self.project_name],
-                    },
+        result = await graphql_query(
+            CREATE_COHORT_FROM_CRITERIA_MUTATION,
+            variables={
+                'project': self.project_name,
+                'cohortSpec': {
+                    'name': 'TestCohort1',
+                    'description': 'Create cohort with an sg list and other criteria',
                 },
-            )
+                'cohortCriteria': {
+                    'sgIdsInternal': [self.genome_sequencing_group_id_external_1],
+                    'projects': [self.project_name],
+                },
+            },
+        )
 
-        with self.assertRaises(ValueError):
+        assert (
+            'Other criteria not supported if sequencing group ids provided as a criterion'
+            in result['errors'][0]['message']
+        )
+
+        with pytest.raises(ValueError):
             await self.cl.create_cohort_from_criteria(
                 project_to_write=self.project_id,
                 description='Create cohort with an sg list and other criteria',
@@ -1498,13 +1506,16 @@ class TestCohortMutations(DbIsolatedTest):
                 ),
             )
 
-    @run_as_sync
-    async def test_create_cohort_from_template_with_archived_sg_and_exclude_set(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_create_cohort_from_template_with_archived_sg_and_exclude_set(
+        self, graphql_query: GraphQLQueryFunction
+    ):
         """Test mutation and API to create a cohort from a template with archived sg and excludeIneligibleSgIdsInternal set to True"""
         await self.sgl.archive_sequencing_group(self.genome_sequencing_group_id_1)
 
         template_id = (
-            await self.run_graphql_query_async(
+            await graphql_query(
                 CREATE_COHORT_TEMPLATE_MUTATION,
                 variables={
                     'project': self.project_name,
@@ -1520,10 +1531,10 @@ class TestCohortMutations(DbIsolatedTest):
                     },
                 },
             )
-        )['cohort']['createCohortTemplate']['id']
+        )['data']['cohort']['createCohortTemplate']['id']
 
         mutation_cohort = (
-            await self.run_graphql_query_async(
+            await graphql_query(
                 CREATE_COHORT_FROM_TEMPLATE_MUTATION,
                 variables={
                     'project': self.project_name,
@@ -1535,7 +1546,7 @@ class TestCohortMutations(DbIsolatedTest):
                     },
                 },
             )
-        )['cohort']['createCohortFromCriteria']['createdCohort']
+        )['data']['cohort']['createCohortFromCriteria']['createdCohort']
 
         api_cohort = await self.cl.create_cohort_from_criteria(
             project_to_write=self.project_id,
@@ -1546,24 +1557,25 @@ class TestCohortMutations(DbIsolatedTest):
             dry_run=False,
         )
 
-        self.assertTrue(mutation_cohort['template']['id'] != template_id)
-        self.assertTrue(len(mutation_cohort['sequencingGroups']) == 1)
+        assert mutation_cohort['template']['id'] != template_id
+        assert len(mutation_cohort['sequencingGroups']) == 1
 
         api_result = (
             await self.cl.query(CohortFilter(id=GenericFilter(eq=api_cohort.cohort_id)))
         )[0]
-        self.assertTrue(len(api_cohort.sequencing_group_ids) == 1)
-        self.assertTrue(api_result.template_id != template_id)
+        assert len(api_cohort.sequencing_group_ids) == 1
+        assert api_result.template_id != template_id
 
-    @run_as_sync
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
     async def test_create_cohort_from_template_with_archived_sg_and_exclude_not_set(
-        self,
+        self, graphql_query: GraphQLQueryFunction
     ):
         """Test mutation and API to create a cohort from a template with archived sg and excludeIneligibleSgIdsInternal not set"""
         await self.sgl.archive_sequencing_group(self.genome_sequencing_group_id_1)
 
         template_id = (
-            await self.run_graphql_query_async(
+            await graphql_query(
                 CREATE_COHORT_TEMPLATE_MUTATION,
                 variables={
                     'project': self.project_name,
@@ -1579,22 +1591,26 @@ class TestCohortMutations(DbIsolatedTest):
                     },
                 },
             )
-        )['cohort']['createCohortTemplate']['id']
+        )['data']['cohort']['createCohortTemplate']['id']
 
-        with self.assertRaises(GraphQLError):
-            await self.run_graphql_query_async(
-                CREATE_COHORT_FROM_TEMPLATE_MUTATION,
-                variables={
-                    'project': self.project_name,
-                    'cohortSpec': {
-                        'name': 'TestCohort1',
-                        'description': 'Create cohort with an archived sequencing group',
-                        'templateId': template_id,
-                    },
+        result = await graphql_query(
+            CREATE_COHORT_FROM_TEMPLATE_MUTATION,
+            variables={
+                'project': self.project_name,
+                'cohortSpec': {
+                    'name': 'TestCohort1',
+                    'description': 'Create cohort with an archived sequencing group',
+                    'templateId': template_id,
                 },
-            )
+            },
+        )
 
-        with self.assertRaises(ValueError):
+        assert (
+            'Contains sequencing groups which are not active.'
+            in result['errors'][0]['message']
+        )
+
+        with pytest.raises(ValueError):
             await self.cl.create_cohort_from_criteria(
                 project_to_write=self.project_id,
                 cohort_name='TestCohort2',

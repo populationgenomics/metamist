@@ -414,7 +414,9 @@ def prepare_query_from_dict_field(
                 f'Supported types are: {", ".join(sorted(supported_types))}'
             )
 
-        _inner_query = value.to_sql(t"json_value(a, '$' returning {pg_type:i})")
+        _inner_query = value.to_sql(
+            t"json_query(a, '$' returning {pg_type:i} omit quotes)"
+        )
 
         if _inner_query:
             conditionals.append(t"""

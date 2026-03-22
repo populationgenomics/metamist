@@ -1,19 +1,19 @@
+import pytest
+
+from db.python.connect import Connection
 from db.python.layers.participant import ParticipantLayer
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantUpsertInternal
-from test.testbase import DbIsolatedTest, run_as_sync
 
 
-class TestParticipant(DbIsolatedTest):
+class TestParticipant:
     """Test getting participants"""
 
-    @run_as_sync
-    async def setUp(self) -> None:
-        super().setUp()
-
+    @pytest.fixture(autouse=True)
+    async def setup(self, connection_with_project: Connection):
         self.ex01 = {PRIMARY_EXTERNAL_ORG: 'EX01', 'other': 'OTHER1'}
         self.ex02 = {PRIMARY_EXTERNAL_ORG: 'EX02'}
 
-        pl = ParticipantLayer(self.connection)
+        pl = ParticipantLayer(connection_with_project)
         await pl.upsert_participants(
             [
                 ParticipantUpsertInternal(
@@ -31,28 +31,31 @@ class TestParticipant(DbIsolatedTest):
             ]
         )
 
-    @run_as_sync
-    async def test_get_all_participants(self):
+    @pytest.mark.asyncio
+    async def test_get_all_participants(self, connection_with_project: Connection):
         """Test getting all participants"""
-        pl = ParticipantLayer(self.connection)
-        ps = await pl.get_participants(project=1)
+        pl = ParticipantLayer(connection_with_project)
+        ps = await pl.get_participants(project=connection_with_project.project_id)
 
-        self.assertEqual(2, len(ps))
+        assert len(ps) == 2
 
-        self.assertEqual(self.ex01, ps[0].external_ids)
-        self.assertEqual(1, ps[0].meta['field'])
-        self.assertEqual('XX', ps[0].karyotype)
+        assert self.ex01 == ps[0].external_ids
+        assert ps[0].meta['field'] == 1
+        assert ps[0].karyotype == 'XX'
 
-        self.assertEqual(self.ex02, ps[1].external_ids)
+        assert self.ex02 == ps[1].external_ids
 
-    @run_as_sync
-    async def test_get_participant_by_eid(self):
+    @pytest.mark.asyncio
+    async def test_get_participant_by_eid(self, connection_with_project: Connection):
         """Test to see what's in the database"""
-        pl = ParticipantLayer(self.connection)
-        ps = await pl.get_participants(project=1, external_participant_ids=['EX02'])
+        pl = ParticipantLayer(connection_with_project)
+        ps = await pl.get_participants(
+            project=connection_with_project.project_id,
+            external_participant_ids=['EX02'],
+        )
 
-        self.assertEqual(1, len(ps))
+        assert len(ps) == 1
 
-        self.assertEqual(self.ex02, ps[0].external_ids)
-        self.assertEqual(2, ps[0].meta['field'])
-        self.assertEqual('XY', ps[0].karyotype)
+        assert self.ex02 == ps[0].external_ids
+        assert ps[0].meta['field'] == 2
+        assert ps[0].karyotype == 'XY'

@@ -13,10 +13,13 @@ import uuid
 from collections.abc import AsyncGenerator, Awaitable, Generator
 from pathlib import Path
 from typing import Any, Protocol
+from unittest.mock import MagicMock
 
 import psycopg
 import pytest
 from fastapi import FastAPI
+from gql import GraphQLRequest
+from graphql import DocumentNode, print_ast
 from httpx import ASGITransport, AsyncClient
 from psycopg import AsyncConnection, sql
 from psycopg.rows import DictRow, dict_row
@@ -44,6 +47,24 @@ DB_DIR = Path(__file__).parent.parent / 'db'
 
 # Default test user for authentication
 TEST_USER = 'testuser@example.com'
+
+
+@pytest.fixture(autouse=True)
+def mock_gcs_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Mock the GCS client to avoid requiring GCP credentials in tests.
+
+    This is automatically used by all tests unless overridden by a more specific
+    fixture (e.g. test_analysis_output_files.py has its own fake GCS server).
+    """
+
+    def _mock_get_gcs_client():
+        """Return a mock GCS client that doesn't require credentials."""
+        return MagicMock()
+
+    monkeypatch.setattr(
+        'models.models.output_file.get_gcs_client', _mock_get_gcs_client
+    )
 
 
 class PostgresContainer(DockerContainer):
@@ -359,6 +380,28 @@ class GraphQLQueryFunction(Protocol):
     def __call__(
         self, query: str, variables: dict[str, Any] | None = None
     ) -> Awaitable[dict[str, Any]]: ...
+
+
+def convert_query_to_string(query):
+    """Convert DocumentNode or GraphQLRequest to string for testing."""
+    if isinstance(query, GraphQLRequest):
+        return print_ast(query.document)
+    if isinstance(query, DocumentNode):
+        return print_ast(query)
+    return query
+
+
+def make_graphql_query_mock(graphql_query: GraphQLQueryFunction):
+    """Create a mock for query_async that routes through the test graphql_query fixture."""
+
+    async def _mock(query, variables=None):
+        query_str = convert_query_to_string(query)
+        result = await graphql_query(query_str, variables)
+        if 'errors' in result and result['errors']:
+            raise Exception(result['errors'])
+        return result['data']
+
+    return _mock
 
 
 @pytest.fixture

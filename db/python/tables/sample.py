@@ -80,7 +80,7 @@ class SampleTable(DbBase):
             # 2024-06-15 mfranklin: left join, inner join, doesn't matter as there
             #       should always be an external_id
             query_template += (
-                t'LEFT JOIN sample_external_id seid ON seid.sample_id = ss.id'
+                t' LEFT JOIN sample_external_id seid ON seid.sample_id = ss.id'
             )
 
         if filter_.sequencing_group or filter_.assay:
@@ -97,7 +97,7 @@ class SampleTable(DbBase):
                     )
                 )
 
-            query_template += t'INNER JOIN sequencing_group sg ON sg.sample_id = ss.id'
+            query_template += t' INNER JOIN sequencing_group sg ON sg.sample_id = ss.id'
 
         if filter_.assay:
             wheres.append(
@@ -110,7 +110,7 @@ class SampleTable(DbBase):
                 )
             )
 
-            query_template += t'INNER JOIN assay a ON a.sample_id = ss.id'
+            query_template += t' INNER JOIN assay a ON a.sample_id = ss.id'
 
         # WHERE
         wheres = [w for w in wheres if w is not None]
@@ -245,7 +245,7 @@ class SampleTable(DbBase):
                 s.type,
                 s.sample_root_id,
                 s.sample_parent_id,
-                s.meta,
+                s.meta::text as meta,
                 {mt_exid_query:q}
             FROM sample s
             LEFT JOIN sample_external_id seid
@@ -396,12 +396,21 @@ class SampleTable(DbBase):
 
                 project = row['project']
 
+                # Use MERGE to handle both the primary key (sample_id, name) and
+                # the unique index (project, external_id) conflicts.
+                # Mimics MariaDB ON DUPLICATE KEY UPDATE behavior.
                 _update_query = """
-                    INSERT INTO sample_external_id (project, sample_id, name, external_id, audit_log_id)
-                    VALUES (%(project)s, %(id)s, %(name)s, %(external_id)s, %(audit_log_id)s)
-                    ON CONFLICT (sample_id, name) DO UPDATE SET
-                        external_id = EXCLUDED.external_id,
-                        audit_log_id = EXCLUDED.audit_log_id
+                    MERGE INTO sample_external_id AS target
+                    USING (SELECT %(project)s AS project, %(id)s AS sample_id, %(name)s AS name,
+                                  %(external_id)s AS external_id, %(audit_log_id)s AS audit_log_id) AS source
+                    ON (target.sample_id = source.sample_id AND target.name = source.name)
+                       OR (target.project = source.project AND target.external_id = source.external_id)
+                    WHEN MATCHED THEN
+                        UPDATE SET external_id = source.external_id,
+                                   audit_log_id = source.audit_log_id
+                    WHEN NOT MATCHED THEN
+                        INSERT (project, sample_id, name, external_id, audit_log_id)
+                        VALUES (source.project, source.sample_id, source.name, source.external_id, source.audit_log_id)
                 """
                 _eid_values = [
                     {
