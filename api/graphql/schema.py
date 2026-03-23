@@ -1191,8 +1191,6 @@ class GraphQLSequencingGroup:
         project: GraphQLFilter[str] | None = None,
     ) -> list[GraphQLAnalysis]:
         async with info.context['get_connection']() as connection:
-            loader = info.context['loaders'][LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS]
-
             _project_filter: GenericFilter[ProjectId] | None = None
             if project:
                 project_names = project.all_values()
@@ -1207,23 +1205,24 @@ class GraphQLSequencingGroup:
                     lambda p: project_id_map[p]
                 )
 
-            analyses = await loader.load(
-                {
-                    'id': root.internal_id,
-                    'filter_': AnalysisFilter(
-                        status=status.to_internal_filter() if status else None,
-                        type=type.to_internal_filter() if type else None,
-                        meta=graphql_meta_filter_to_internal_filter(meta),
-                        active=(
-                            active.to_internal_filter()
-                            if active
-                            else GenericFilter(eq=True)
-                        ),
-                        project=_project_filter,
+        loader = info.context['loaders'][LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS]
+        analyses = await loader.load(
+            {
+                'id': root.internal_id,
+                'filter_': AnalysisFilter(
+                    status=status.to_internal_filter() if status else None,
+                    type=type.to_internal_filter() if type else None,
+                    meta=graphql_meta_filter_to_internal_filter(meta),
+                    active=(
+                        active.to_internal_filter()
+                        if active
+                        else GenericFilter(eq=True)
                     ),
-                }
-            )
-            return [GraphQLAnalysis.from_internal(a) for a in analyses]
+                    project=_project_filter,
+                ),
+            }
+        )
+        return [GraphQLAnalysis.from_internal(a) for a in analyses]
 
     @strawberry.field
     async def assays(
