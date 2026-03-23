@@ -1,0 +1,7 @@
+name: metamist
+runtime:
+  name: python
+  options:
+    toolchain: uv
+    virtualenv: ../.venv
+description: IAC for metamist server and associated infra

@@ -4,10 +4,10 @@ services:
     build: .
     container_name: metamist_postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-metamist}
+      POSTGRES_USER: metamist_superuser
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-metamist_password}
-      POSTGRES_DB: ${POSTGRES_DB:-metamist_db}
-      DATABASE_URL: postgres://${POSTGRES_USER:-metamist}:${POSTGRES_PASSWORD:-metamist_password}@localhost:5432/${POSTGRES_DB:-metamist_db}?sslmode=disable&search_path=main
+      POSTGRES_DB: metamist
+      DATABASE_URL: postgres://metamist_superuser:${POSTGRES_PASSWORD:-metamist_password}@localhost:5432/metamist?sslmode=disable&search_path=public
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:

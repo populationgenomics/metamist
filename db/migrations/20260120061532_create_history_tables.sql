@@ -1,6 +1,5 @@
 -- migrate:up
 
-CREATE SCHEMA IF NOT EXISTS history;
 
 SET search_path TO history, main;
 
@@ -75,5 +74,3 @@ drop table if exists analysis_runner_history;
 drop table if exists analysis_outputs_history;
 drop table if exists analysis_cohort_history;
 drop table if exists analysis_history;
-
-DROP SCHEMA IF EXISTS history;

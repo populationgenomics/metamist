@@ -70,8 +70,9 @@ web/src/__generated__
 # mypy
 .mypy_cache/
 
-# pulumi config files
-Pulumi*.yaml
+# Don't version pulumi configs, these are stored in metamist-private
+deploy/Pulumi.development.yaml
+deploy/Pulumi.production.yaml
 
 # performance profile files
 profiles

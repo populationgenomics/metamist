@@ -11,12 +11,10 @@ Json = dict[str | Literal['anyOf', 'type'], 'Json'] | list['Json'] | str | bool
 
 URLS = []
 if 'dev' in SM_ENVIRONMENT:
-    URLS.append('https://sample-metadata-dev.populationgenomics.org.au')
-    URLS.append('https://sample-metadata-api-dev-mnrpw3mdza-ts.a.run.app')
+    URLS.append('https://metamist-dev.populationgenomics.org.au')
 
 elif 'prod' in SM_ENVIRONMENT:
-    URLS.append('https://sample-metadata.populationgenomics.org.au')
-    URLS.append('https://sample-metadata-api-mnrpw3mdza-ts.a.run.app')
+    URLS.append('https://metamist.populationgenomics.org.au')
 else:
     port = getenv('PORT', '8000')
     URLS.append(f'http://localhost:{port}')

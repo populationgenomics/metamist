@@ -1,6 +1,6 @@
 -- migrate:up
 
-SET search_path TO main;
+SET search_path TO public;
 
 -- RFC 7396 JSON Merge Patch implementation
 -- https://datatracker.ietf.org/doc/html/rfc7396
@@ -74,9 +74,11 @@ BEGIN
 END;
 $$;
 
+-- Allow login roles to use the new function
+GRANT EXECUTE ON FUNCTION public.json_merge_patch(JSONB, JSONB) TO metamist_connect;
 
 -- migrate:down
 
-SET search_path TO main;
+SET search_path TO public;
 
 DROP FUNCTION IF EXISTS json_merge_patch(JSONB, JSONB);

@@ -1,5 +1,5 @@
-FROM python:3.14
-COPY --from=ghcr.io/astral-sh/uv:0.8.22 /uv /uvx /bin/
+FROM python:3.14-slim
+COPY --from=ghcr.io/astral-sh/uv:0.10.6 /uv /uvx /bin/
 
 ARG SM_ENVIRONMENT
 
@@ -16,7 +16,7 @@ ENV UV_LINK_MODE=copy
 RUN groupadd -r appuser && useradd -r -g appuser -d /home/appuser -m -s /bin/bash appuser
 
 # Set the working directory
-WORKDIR /app/sample_metadata/
+WORKDIR /app/metamist/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
@@ -30,17 +30,9 @@ COPY models models/
 
 
 # Change ownership of the application directory to the non-root user
-RUN chown -R appuser:appuser /app/sample_metadata/
+RUN chown -R appuser:appuser /app/metamist/
 
 # Switch to the non-root user
 USER appuser
 
-EXPOSE $PORT
-
-# Command to run the FastAPI app
-# execute in shell form rather than exec form to allow for variable substitution
-# @see https://docs.docker.com/reference/dockerfile/#shell-and-exec-form
-# some linting tools recomment exec form with a JSON array but the docker docs suggest the
-# only way to get variable substitution with exec form is by prefixing with `sh -c` which
-# is the exact same as using shell form, so ergonimcally this is much nicer
-CMD uv run --no-project uvicorn --port ${PORT} --host 0.0.0.0 api.server:app
+ENV PATH="/app/metamist/.venv/bin:$PATH"

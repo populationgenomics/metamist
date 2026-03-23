@@ -1,0 +1,124 @@
+name: Run Database Migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'Migration command'
+        required: true
+        default: 'status'
+        type: choice
+        options:
+          - status
+          - up
+
+
+permissions: {}
+
+jobs:
+
+  run-migration:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    environment: ${{ github.ref == 'refs/heads/pg-main' && 'pg-production' || 'pg-development' }}
+    env:
+      CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          persist-credentials: false
+
+      - id: 'google-cloud-auth'
+        name: 'Authenticate to Google Cloud'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.WORKLOAD_IDENTITY_SA }}
+
+      - id: 'google-cloud-sdk-setup'
+        name: 'Set up Cloud SDK'
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - id: 'set-variables'
+        name: 'Set environment-specific variables'
+        env:
+          ENVIRONMENT: ${{ vars.SM_ENVIRONMENT }}
+        run: |
+          if [ "$ENVIRONMENT" == "production" ]; then
+            echo "SERVICE_NAME=metamist-migration-production" >> "$GITHUB_OUTPUT"
+            echo "REGION=australia-southeast1" >> "$GITHUB_OUTPUT"
+          else
+            echo "SERVICE_NAME=metamist-migration-development" >> "$GITHUB_OUTPUT"
+            echo "REGION=australia-southeast1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - id: 'run-migration'
+        name: 'Execute migration service'
+        env:
+          COMMAND: ${{ github.event.inputs.command }}
+          ENVIRONMENT: ${{ vars.SM_ENVIRONMENT }}
+          SERVICE_NAME: ${{ steps.set-variables.outputs.SERVICE_NAME }}
+          REGION: ${{ steps.set-variables.outputs.REGION }}
+          REPOSITORY: ${{ github.repository }}
+          REF: ${{ github.ref }}
+          SERVICE_ACCOUNT: ${{ vars.WORKLOAD_IDENTITY_SA }}
+        run: |
+          echo "============================================"
+          echo "Running: $COMMAND"
+          echo "Environment: $ENVIRONMENT"
+          echo "Service: $SERVICE_NAME"
+          echo "Repository: $REPOSITORY"
+          echo "Ref: $REF"
+          echo "============================================"
+
+          SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" \
+            --region="$REGION" \
+            --format="value(status.url)")
+
+          ID_TOKEN=$(gcloud auth print-identity-token --impersonate-service-account="$SERVICE_ACCOUNT" --audiences="$SERVICE_URL" --include-email)
+
+          JSON_DATA=$(jq -n --arg cmd "$COMMAND" --arg ref "$REF" '{command: $cmd, github_ref: $ref}')
+
+          HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" -X POST "$SERVICE_URL/migrate" \
+            -H "Authorization: Bearer $ID_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$JSON_DATA")
+
+          echo ""
+          echo "============================================"
+          echo "Job execution logs"
+          echo "============================================"
+
+          if jq -e . >/dev/null 2>&1 < response.json; then
+            echo "Repository: $(jq -r '.github_repository // "N/A"' response.json)"
+            echo "Ref: $(jq -r '.github_ref // "N/A"' response.json)"
+            echo "--------------------------------------------"
+
+            DBMATE_OUTPUT=$(jq -r '.dbmate_output // empty' response.json)
+            if [ -n "$DBMATE_OUTPUT" ] && [ "$DBMATE_OUTPUT" != "null" ]; then
+              echo "Database Output:"
+              echo "$DBMATE_OUTPUT"
+              echo "--------------------------------------------"
+            fi
+
+            ERROR_MSG=$(jq -r '.error_message // empty' response.json)
+            if [ -n "$ERROR_MSG" ] && [ "$ERROR_MSG" != "null" ]; then
+              echo "Error Message:"
+              echo "$ERROR_MSG"
+              echo "--------------------------------------------"
+            fi
+
+            SUCCESS=$(jq -r '.success // "false"' response.json)
+          else
+            cat response.json
+            SUCCESS="false"
+          fi
+
+          echo ""
+
+          if [ "$SUCCESS" != "true" ] || [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "::error::Migration failed with status $HTTP_STATUS"
+            exit 1
+          fi

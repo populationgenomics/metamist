@@ -72,9 +72,9 @@ if __name__ == "__main__":
 
 #### Further resources
 
-- [GraphiQL UI](https://sample-metadata.populationgenomics.org.au/graphql), for exploration of the GraphQL API
-- [Python client documentation](https://sample-metadata.populationgenomics.org.au/documentation)
-- [Swagger HTTP API documentation](https://sample-metadata.populationgenomics.org.au/swagger)
+- [GraphiQL UI](https://metamist.populationgenomics.org.au/graphql), for exploration of the GraphQL API
+- [Python client documentation](https://metamist.populationgenomics.org.au/documentation)
+- [Swagger HTTP API documentation](https://metamist.populationgenomics.org.au/swagger)
 
 
 ### Testing scripts against a local database

@@ -66,8 +66,8 @@ In `.bashrc` or `.zshrc`, add the following lines:
 export SM_LOCALONLY_DEFAULTUSER="<localusername>"
 export SM_ENVIRONMENT="local"
 
-export SM_DEV_DB_NAME="metamist_db"
-export SM_DEV_DB_USER="metamist"
+export SM_DEV_DB_NAME="metamist"
+export SM_DEV_DB_USER="metamist_superuser"
 export SM_DEV_DB_PASSWORD="metamist_password"
 export SM_DEV_DB_PORT="5432"
 ```
@@ -91,8 +91,8 @@ In your `.vscode/launch.json`, create the following configuration:
             "env": {
                 "SM_LOCALONLY_DEFAULTUSER": "<localusername>",
                 "SM_ENVIRONMENT": "local",
-                "SM_DEV_DB_NAME": "metamist_db",
-                "SM_DEV_DB_USER": "metamist",
+                "SM_DEV_DB_NAME": "metamist",
+                "SM_DEV_DB_USER": "metamist_superuser",
                 "SM_DEV_DB_PASSWORD": "metamist_password",
                 "SM_DEV_DB_PORT": "5432",
             }
@@ -114,7 +114,7 @@ docker exec -it metamist_postgres bash
 Enter the Postgres command prompt
 
 ```bash
-psql "postgresql://metamist:metamist_password@localhost:5432/metamist_db?options=--search_path%3Dmain"
+psql "postgresql://metamist_superuser:metamist_password@localhost:5432/metamist?options=--search_path%3Dmain"
 ```
 
 Add your local username to the `project-creators` and `members-admin` groups:
@@ -157,10 +157,10 @@ Now that everything is set up, you can start the api server. If you are using vs
 
 ![Run and Debug](../resources/debug-api.png)
 
-If you are not using vscode, you can run the API with uvicorn.
+If you are not using vscode, you can run the API with hypercorn.
 
 ```bash
-uv run uvicorn --port 8000 --host 0.0.0.0 api.server:app
+uv run hypercorn --bind 0.0.0.0:8000 api.server:app
 ```
 
 
