@@ -30,14 +30,14 @@ class MetaTable(DbBase):
         required because duckdb doesn't support column names which are an empty string.
         """
         return t"""
-            JSON_OBJECT_AGG(
+            (JSON_OBJECT_AGG(
                 CASE
                     WHEN {table_alias:i}.name = {PRIMARY_EXTERNAL_ORG}
                     THEN {EXTERNAL_ORG_SENTINEL}
                     ELSE {table_alias:i}.name
                 END,
                 {table_alias:i}.external_id
-            )::text AS external_ids
+            ) filter (where {table_alias:i}.name is not null))::text  AS external_ids
         """
 
     async def entity_meta_table(
