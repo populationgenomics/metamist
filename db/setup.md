@@ -13,3 +13,11 @@ Build the database
 
 Run detached (-d)
 > docker compose run -d postgres
+
+
+## Regenerate schema.sql file
+
+
+```bash
+docker compose exec postgres dbmate --schema-file /dev/stdout dump > schema.sql
+```
