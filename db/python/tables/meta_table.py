@@ -8,7 +8,6 @@ from typing import Any
 import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
-from databases.interfaces import Record
 
 from db.python.tables.base import DbBase
 from models.models import PRIMARY_EXTERNAL_ORG
@@ -44,7 +43,7 @@ class MetaTable(DbBase):
     async def entity_meta_table(
         self,
         query: Template,
-        row_getter: Callable[[Record], dict[str, Any]],
+        row_getter: Callable[[dict[str, Any]], dict[str, Any]],
         has_external_ids: bool,
         has_meta: bool,
     ):

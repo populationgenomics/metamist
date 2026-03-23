@@ -4,8 +4,6 @@ import itertools
 from datetime import datetime
 from typing import Any, NamedTuple
 
-from databases.interfaces import Record
-
 from db.python.enum_tables import SequencingPlatformTable as SeqPlatformTable
 from db.python.enum_tables import SequencingTechnologyTable as SeqTechTable
 from db.python.layers.base import BaseLayer
@@ -136,8 +134,8 @@ class ProjectInsightsDb(DbBase):
     """
 
     # Helper functions
-    def get_analysis_row(self, row: Record) -> AnalysisRow:
-        """Parse a table row returned by fetch_all into an AnalysisRow object"""
+    def get_analysis_row(self, row: dict[str, Any]) -> AnalysisRow:
+        """Parse a table row returned by fetchall into an AnalysisRow object"""
         return AnalysisRow(
             id=row['id'],
             output=row['output'],
