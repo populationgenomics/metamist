@@ -122,6 +122,24 @@ jobs:
       #     packages-dir: packages/metamist/dist
       #     skip-existing: true
 
+
+      # The config needed to deploy is stored in the metamist-private repository
+      # The next two steps check out that repo and copy the necessary config files
+      - name: Checkout private config repository
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          repository: populationgenomics/metamist-private
+          path: metamist-private
+          token: ${{ secrets.METAMIST_PRIVATE_PAT }}
+          persist-credentials: false
+
+
+      - name: Copy Pulumi configs
+        env:
+          PULUMI_STACK_NAME: ${{ vars.PULUMI_STACK_NAME }}
+        run: |
+          cp "metamist-private/metamist_infra_config/Pulumi.${PULUMI_STACK_NAME}.yaml" deploy/
+
       - uses: pulumi/actions@8582a9e8cc630786854029b4e09281acd6794b58 # v6.6.1
         with:
           command: up
