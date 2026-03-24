@@ -1,12 +1,13 @@
 # /// script
 # dependencies = [
 #   "duckdb",
-#   "python-dotenv",
 #   "click",
+#   "google-cloud-secret-manager",
 # ]
 # ///
 
 
+import json
 import os
 import shutil
 import subprocess
@@ -15,13 +16,11 @@ import tempfile
 import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import click
-import dotenv
 import duckdb
-
-
-dotenv.load_dotenv()
+from google.cloud import secretmanager
 
 
 @dataclass
@@ -45,44 +44,63 @@ class TableInfo:
     has_system_versioning: bool = False
 
 
-maria_db_database = os.getenv('MARIADB_DB')
-maria_db_password = os.getenv('MARIADB_PWD')
-maria_db_user = os.getenv('MARIADB_USER')
-maria_db_port = os.getenv('MARIADB_PORT')
-maria_db_host = os.getenv('MARIADB_HOST')
+@dataclass
+class DbCreds:
+    """Connection details for database"""
 
-postgres_password = os.getenv('POSTGRES_PASSWORD')
-postgres_database = os.getenv('POSTGRES_DB')
-postgres_user = os.getenv('POSTGRES_USER')
-postgres_port = os.getenv('POSTGRES_PORT')
-postgres_host = os.getenv('POSTGRES_HOST')
+    database: str
+    username: str
+    password: str
+    port: int
+    host: str
+
+    @staticmethod
+    def from_secret(gcp_project: str, secret_name: str):
+        name = f'projects/{gcp_project}/secrets/{secret_name}/versions/latest'
+        client = secretmanager.SecretManagerServiceClient()
+        response = client.access_secret_version(request={'name': name})
+        data: dict[str, Any] = json.loads(response.payload.data.decode('UTF-8'))
+
+        return DbCreds(
+            database=data.get('database'),
+            password=data.get('password'),
+            username=data.get('username'),
+            port=int(data.get('port')),
+            host=data.get('host'),
+        )
 
 
 duck = duckdb.connect(database=':memory:')
 
 
-duck.execute(f"""
-CREATE SECRET (
-   TYPE mysql,
-   HOST '{maria_db_host}',
-   PORT {maria_db_port},
-   DATABASE '{maria_db_database}',
-   USER '{maria_db_user}',
-   PASSWORD '{maria_db_password}'
-)
-""")
+def setup_secrets(gcp_project: str):  # noqa: D103
 
+    mariadb_creds = DbCreds.from_secret(gcp_project, 'data-copy-mariadb-creds')
+    postgres_creds = DbCreds.from_secret(gcp_project, 'data-copy-postgres-creds')
 
-duck.execute(f"""
-CREATE SECRET (
-   TYPE postgres,
-   HOST '{postgres_host}',
-   PORT {postgres_port},
-   DATABASE '{postgres_database}',
-   USER '{postgres_user}',
-   PASSWORD '{postgres_password}'
-)
-""")
+    duck.execute(f"""
+    CREATE SECRET (
+       TYPE mysql,
+       HOST '{mariadb_creds.host}',
+       PORT {mariadb_creds.port},
+       DATABASE '{mariadb_creds.database}',
+       USER '{mariadb_creds.username}',
+       PASSWORD '{mariadb_creds.password}'
+    )
+    """)
+
+    duck.execute(f"""
+    CREATE SECRET (
+       TYPE postgres,
+       HOST '{postgres_creds.host}',
+       PORT {postgres_creds.port},
+       DATABASE '{postgres_creds.database}',
+       USER '{postgres_creds.username}',
+       PASSWORD '{postgres_creds.password}'
+    )
+    """)
+
+    return mariadb_creds, postgres_creds
 
 
 tables = [
@@ -569,9 +587,9 @@ tables = [
 ]
 
 
-def download_mariadb_data():  # noqa: D103
+def download_mariadb_data(mariadb_creds: DbCreds):  # noqa: D103
     duck.execute(f"""
-    ATTACH 'database={maria_db_database}' AS mysql_db (TYPE mysql);
+    ATTACH 'database={mariadb_creds.database}' AS mysql_db (TYPE mysql);
     """)
 
     for table in tables:
@@ -611,7 +629,7 @@ def download_mariadb_data():  # noqa: D103
             COPY (
                 SELECT * FROM mysql_query(
                     'mysql_db',
-                    'select {select_text} from {maria_db_database}.{table.name}{system_time_condition};'
+                    'select {select_text} from {mariadb_creds.database}.{table.name}{system_time_condition};'
                 )
             ) TO './data/{table.name}.parquet';
         """)
@@ -754,7 +772,7 @@ def get_applied_migrations(
 ):
     """Get the list of applied migration versions (timestamps)."""
     output = run_dbmate(['status'], db_url, dbmate_path, migrations_dir)
-    applied = []
+    applied: list[str] = []
     for line in output.splitlines():
         if line.strip().startswith('[X]'):
             # e.g., "[X] 20260110061420_create_roles.sql"
@@ -766,18 +784,21 @@ def get_applied_migrations(
     return applied
 
 
-def drop_other_connections():
+def drop_other_connections(postgres_creds: DbCreds):
     """Drop all other active connections to the Postgres database."""
     # Use pg_terminate_backend to force other clients to reconnect
     duck.execute(f"""
         SELECT * FROM postgres_query(
             'pg_db',
-            'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = ''{postgres_database}'' AND pid <> pg_backend_pid() AND backend_type = ''client backend'''
+            'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = ''{postgres_creds.database}'' AND pid <> pg_backend_pid() AND backend_type = ''client backend'''
         );
     """)
 
 
 @click.command()
+@click.option(
+    '--project', required=True, help='GCP Project ID where secrets are stored'
+)
 @click.option(
     '--use-local-data', is_flag=True, help='Use existing parquet files in ./data/'
 )
@@ -787,15 +808,23 @@ def drop_other_connections():
     default='../../db/migrations',
     help='Path to migrations directory',
 )
-def main(use_local_data: bool, dbmate_path: str, migrations_dir: str):
+def main(
+    project: str,
+    use_local_data: bool,
+    dbmate_path: str,
+    migrations_dir: str,
+):
     """Migrate data from MariaDB to PostgreSQL."""
+    click.echo('Fetching credentials from Secret Manager...')
+    mariadb_creds, postgres_creds = setup_secrets(project)
+
     # 1. Print connection details
     click.echo('--- Database Connection Details ---')
     click.echo(
-        f'Source (MariaDB):  {maria_db_host} / {maria_db_database} (User: {maria_db_user})'
+        f'Source (MariaDB):  {mariadb_creds.host} / {mariadb_creds.database} (User: {mariadb_creds.username})'
     )
     click.echo(
-        f'Dest (PostgreSQL): {postgres_host} / {postgres_database} (User: {postgres_user})'
+        f'Dest (PostgreSQL): {postgres_creds.host} / {postgres_creds.database} (User: {postgres_creds.username})'
     )
     click.echo('-----------------------------------')
 
@@ -807,10 +836,8 @@ def main(use_local_data: bool, dbmate_path: str, migrations_dir: str):
         click.echo('Aborted.')
         return
 
-    assert postgres_password
-
     # Prepare Postgres URL for dbmate
-    pg_url = f'postgres://{postgres_user}:{urllib.parse.quote(postgres_password)}@{postgres_host}:{postgres_port}/{postgres_database}?search_path=public,main,history'
+    pg_url = f'postgres://{postgres_creds.username}:{urllib.parse.quote(postgres_creds.password)}@{postgres_creds.host}:{postgres_creds.port}/{postgres_creds.database}?search_path=public,main,history'
 
     # 3. Preparation (Local Data)
     data_dir = Path('./data')
@@ -865,7 +892,7 @@ def main(use_local_data: bool, dbmate_path: str, migrations_dir: str):
     # 5. Data Extraction
     if not use_local_data:
         click.echo('Starting download from MariaDB...')
-        download_mariadb_data()
+        download_mariadb_data(mariadb_creds=mariadb_creds)
     else:
         click.echo('Using local data (skipping MariaDB download)...')
 
@@ -895,7 +922,7 @@ def main(use_local_data: bool, dbmate_path: str, migrations_dir: str):
 
     # 9. Force client reconnection, otherwise psycopg will have the wrong OIDs registered
     # for enums
-    drop_other_connections()
+    drop_other_connections(postgres_creds)
 
     click.echo('Done!')
 
