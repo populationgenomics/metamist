@@ -415,7 +415,7 @@ class ProjectInsightsDb(DbBase):
             LEFT JOIN sequencing_group sg on sg.sample_id = s.id
         WHERE
             f.project = ANY({project_ids})
-            AND LOWER(sg.type) = ANY({sequencing_types_param})
+            AND sg.type = ANY({sequencing_types_param})
         GROUP BY
             f.project,
             sg.type,
@@ -446,7 +446,7 @@ class ProjectInsightsDb(DbBase):
             LEFT JOIN sequencing_group sg on sg.sample_id = s.id
         WHERE
             p.project = ANY({project_ids})
-            AND LOWER(sg.type) = ANY({sequencing_types_param})
+            AND sg.type = ANY({sequencing_types_param})
         GROUP BY
             p.project,
             sg.type,
@@ -476,7 +476,7 @@ class ProjectInsightsDb(DbBase):
             LEFT JOIN sequencing_group sg on sg.sample_id = s.id
         WHERE
             s.project = ANY({project_ids})
-            AND LOWER(sg.type) = ANY({sequencing_types_param})
+            AND sg.type = ANY({sequencing_types_param})
         GROUP BY
             s.project,
             sg.type,
@@ -507,7 +507,7 @@ class ProjectInsightsDb(DbBase):
             LEFT JOIN sample s on s.id = sg.sample_id
         WHERE
             s.project = ANY({project_ids})
-            AND LOWER(sg.type) = ANY({sequencing_types_param})
+            AND sg.type = ANY({sequencing_types_param})
         GROUP BY
             s.project,
             sg.type,
@@ -540,7 +540,7 @@ class ProjectInsightsDb(DbBase):
             LEFT JOIN sequencing_group sg ON sg.id = asg.sequencing_group_id
         WHERE
             a.project = ANY({project_ids})
-            AND LOWER(sg.type) = ANY({sequencing_types_param})
+            AND sg.type = ANY({sequencing_types_param})
             AND a.type = 'cram'
             AND a.status = 'completed'
         GROUP BY
@@ -593,7 +593,7 @@ class ProjectInsightsDb(DbBase):
             AND a.timestamp_completed = max_timestamps.max_timestamp
         WHERE
             a.project = ANY({project_ids})
-            AND LOWER(sg.type) = ANY({sequencing_types_param})
+            AND sg.type = ANY({sequencing_types_param})
             AND a.type = 'cram'
             AND a.status = 'completed';
         """
@@ -749,7 +749,7 @@ class ProjectInsightsDb(DbBase):
             LEFT JOIN sequencing_group sg on sg.sample_id = s.id
         WHERE
             f.project = ANY({project_ids})
-            AND LOWER(sg.type) = ANY({sequencing_types_param})
+            AND sg.type = ANY({sequencing_types_param})
         ORDER BY
             f.project,
             sg.type,
