@@ -643,7 +643,7 @@ class ParticipantTable:
         """
         wheres = [t'p.project = {project}']
         if sequencing_type:
-            wheres.append(t'LOWER(sg.type) = {sequencing_type.lower()}')
+            wheres.append(t'sg.type = {sequencing_type.lower()}')
 
         where_str = sql.SQL(' AND ').join(wheres) if wheres else t''
 

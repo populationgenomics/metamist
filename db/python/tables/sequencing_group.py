@@ -358,8 +358,8 @@ class SequencingGroupTable(DbBase):
         FROM sequencing_group
         WHERE
             sample_id = {sample_id}
-            AND LOWER(type) = {values['type'].lower()}
-            AND LOWER(technology) = {values['technology'].lower()}
+            AND type = {values['type'].lower()}
+            AND technology = {values['technology'].lower()}
             AND LOWER(platform) = {values['platform'].lower()}
             AND NOT archived
         """
