@@ -221,7 +221,7 @@ if __name__ == '__main__':
     logging.getLogger('watchfiles.main').setLevel(logging.WARNING)
 
     uvicorn.run(
-        'api.server:app',
+        'api.server_old:app',
         host='0.0.0.0',
         port=int(os.getenv('PORT', '8000')),
         reload=True,

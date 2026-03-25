@@ -9,7 +9,7 @@ import tempfile
 import time
 from functools import lru_cache
 
-from api.server import _VERSION, app
+from api.server_old import _VERSION, app
 from api.utils.openapi import get_openapi_3_0_schema
 
 
