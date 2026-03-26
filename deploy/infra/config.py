@@ -41,6 +41,13 @@ class ServerConfig(BaseModel):
     oauth_audience: str
     sm_legacy_proxy_sa: str
 
+    # Cloud run and db tuning
+    db_min_pool_size: int
+    db_max_pool_size: int
+    cloudrun_min_instances: int
+    cloudrun_max_instances: int
+    cloudrun_max_concurrent_requests: int
+
 
 class MigrationsConfig(BaseModel):
     """Migrations-specific configuration."""

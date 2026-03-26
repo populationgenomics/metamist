@@ -64,9 +64,10 @@ def create_server_resources(
             service_account=service_account.email,
             timeout='300s',
             scaling=gcp.cloudrunv2.ServiceTemplateScalingArgs(
-                min_instance_count=0,
-                max_instance_count=10,
+                min_instance_count=config.server.cloudrun_min_instances,
+                max_instance_count=config.server.cloudrun_max_instances,
             ),
+            max_instance_request_concurrency=config.server.cloudrun_max_concurrent_requests,
             vpc_access=(
                 gcp.cloudrunv2.ServiceTemplateVpcAccessArgs(
                     network_interfaces=[
@@ -174,6 +175,14 @@ def create_server_resources(
                         ),
                         gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name='SM_LEGACY_PROXY_SA',
+                            value=config.server.sm_legacy_proxy_sa,
+                        ),
+                        gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name='DB_POOL_MIN_SIZE',
+                            value=config.server.sm_legacy_proxy_sa,
+                        ),
+                        gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
+                            name='DB_POOL_MAX_SIZE',
                             value=config.server.sm_legacy_proxy_sa,
                         ),
                         gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
