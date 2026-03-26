@@ -166,7 +166,7 @@ def create_server_resources(
                         ),
                         gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name='METAMIST_GCP_PROJECT',
-                            value=config.server.metamist_gcp_project,
+                            value=config.project,
                         ),
                         gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name='SM_OAUTHAUDIENCE',

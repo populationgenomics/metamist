@@ -37,7 +37,6 @@ class ServerConfig(BaseModel):
     gcp_bq_budget_view: str
     gcp_bq_billing_view: str
     gcp_bq_batches_view: str
-    metamist_gcp_project: str
     oauth_audience: str
     sm_legacy_proxy_sa: str
 
