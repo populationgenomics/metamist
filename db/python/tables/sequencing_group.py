@@ -360,7 +360,7 @@ class SequencingGroupTable(DbBase):
             sample_id = {sample_id}
             AND type = {values['type'].lower()}
             AND technology = {values['technology'].lower()}
-            AND LOWER(platform) = {values['platform'].lower()}
+            AND platform = {values['platform'].lower()}
             AND NOT archived
         """
         conn = self.connection.pg_connection
