@@ -244,6 +244,52 @@ class TestParticipant:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['reader', 'writer'])
+    async def test_update_participant_meta(
+        self, connection_with_project: Connection, graphql_query: GraphQLQueryFunction
+    ):
+        """Test updating participant meta."""
+
+        player = ParticipantLayer(connection_with_project)
+
+        p1 = await player.upsert_participant(
+            ParticipantUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'},
+                meta={'foo': 'bar'},
+                samples=[],
+            )
+        )
+
+        p2 = await player.upsert_participant(
+            ParticipantUpsertInternal(
+                id=p1.id,
+                meta={'baz': 'qux', 'foo': None},
+            )
+        )
+
+        # ensure second upsert didn't create a new participant
+        assert p1.id == p2.id
+
+        q = """
+        query GetParticipant($pid: Int!) {
+            participant(id: $pid) {
+                id
+                meta
+            }
+        }"""
+
+        resp = await graphql_query(q, {'pid': p1.id})
+
+        assert resp is not None
+        assert resp['data'] is not None
+
+        resp_participant = resp['data']['participant']
+
+        assert resp_participant['id'] == p2.id
+
+        assert resp_participant['meta'] == {'baz': 'qux'}
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
     async def test_upsert_participant_with_phenotypes_twice(
         self, connection_with_project: Connection, graphql_query: GraphQLQueryFunction
     ):
