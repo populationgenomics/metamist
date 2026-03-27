@@ -354,7 +354,7 @@ class FamilyTable(DbBase):
 
         if not family_ids:
             return {}
-        
+
         fids_case_insensitive = [fid.lower() for fid in family_ids]
 
         project_param = project or self.project_id

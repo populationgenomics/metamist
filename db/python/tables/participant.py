@@ -505,7 +505,7 @@ class ParticipantTable:
 
         if len(external_participant_ids) == 0:
             return {}
-        
+
         eids_case_insensitive = [eid.lower() for eid in external_participant_ids]
 
         _query = t"""

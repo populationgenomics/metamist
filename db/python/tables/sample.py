@@ -601,7 +601,7 @@ class SampleTable(DbBase):
             raise ValueError(
                 'Project must be provided to get sample id map by external ids'
             )
-        
+
         eids_case_insensitive = [eid.lower() for eid in external_ids]
 
         _query = t"""
