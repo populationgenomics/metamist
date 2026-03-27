@@ -548,10 +548,10 @@ export default function ProcessingTimes({ project }: { project: string }) {
                             query: `
                                 SELECT
                                     s_child.meta_percent_viability AS percent_viability,
-                                    s_parent.meta_processing_site 
-                                        || ' - ' || 
-                                        s_parent.meta_collection_event_type 
-                                        || ' - ' || 
+                                    s_parent.meta_processing_site
+                                        || ' - ' ||
+                                        s_parent.meta_collection_event_type
+                                        || ' - ' ||
                                         s_parent.meta_collection_lab AS grouping_combination
                                 FROM
                                     sample AS s_child
@@ -608,10 +608,10 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                     s_parent.meta_processing_site AS biobank,
                                     s_parent.meta_collection_event_type AS collection_event_type,
                                     s_parent.meta_collection_lab AS collection_lab,
-                                    s_parent.meta_processing_site 
-                                        || ' - ' || 
-                                        s_parent.meta_collection_event_type 
-                                        || ' - ' || 
+                                    s_parent.meta_processing_site
+                                        || ' - ' ||
+                                        s_parent.meta_collection_event_type
+                                        || ' - ' ||
                                         s_parent.meta_collection_lab AS grouping_combination
                                 FROM
                                     sample AS s_child
@@ -676,7 +676,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                 FROM pbmc_data p
                                 JOIN quartiles q ON p.grouping_combination = q.grouping_combination
                                 JOIN stats_no_outliers s ON p.grouping_combination = s.grouping_combination
-                                GROUP BY 
+                                GROUP BY
                                     biobank,
                                     collection_event_type,
                                     collection_lab,
