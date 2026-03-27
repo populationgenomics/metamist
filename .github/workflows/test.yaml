@@ -1,6 +1,8 @@
 name: Test
 on:
   push:
+    branches-ignore:
+      - main
   workflow_call:
     secrets:
       CODECOV_TOKEN:
@@ -9,6 +11,7 @@ on:
         required: true
       SONAR_HOST_URL:
         required: true
+  workflow_dispatch:
 
 permissions: {}
 
