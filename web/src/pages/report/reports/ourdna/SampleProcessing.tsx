@@ -514,6 +514,8 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                     s_child.type = 'pbmc'
                                     AND s_parent.meta_collection_datetime IS NOT NULL
                                     AND s_child.meta_percent_viability IS NOT NULL
+                                    AND s_child.meta_percent_viability >= 0
+                                    AND s_child.meta_percent_viability <= 100
                             `,
                         },
                     ]}
@@ -561,6 +563,8 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                     AND s_parent.meta_processing_site IS NOT NULL
                                     AND s_parent.meta_collection_event_type IS NOT NULL
                                     AND s_parent.meta_collection_lab IS NOT NULL
+                                    AND s_child.meta_percent_viability >= 0
+                                    AND s_child.meta_percent_viability <= 100
                             `,
                         },
                     ]}
@@ -619,6 +623,8 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                     AND s_parent.meta_processing_site IS NOT NULL
                                     AND s_parent.meta_collection_event_type IS NOT NULL
                                     AND s_parent.meta_collection_lab IS NOT NULL
+                                    AND s_child.meta_percent_viability >= 0
+                                    AND s_child.meta_percent_viability <= 100
                             `,
                         },
                         {
@@ -682,6 +688,35 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                     biobank,
                                     collection_event_type,
                                     collection_lab;
+                            `,
+                        },
+                    ]}
+                />
+            </ReportRow>
+            <ReportRow>
+                <ReportItemTable
+                    height={ROW_HEIGHT}
+                    flexGrow={1}
+                    flexBasis={300}
+                    title="Outlier/invalid PBMC samples"
+                    description="Table of PBMC samples with outlier percent_viability values."
+                    project={project}
+                    showToolbar={true}
+                    query={[
+                        {
+                            name: 'result',
+                            query: `
+                                SELECT
+                                    s_child.external_id AS external_id,
+                                    s_child.meta_percent_viability AS percent_viability
+                                FROM
+                                    sample AS s_child
+                                JOIN
+                                    sample AS s_parent ON s_child.sample_parent_id = s_parent.sample_id
+                                WHERE
+                                    s_child.type = 'pbmc'
+                                    AND s_child.meta_percent_viability IS NOT NULL
+                                    AND (s_child.meta_percent_viability < 0 OR s_child.meta_percent_viability > 100)
                             `,
                         },
                     ]}
