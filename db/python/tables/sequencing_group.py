@@ -358,9 +358,9 @@ class SequencingGroupTable(DbBase):
         FROM sequencing_group
         WHERE
             sample_id = {sample_id}
-            AND type = {values['type']}
-            AND technology = {values['technology']}
-            AND platform = {values['platform']}
+            AND type = {values['type'].lower()}
+            AND technology = {values['technology'].lower()}
+            AND platform = {values['platform'].lower()}
             AND NOT archived
         """
         conn = self.connection.pg_connection

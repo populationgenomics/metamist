@@ -417,13 +417,13 @@ class ParticipantTable:
                     _audit_update_query = t"""
                         UPDATE participant_external_id
                         SET audit_log_id = {audit_log_id}
-                        WHERE participant_id = {participant_id} AND name = ANY({to_delete})
+                        WHERE participant_id = {participant_id} AND LOWER(name) = ANY({to_delete})
                     """
                     await conn.execute(_audit_update_query)
 
                     _delete_query = t"""
                         DELETE FROM participant_external_id
-                        WHERE participant_id = {participant_id} AND name = ANY({to_delete})
+                        WHERE participant_id = {participant_id} AND LOWER(name) = ANY({to_delete})
                     """
                     await conn.execute(_delete_query)
 
@@ -457,7 +457,7 @@ class ParticipantTable:
                                 MERGE INTO participant_external_id AS target
                                 USING (VALUES (%(project)s, %(participant_id)s, %(name)s, %(external_id)s, %(audit_log_id)s))
                                     AS source (project, participant_id, name, external_id, audit_log_id)
-                                ON (target.participant_id = source.participant_id AND target.name = source.name)
+                                ON (target.participant_id = source.participant_id AND LOWER(target.name) = LOWER(source.name))
                                    OR (target.project = source.project AND target.external_id = source.external_id)
                                 WHEN MATCHED THEN
                                     UPDATE SET external_id = source.external_id, audit_log_id = source.audit_log_id
@@ -509,10 +509,12 @@ class ParticipantTable:
         if len(external_participant_ids) == 0:
             return {}
 
+        eids_case_insensitive = [eid.lower() for eid in external_participant_ids]
+
         _query = t"""
             SELECT external_id, participant_id AS id
             FROM participant_external_id
-            WHERE external_id = ANY({external_participant_ids}) AND project = {project}
+            WHERE LOWER(external_id) = ANY({eids_case_insensitive}) AND project = {project}
         """
 
         conn = self.connection.pg_connection
@@ -592,14 +594,14 @@ class ParticipantTable:
             UPDATE participant_external_id
             SET external_id = %(external_id)s, audit_log_id = %(audit_log_id)s
             WHERE participant_id = %(participant_id)s
-            AND name = %(name)s
+            AND LOWER(name) = %(name)s
         """
 
         updates = [
             {
                 'external_id': external_id,
                 'participant_id': participant_id,
-                'name': PRIMARY_EXTERNAL_ORG,
+                'name': PRIMARY_EXTERNAL_ORG.lower(),
                 'audit_log_id': audit_log_id,
             }
             for participant_id, external_id in internal_to_external_id.items()
@@ -644,7 +646,7 @@ class ParticipantTable:
         """
         wheres = [t'p.project = {project}']
         if sequencing_type:
-            wheres.append(t'sg.type = {sequencing_type}')
+            wheres.append(t'sg.type = {sequencing_type.lower()}')
 
         where_str = sql.SQL(' AND ').join(wheres) if wheres else t''
 

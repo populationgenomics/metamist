@@ -366,7 +366,7 @@ class AnalysisTable(DbBase):
             INNER JOIN sequencing_group sg ON a_sg.sequencing_group_id = sg.id
             WHERE a.id = (
                 SELECT id FROM analysis
-                WHERE active AND type = {analysis_type} AND project = {project} AND status = 'completed' AND timestamp_completed IS NOT NULL {meta_str}
+                WHERE active AND type = LOWER({analysis_type.lower()}) AND project = {project} AND status = 'completed' AND timestamp_completed IS NOT NULL {meta_str}
                 ORDER BY timestamp_completed DESC
                 LIMIT 1
             )
@@ -413,7 +413,7 @@ class AnalysisTable(DbBase):
                 id NOT IN (
                     SELECT a_sg.sequencing_group_id FROM analysis_sequencing_group a_sg
                     LEFT JOIN analysis a ON a_sg.analysis_id = a.id
-                    WHERE a.type = {analysis_type} AND a.active
+                    WHERE a.type = LOWER({analysis_type.lower()}) AND a.active
                 )
         """
 
@@ -442,7 +442,7 @@ class AnalysisTable(DbBase):
             LEFT JOIN analysis_sequencing_group a_sg ON a_sg.analysis_id = a.id
             WHERE
                 a.active AND
-                a.type = {analysis_type} AND
+                a.type = LOWER({analysis_type.lower()}) AND
                 a.timestamp_completed IS NOT NULL AND
                 a_sg.sequencing_group_id = ANY({sequencing_group_ids})
             ORDER BY a.timestamp_completed DESC
@@ -535,8 +535,9 @@ class AnalysisTable(DbBase):
             t'peid.name = {PRIMARY_EXTERNAL_ORG}',
         ]
         if sequencing_types:
+            st_case_insensitive = [t.lower() for t in sequencing_types]
             where_conditions.append(
-                t"JSON_VALUE(a.meta, '$.sequencing_type') = ANY({sequencing_types})"
+                t"LOWER(a.meta->>'sequencing_type') = ANY({st_case_insensitive})"
             )
 
         if participant_ids:
