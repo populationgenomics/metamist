@@ -1,8 +1,9 @@
-import unittest
 import unittest.mock
 from datetime import datetime
 from io import StringIO
 from types import SimpleNamespace
+
+import pytest
 
 from cpg_utils import to_path
 from metamist.audit.adapters import StorageClient
@@ -40,13 +41,13 @@ from test.data.audit_fixtures.audit_test import (
     SR_ILLUMINA_EXOME_SGS_CRAM_RESPONSE,
 )
 from test.data.audit_fixtures.bucket_files import MAIN_BUCKET_FILES, UPLOAD_BUCKET_FILES
-from test.testbase import run_as_sync
 
 
-class TestAudit(unittest.TestCase):
+class TestAudit:
     """Test the audit module"""
 
-    def setUp(self):
+    @pytest.fixture(autouse=True)
+    def set_up(self):
         """Set up test fixtures."""
         # Start the storage client mock before creating GCSDataAccess
         self.storage_client_patcher = unittest.mock.patch(
@@ -76,15 +77,15 @@ class TestAudit(unittest.TestCase):
 gs://cpg-dataset-main-upload/file1.bam,2048000000,SG01,exome,short-read,illumina,1,S01,EXT001,1,"P001",1,cram,delete,File is old and replaced by newer upload
 gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina,2,S02,EXT002,2,"P002",2,cram,review,File not found in main bucket"""
 
-    def tearDown(self):
-        """Clean up test fixtures."""
+        yield
+
         self.storage_client_patcher.stop()
         self.bucket_patcher.stop()
 
     def test_file_matching_service(self):
         """Test FileMatchingService"""
-        self.assertIsInstance(self.file_matcher, FileMatchingService)
-        self.assertIsInstance(self.audit_analyzer.file_matcher, FileMatchingService)
+        assert isinstance(self.file_matcher, FileMatchingService)
+        assert isinstance(self.audit_analyzer.file_matcher, FileMatchingService)
 
     def test_gcs_data_access_setup(self):
         """
@@ -92,17 +93,15 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
         since these are used frequently in the tests.
         """
         # Verify that the bucket names are set correctly from our mocks
-        self.assertEqual(self.gcs_data_access.main_bucket, 'cpg-dataset-main')
-        self.assertEqual(self.gcs_data_access.upload_bucket, 'cpg-dataset-main-upload')
-        self.assertEqual(
-            self.gcs_data_access.analysis_bucket, 'cpg-dataset-main-analysis'
-        )
-        self.assertEqual(self.gcs_data_access.dataset, 'dataset')
-        self.assertEqual(self.gcs_data_access.gcp_project, 'test')
+        assert self.gcs_data_access.main_bucket == 'cpg-dataset-main'
+        assert self.gcs_data_access.upload_bucket == 'cpg-dataset-main-upload'
+        assert self.gcs_data_access.analysis_bucket == 'cpg-dataset-main-analysis'
+        assert self.gcs_data_access.dataset == 'dataset'
+        assert self.gcs_data_access.gcp_project == 'test'
 
     # ===== METAMIST DATA ACCESS TESTS =====
     # These test the data access layer - mapping GraphQL responses to domain models
-    @run_as_sync
+    @pytest.mark.asyncio
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     async def test_validate_enums(self, mock_query_async):
         """Test MetamistDataAccess.validate_enums"""
@@ -116,14 +115,14 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             file_types=tuple(list(FileType)),  # noqa: C414
         )
         result = await self.metamist_data_access.validate_metamist_enums(config=config)
-        self.assertEqual(config, result)
+        assert config == result
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     async def test_validate_enums_failure(self, mock_query_async):
         """Test MetamistDataAccess.validate_enums invalid input"""
         mock_query_async.return_value = ENUMS_QUERY_RESULT
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             await self.metamist_data_access.validate_metamist_enums(
                 config=AuditConfig(
                     dataset='dataset',
@@ -139,7 +138,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
                 )
             )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     async def test_get_all_sequencing_groups(self, mock_query_async):
         """Test MetamistDataAccess.get_sequencing_groups"""
@@ -151,15 +150,15 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             sequencing_technologies=['short-read', 'long_read'],
             sequencing_platforms=['illumina', 'pacbio', 'ont'],
         )
-        self.assertEqual(len(result), 7)
+        assert len(result) == 7
         for sg in result:
-            self.assertIsInstance(sg, SequencingGroup)
+            assert isinstance(sg, SequencingGroup)
             for assay in sg.assays:
-                self.assertIsInstance(assay, Assay)
+                assert isinstance(assay, Assay)
                 for rf in assay.read_files:
-                    self.assertIsInstance(rf, FileMetadata)
+                    assert isinstance(rf, FileMetadata)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     async def test_get_sequencing_groups_with_secondary_files(self, mock_query_async):
         """Test MetamistDataAccess.get_sequencing_groups"""
@@ -171,9 +170,9 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             sequencing_technologies=['short-read', 'long_read'],
             sequencing_platforms=['illumina', 'pacbio', 'ont'],
         )
-        self.assertEqual(len(result[0].assays[0].read_files), 2)
+        assert len(result[0].assays[0].read_files) == 2
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     async def test_get_filtered_sequencing_groups(self, mock_query_async):
         """Test MetamistDataAccess.get_sequencing_groups filtered"""
@@ -186,16 +185,16 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             sequencing_platforms=['illumina'],
         )
 
-        self.assertEqual(len(result), 1)
+        assert len(result) == 1
         sg = result[0]
-        self.assertIsInstance(sg, SequencingGroup)
-        self.assertEqual(sg.id, 'SG01_2')
-        self.assertEqual(sg.technology, 'short-read')
-        self.assertEqual(sg.platform, 'illumina')
-        self.assertEqual(sg.sample.external_id, 'EXT001')
-        self.assertEqual(sg.sample.participant.external_id, 'P001')
+        assert isinstance(sg, SequencingGroup)
+        assert sg.id == 'SG01_2'
+        assert sg.technology == 'short-read'
+        assert sg.platform == 'illumina'
+        assert sg.sample.external_id == 'EXT001'
+        assert sg.sample.participant.external_id == 'P001'
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query')
     async def test_get_dataset_cohort(self, mock_query):
         """Test MetamistDataAccess.get_dataset_cohort"""
@@ -205,9 +204,9 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
         cohort_id = self.metamist_data_access.graphql_client.get_dataset_cohort(
             'dataset', 'Cohort 1'
         )
-        self.assertEqual(cohort_id, 'C01')
+        assert cohort_id == 'C01'
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query')
     async def test_get_dataset_cohort_create_new(self, mock_query):
         """Test MetamistDataAccess.get_dataset_cohort where none are found so we create new"""
@@ -226,9 +225,9 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
         cohort_id = self.metamist_data_access.graphql_client.get_dataset_cohort(
             'dataset', 'Cohort 1'
         )
-        self.assertEqual(cohort_id, 'C01')
+        assert cohort_id == 'C01'
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query')
     async def test_get_audit_deletion_analysis(self, mock_query):
         """Test MetamistDataAccess.get_audit_deletion_analyses"""
@@ -256,10 +255,10 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             output='gs://cpg-dataset-main-analysis/audit_results/20250901_1633/deleted_file.csv',
         )
 
-        self.assertIsInstance(result, dict)
-        self.assertEqual(result['id'], 1)
+        assert isinstance(result, dict)
+        assert result['id'] == 1
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query')
     async def test_get_audit_deletion_analysis_none(self, mock_query):
         """Test MetamistDataAccess.get_audit_deletion_analyses"""
@@ -274,7 +273,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             output='gs://cpg-dataset-main-analysis/audit_results/20250901_1633/deleted_file.csv',
         )
 
-        self.assertIsNone(result)
+        assert result is None
 
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query')
     def test_create_audit_deletion_analysis(self, mock_query):
@@ -291,7 +290,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             stats={},
         )
 
-        self.assertEqual(result, 1)
+        assert result == 1
 
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query')
     def test_update_audit_deletion_analysis(self, mock_query):
@@ -305,16 +304,16 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             dataset='dataset',
             output=report_path,
         )
-        self.assertEqual(existing_audit_deletion['output'], report_path)
+        assert existing_audit_deletion['output'] == report_path
         result = self.metamist_data_access.update_audit_deletion_analysis(
             existing_analysis=existing_audit_deletion,
             audited_report_name='files_to_delete',
             stats={},
         )
 
-        self.assertEqual(result, 1)
+        assert result == 1
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     async def test_get_analyses_for_sequencing_groups(self, mock_query_async):
         """Test MetamistDataAccess.get_analyses_for_sequencing_groups"""
@@ -326,13 +325,13 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             analysis_types=['cram', 'vcf'],
         )
 
-        self.assertEqual(len(result), 7)
+        assert len(result) == 7
         for analysis in result:
-            self.assertIsInstance(analysis, Analysis)
-            self.assertIn(analysis.id, [1, 2, 3, 4, 5, 6, 7])
-            self.assertIn(analysis.type, ['cram', 'vcf'])
+            assert isinstance(analysis, Analysis)
+            assert analysis.id in [1, 2, 3, 4, 5, 6, 7]
+            assert analysis.type in ['cram', 'vcf']
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     async def test_get_analyses_alternate(self, mock_query_async):
         """Test MetamistDataAccess.get_analyses_for_sequencing_groups"""
@@ -344,15 +343,16 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             analysis_types=['cram'],
         )
 
-        self.assertEqual(len(result), 2)
-        self.assertIsInstance(result[0], Analysis)
-        self.assertEqual(result[0].id, 101)
-        self.assertEqual(result[0].timestamp_completed, datetime.min)
-        self.assertEqual(
-            result[0].output_path, 'gs://cpg-dataset-main-upload/2023-05-01/EXT101.cram'
+        assert len(result) == 2
+        assert isinstance(result[0], Analysis)
+        assert result[0].id == 101
+        assert result[0].timestamp_completed == datetime.min
+        assert (
+            result[0].output_path
+            == 'gs://cpg-dataset-main-upload/2023-05-01/EXT101.cram'
         )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     async def test_get_filtered_analyses_for_sequencing_groups(self, mock_query_async):
         """Test MetamistDataAccess.get_analyses_for_sequencing_groups filtered"""
@@ -364,16 +364,14 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             analysis_types=['cram'],
         )
 
-        self.assertEqual(len(result), 1)
+        assert len(result) == 1
         analysis = result[0]
-        self.assertIsInstance(analysis, Analysis)
-        self.assertEqual(analysis.id, 2)
-        self.assertEqual(analysis.sequencing_group_id, 'SG01_2')
-        self.assertEqual(analysis.type, 'cram')
-        self.assertTrue(analysis.is_cram)
-        self.assertEqual(
-            analysis.output_path, 'gs://cpg-dataset-main/exome/cram/SG01_2.cram'
-        )
+        assert isinstance(analysis, Analysis)
+        assert analysis.id == 2
+        assert analysis.sequencing_group_id == 'SG01_2'
+        assert analysis.type == 'cram'
+        assert analysis.is_cram
+        assert analysis.output_path == 'gs://cpg-dataset-main/exome/cram/SG01_2.cram'
 
     # ===== GCS DATA ACCESS TESTS =====
     # These test the data access layer - mapping GCS responses to domain models
@@ -392,7 +390,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             file_types=[FileType.FASTQ, FileType.BAM, FileType.CRAM],
         )
 
-        self.assertEqual(len(blobs), 10)
+        assert len(blobs) == 10
 
     @unittest.mock.patch.object(GCSDataAccess, 'list_files_in_bucket')
     def test_list_all_files_in_bucket(self, mock_list_files):
@@ -408,7 +406,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             file_types=list(FileType),
         )
 
-        self.assertEqual(len(blobs), 11)
+        assert len(blobs) == 11
 
     @unittest.mock.patch.object(StorageClient, 'check_blobs')
     def test_validate_cram_files(self, mock_check_blobs):
@@ -419,12 +417,10 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             cram_paths=[f.filepath for f in MAIN_BUCKET_FILES[:2]]
         )
 
-        self.assertEqual(len(found), 2)
-        self.assertEqual(len(missing), 0)
-        self.assertEqual(found[0], to_path('gs://cpg-dataset-main/cram/SG01_1.cram'))
-        self.assertEqual(
-            found[1], to_path('gs://cpg-dataset-main/exome/cram/SG01_2.cram')
-        )
+        assert len(found) == 2
+        assert len(missing) == 0
+        assert found[0] == to_path('gs://cpg-dataset-main/cram/SG01_1.cram')
+        assert found[1] == to_path('gs://cpg-dataset-main/exome/cram/SG01_2.cram')
 
     @unittest.mock.patch.object(StorageClient, 'check_blobs')
     def test_validate_cram_files_with_missing(self, mock_check_blobs):
@@ -436,13 +432,11 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             cram_paths=[f.filepath for f in MAIN_BUCKET_FILES[:3]]
         )
 
-        self.assertEqual(len(found), 2)
-        self.assertEqual(len(missing), 1)
-        self.assertEqual(found[0], to_path('gs://cpg-dataset-main/cram/SG01_1.cram'))
-        self.assertEqual(
-            found[1], to_path('gs://cpg-dataset-main/exome/cram/SG01_2.cram')
-        )
-        self.assertEqual(missing[0], to_path('gs://cpg-dataset-main/cram/SG02.cram'))
+        assert len(found) == 2
+        assert len(missing) == 1
+        assert found[0] == to_path('gs://cpg-dataset-main/cram/SG01_1.cram')
+        assert found[1] == to_path('gs://cpg-dataset-main/exome/cram/SG01_2.cram')
+        assert missing[0] == to_path('gs://cpg-dataset-main/cram/SG02.cram')
 
     # ===== AUDIT ANALYZER TESTS =====
     # These test the core business logic - most complex tests
@@ -455,15 +449,15 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             UPLOAD_BUCKET_FILES,
             list(ANALYSES.values()),
         )
-        self.assertIsInstance(result, AuditResult)
+        assert isinstance(result, AuditResult)
 
         # Should have files to delete
-        self.assertGreater(len(result.files_to_delete), 0)
+        assert len(result.files_to_delete) > 0
         # Should have files to review (uningested file)
-        self.assertGreater(len(result.files_to_review), 0)
+        assert len(result.files_to_review) > 0
         # Should mark SG as complete
-        self.assertEqual(len(result.unaligned_sequencing_groups), 1)
-        self.assertEqual(result.unaligned_sequencing_groups[0].id, 'SG04')
+        assert len(result.unaligned_sequencing_groups) == 1
+        assert result.unaligned_sequencing_groups[0].id == 'SG04'
 
     def test_analyze_with_moved_files(self):
         """Test moved file detection"""
@@ -473,14 +467,14 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
         )
 
         # Should detect the moved files
-        self.assertGreater(len(result.moved_files), 0)
-        self.assertEqual(
-            result.moved_files[0].filepath,
-            'gs://cpg-dataset-main-upload/unknown_files/unknown_R1.fq',
+        assert len(result.moved_files) > 0
+        assert (
+            result.moved_files[0].filepath
+            == 'gs://cpg-dataset-main-upload/unknown_files/unknown_R1.fq'
         )
-        self.assertEqual(
-            result.moved_files[1].filepath,
-            'gs://cpg-dataset-main-upload/unknown_files/unknown_R2.fq',
+        assert (
+            result.moved_files[1].filepath
+            == 'gs://cpg-dataset-main-upload/unknown_files/unknown_R2.fq'
         )
 
     def test_analyze_with_uningested_files(self):
@@ -490,9 +484,9 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             list(SEQUENCING_GROUPS.values()), UPLOAD_BUCKET_FILES, analyses
         )
 
-        self.assertGreater(len(result.files_to_review), 0)
+        assert len(result.files_to_review) > 0
         for entry in result.files_to_review:
-            self.assertIsNotNone(entry.filepath)
+            assert entry.filepath is not None
 
     # ===== FILE MATCHING SERVICE TESTS =====
     # These test the file matching logic
@@ -503,7 +497,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
 
         for analysis in analyses:
             if analysis.id == 7:
-                self.assertIsNotNone(analysis.original_file)
+                assert analysis.original_file is not None
 
     def test_find_uningested_files(self):
         """Test finding uningested files"""
@@ -511,22 +505,21 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
         bucket_files = UPLOAD_BUCKET_FILES[:1]
 
         moved_files = self.file_matcher.find_moved_files(metamist_files, bucket_files)
-        self.assertEqual(len(moved_files), 0)
+        assert len(moved_files) == 0
 
         uningested = self.file_matcher.find_uningested_files(
             metamist_files, bucket_files, moved_files
         )
 
-        self.assertEqual(len(uningested), 1)
-        self.assertEqual(
-            uningested[0].filepath,
-            to_path('gs://cpg-dataset-main-upload/2025-01-01/bams/EXT001.bam'),
+        assert len(uningested) == 1
+        assert uningested[0].filepath == to_path(
+            'gs://cpg-dataset-main-upload/2025-01-01/bams/EXT001.bam'
         )
 
     # ===== INTEGRATION TESTS =====
     # These test multiple components working together
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     async def test_audit_config_instantiation_from_inputs(self, mock_query_async):
         """Test configuration creation from inputs"""
@@ -543,9 +536,9 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
         mock_query_async.return_value = ENUMS_QUERY_RESULT
 
         config = AuditConfig.from_cli_args(config_args)
-        self.assertIsInstance(config, AuditConfig)
+        assert isinstance(config, AuditConfig)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @unittest.mock.patch('metamist.audit.adapters.graphql_client.query_async')
     @unittest.mock.patch.object(GCSDataAccess, 'list_files_in_bucket')
     async def test_full_audit_workflow_write_reports(
@@ -583,7 +576,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             Reporter, 'write_audit_reports'
         ) as mock_write_reports:
             await orchestrator.run_audit(config)
-            self.assertTrue(mock_write_reports.called)
+            assert mock_write_reports.called
 
     # ===== REPORTER SERVICE TESTS =====
     # These test the report writing and reading logic
@@ -607,30 +600,27 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             'review_comment': 'File is old and replaced by newer upload',
         }
         entry = AuditReportEntry.from_report_dict(data)
-        self.assertIsInstance(entry, AuditReportEntry)
-        self.assertEqual(entry.filepath, data['filepath'])
-        self.assertEqual(entry.filesize, data['filesize'])
-        self.assertEqual(entry.sg_id, data['sg_id'])
-        self.assertEqual(entry.sg_type, data['sg_type'])
-        self.assertEqual(entry.sg_tech, data['sg_tech'])
-        self.assertEqual(entry.sg_platform, data['sg_platform'])
-        self.assertEqual(entry.sample_id, data['sample_id'])
-        self.assertEqual(
-            entry.participant_external_ids, data['participant_external_ids']
-        )
-        self.assertEqual(entry.cram_analysis_id, data['cram_analysis_id'])
-        self.assertEqual(entry.cram_file_path, data['cram_file_path'])
-        self.assertEqual(entry.action, data['action'])
-        self.assertEqual(entry.review_comment, data['review_comment'])
+        assert isinstance(entry, AuditReportEntry)
+        assert entry.filepath == data['filepath']
+        assert entry.filesize == data['filesize']
+        assert entry.sg_id == data['sg_id']
+        assert entry.sg_type == data['sg_type']
+        assert entry.sg_tech == data['sg_tech']
+        assert entry.sg_platform == data['sg_platform']
+        assert entry.sample_id == data['sample_id']
+        assert entry.participant_external_ids == data['participant_external_ids']
+        assert entry.cram_analysis_id == data['cram_analysis_id']
+        assert entry.cram_file_path == data['cram_file_path']
+        assert entry.action == data['action']
+        assert entry.review_comment == data['review_comment']
 
         entry_dict = entry.to_report_dict()
         fields_to_headers = {
             v: k for k, v in AuditReportEntry.HEADER_TO_FIELD_MAP.items()
         }
-        self.assertEqual(
-            entry_dict,
-            {fields_to_headers[header]: value for header, value in data.items()},
-        )
+        assert entry_dict == {
+            fields_to_headers[header]: value for header, value in data.items()
+        }
 
     def test_get_report_rows_from_name_file_exists(self):
         """Test the Reporter.get_report_rows_from_name method."""
@@ -642,16 +632,14 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
         mock_path.open.return_value.__enter__.return_value = mock_file
 
         rows = self.reporter.get_report_rows(mock_path)
-        self.assertEqual(len(rows), 2)
-        self.assertIsInstance(rows[0], AuditReportEntry)
-        self.assertEqual(rows[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
-        self.assertEqual(
-            rows[0].filesize, '2048000000'
-        )  # Note: will be string from CSV
-        self.assertEqual(rows[0].sg_id, 'SG01')
-        self.assertEqual(rows[0].action.upper(), 'DELETE')
-        self.assertEqual(rows[1].filepath, 'gs://cpg-dataset-main-upload/file2.bam')
-        self.assertEqual(rows[1].action.upper(), 'REVIEW')
+        assert len(rows) == 2
+        assert isinstance(rows[0], AuditReportEntry)
+        assert rows[0].filepath == 'gs://cpg-dataset-main-upload/file1.bam'
+        assert rows[0].filesize == '2048000000'
+        assert rows[0].sg_id == 'SG01'
+        assert rows[0].action.upper() == 'DELETE'
+        assert rows[1].filepath == 'gs://cpg-dataset-main-upload/file2.bam'
+        assert rows[1].action.upper() == 'REVIEW'
 
     def test_get_report_rows_file_not_exists(self):
         """Test reading CSV when file doesn't exist."""
@@ -662,8 +650,8 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             mock_error.return_value = None  # No-op for logging
             rows = self.reporter.get_report_rows(mock_path)
 
-            self.assertEqual(rows, [])
-            self.assertTrue(mock_error.called)
+            assert rows == []
+            assert mock_error.called
 
     def test_get_report_stats_from_file(self):
         """Test the Reporter.get_report_stats method."""
@@ -675,8 +663,8 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
         stats = self.reporter.get_report_stats(mock_path)
 
         expected_total_size = 2048000000 + 512000000  # Sum of file sizes
-        self.assertEqual(stats['total_size'], expected_total_size)
-        self.assertEqual(stats['file_count'], 2)
+        assert stats['total_size'] == expected_total_size
+        assert stats['file_count'] == 2
 
     def test_get_report_entries_stats(self):
         """Test the Reporter.get_report_entries_stats method."""
@@ -686,15 +674,15 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             AuditReportEntry(filepath='file3.bam', filesize=None),  # Test None handling
         ]
 
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             self.reporter.get_report_entries_stats(None)  # type: ignore
 
         stats = self.reporter.get_report_entries_stats(
             entries[:2]
         )  # Only first two have valid filesize
 
-        self.assertEqual(stats['total_size'], 3000)
-        self.assertEqual(stats['file_count'], 2)
+        assert stats['total_size'] == 3000
+        assert stats['file_count'] == 2
 
     def test_write_csv_report_new_file(self):
         """Test writing CSV report to new file."""
@@ -737,9 +725,9 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             uploaded_content = uploaded_buffer.getvalue()
 
             # Should contain headers and data
-            self.assertIn('File Path', uploaded_content)
-            self.assertIn('gs://bucket/file1.bam', uploaded_content)
-            self.assertIn('SG01', uploaded_content)
+            assert 'File Path' in uploaded_content
+            assert 'gs://bucket/file1.bam' in uploaded_content
+            assert 'SG01' in uploaded_content
 
     def test_write_csv_report_append_to_existing(self):
         """Test appending to existing CSV file."""
@@ -818,13 +806,13 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
         ) as mock_write_csv_report:
             self.reporter.write_audit_reports(audit_result, config)
             stats = self.reporter.generate_summary_statistics(audit_result)
-            self.assertIsInstance(stats, dict)
-            self.assertEqual(stats['files_to_delete'], 2)
-            self.assertEqual(stats['files_to_delete_size_gb'], 3072000000 / (1024**3))
-            self.assertEqual(stats['files_to_review'], 2)
-            self.assertEqual(stats['files_to_review_size_gb'], 768000000 / (1024**3))
-            self.assertEqual(stats['unaligned_sgs'], 1)
-            self.assertTrue(mock_write_csv_report.called)
+            assert isinstance(stats, dict)
+            assert stats['files_to_delete'] == 2
+            assert stats['files_to_delete_size_gb'] == 3072000000 / (1024**3)
+            assert stats['files_to_review'] == 2
+            assert stats['files_to_review_size_gb'] == 768000000 / (1024**3)
+            assert stats['unaligned_sgs'] == 1
+            assert mock_write_csv_report.called
 
     # ===== REVIEW AUDIT RESULTS TESTS =====
     # Test the report reviewing entrypoint and related functions
@@ -857,8 +845,8 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                 ),
             ],
         )
-        self.assertEqual(len(parsed), 1)
-        self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
+        assert len(parsed) == 1
+        assert parsed[0].filepath == 'gs://cpg-dataset-main-upload/file1.bam'
         parsed = self.reporter.filter_rows(
             [expressions[1]],
             rows=[
@@ -872,8 +860,8 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                 ),
             ],
         )
-        self.assertEqual(len(parsed), 1)
-        self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
+        assert len(parsed) == 1
+        assert parsed[0].filepath == 'gs://cpg-dataset-main-upload/file1.bam'
         parsed = self.reporter.filter_rows(
             [expressions[2]],
             rows=[
@@ -887,8 +875,8 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                 ),
             ],
         )
-        self.assertEqual(len(parsed), 1)
-        self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
+        assert len(parsed) == 1
+        assert parsed[0].filepath == 'gs://cpg-dataset-main-upload/file1.bam'
         parsed = self.reporter.filter_rows(
             [expressions[3]],
             rows=[
@@ -909,8 +897,8 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                 ),
             ],
         )
-        self.assertEqual(len(parsed), 1)
-        self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
+        assert len(parsed) == 1
+        assert parsed[0].filepath == 'gs://cpg-dataset-main-upload/file1.bam'
 
         # Now a compound expression
         parsed = self.reporter.filter_rows(
@@ -930,8 +918,8 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                 ),
             ],
         )
-        self.assertEqual(len(parsed), 1)
-        self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
+        assert len(parsed) == 1
+        assert parsed[0].filepath == 'gs://cpg-dataset-main-upload/file1.bam'
 
         # Compound with 'or'
         parsed = self.reporter.filter_rows(
@@ -962,11 +950,11 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                 ),
             ],
         )
-        self.assertEqual(len(parsed), 4)
-        self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
-        self.assertEqual(parsed[1].filepath, 'gs://cpg-dataset-main-upload/file2.cram')
-        self.assertEqual(parsed[2].filepath, 'gs://cpg-dataset-main-upload/file3.bam')
-        self.assertEqual(parsed[3].filepath, 'gs://cpg-dataset-main-upload/file4.bam')
+        assert len(parsed) == 4
+        assert parsed[0].filepath == 'gs://cpg-dataset-main-upload/file1.bam'
+        assert parsed[1].filepath == 'gs://cpg-dataset-main-upload/file2.cram'
+        assert parsed[2].filepath == 'gs://cpg-dataset-main-upload/file3.bam'
+        assert parsed[3].filepath == 'gs://cpg-dataset-main-upload/file4.bam'
 
         parsed = self.reporter.filter_rows(
             ['sample_id != "S03"'],
@@ -981,8 +969,8 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                 ),
             ],
         )
-        self.assertEqual(len(parsed), 1)
-        self.assertEqual(parsed[0].filepath, 'gs://cpg-dataset-main-upload/file1.bam')
+        assert len(parsed) == 1
+        assert parsed[0].filepath == 'gs://cpg-dataset-main-upload/file1.bam'
 
     def test_review_rows(self):
         """Test reviewing rows - updating action and comments"""
@@ -1010,12 +998,10 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                 comment='Reviewed and marked for ingestion',
                 audit_logs=self.audit_logs,
             )
-            self.assertEqual(len(review_result.reviewed_files), 2)
+            assert len(review_result.reviewed_files) == 2
             for row in review_result.reviewed_files:
-                self.assertEqual(row.action, 'INGEST')
-                self.assertEqual(
-                    row.review_comment, 'Reviewed and marked for ingestion'
-                )
+                assert row.action == 'INGEST'
+                assert row.review_comment == 'Reviewed and marked for ingestion'
 
             rows = [
                 AuditReportEntry(
@@ -1035,12 +1021,12 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                 comment='No changes made',
                 audit_logs=self.audit_logs,
             )
-            self.assertEqual(len(review_result.reviewed_files), 2)
+            assert len(review_result.reviewed_files) == 2
             for row in review_result.reviewed_files:
-                self.assertEqual(row.action, 'REVIEW')
-                self.assertEqual(row.review_comment, 'No changes made')
+                assert row.action == 'REVIEW'
+                assert row.review_comment == 'No changes made'
 
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError):
                 review_rows(
                     rows,
                     action='INVALID_ACTION',
@@ -1101,11 +1087,11 @@ gs://bucket/existing.bam,500,SG00,DELETE"""
                     dry_run=False,
                 )
 
-                self.assertEqual(len(deletion_result.deleted_files), 2)
+                assert len(deletion_result.deleted_files) == 2
 
                 stats = self.reporter.get_report_entries_stats(
                     deletion_result.deleted_files
                 )
-                self.assertIsInstance(stats, dict)
-                self.assertEqual(stats['total_size'], 2048000000 + 1024000000)
-                self.assertEqual(stats['file_count'], 2)
+                assert isinstance(stats, dict)
+                assert stats['total_size'] == 2048000000 + 1024000000
+                assert stats['file_count'] == 2

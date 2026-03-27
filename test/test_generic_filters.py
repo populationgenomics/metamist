@@ -91,6 +91,7 @@ async def execute_filter(
 
 
 @pytest.mark.asyncio
+@pytest.mark.db_superuser
 class TestGenericFilters:
     """Test generic filters against real database"""
 
@@ -659,6 +660,7 @@ class TestGenericFilters:
 
 
 @pytest.mark.asyncio
+@pytest.mark.db_superuser
 class TestGenericDictFilters:
     """Test generic filters in a dictionary context against real database"""
 

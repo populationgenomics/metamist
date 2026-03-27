@@ -334,7 +334,7 @@ DEFAULT_SEQUENCING_META = {
 }
 
 
-class TestProject(TypedDict):
+class ProjectDict(TypedDict):
     """dict to store project id and name"""
 
     id: int
@@ -539,7 +539,7 @@ class TestComment:
         """
         project_result = await graphql_query(project_query)
         project = project_result['data']['myProjects'][0]
-        self.project: TestProject = project
+        self.project: ProjectDict = project
 
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_add_comment_to_project(self):

@@ -1,9 +1,13 @@
+import logging
 from datetime import datetime
 from io import StringIO
 from unittest.mock import patch
 
+import pytest
+
 from metamist.parser.generic_parser import ParsedParticipant
 
+from db.python.connect import Connection
 from db.python.layers import ParticipantLayer
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -11,13 +15,13 @@ from models.models import (
     SampleUpsertInternal,
 )
 from scripts.parse_existing_cohort import Columns, ExistingCohortParser
-from test.testbase import DbIsolatedTest, run_as_sync
+from test.conftest import GraphQLQueryFunction, make_graphql_query_mock
 
 
-class TestExistingCohortParser(DbIsolatedTest):
+class TestExistingCohortParser:
     """Test the ExistingCohortParser"""
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
     @patch('metamist.parser.cloudhelper.CloudHelper.datetime_added')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
@@ -28,11 +32,13 @@ class TestExistingCohortParser(DbIsolatedTest):
         mock_fileexists,
         mock_datetime_added,
         mock_graphql_query,
+        connection_with_project: Connection,
+        graphql_query: GraphQLQueryFunction,
     ):
         """
         Test importing a single row, forms objects and checks response
         """
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         mock_filesize.return_value = 111
         mock_fileexists.return_value = False
@@ -48,7 +54,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project=self.project_name,
+            project=connection_with_project.project.name,
             allow_missing_files=False,
             sequencing_type='genome',
         )
@@ -64,13 +70,13 @@ class TestExistingCohortParser(DbIsolatedTest):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(1, summary.samples.insert)
-        self.assertEqual(1, summary.assays.insert)
-        self.assertEqual(0, summary.samples.update)
-        self.assertEqual(0, summary.assays.update)
+        assert summary.samples.insert == 1
+        assert summary.assays.insert == 1
+        assert summary.samples.update == 0
+        assert summary.assays.update == 0
 
         sample_to_add = participants[0].samples[0]
-        self.assertEqual('EXTID1234', sample_to_add.primary_external_id)
+        assert sample_to_add.primary_external_id == 'EXTID1234'
         expected_sequence_dict = {
             'reference_genome': 'hg38',
             'platform': 'App',
@@ -102,11 +108,10 @@ class TestExistingCohortParser(DbIsolatedTest):
             'batch': 'M01',
         }
         assay = sample_to_add.sequencing_groups[0].assays[0]
-        self.maxDiff = None
-        self.assertDictEqual(expected_sequence_dict, assay.meta)
+        assert assay.meta == expected_sequence_dict
 
-    @run_as_sync
-    async def test_no_header(self):
+    @pytest.mark.asyncio
+    async def test_no_header(self, connection_with_project: Connection):
         """
         Test input without a header
         """
@@ -119,7 +124,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project=self.project_name,
+            project=connection_with_project.project.name,
             allow_missing_files=False,
             sequencing_type='genome',
         )
@@ -131,7 +136,7 @@ class TestExistingCohortParser(DbIsolatedTest):
 
         file_contents = '\n'.join(rows)
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             await parser.parse_manifest(
                 StringIO(file_contents), delimiter='\t', dry_run=True
             )
@@ -169,13 +174,13 @@ class TestExistingCohortParser(DbIsolatedTest):
 
     #     file_contents = '\n'.join(rows)
 
-    #     with self.assertRaises(ValueError):
+    #     with pytest.raises(ValueError):
     #         await parser.parse_manifest(
     #             StringIO(file_contents), delimiter='\t', dry_run=True
     #         )
     #     return
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
     @patch('metamist.parser.cloudhelper.CloudHelper.datetime_added')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
@@ -186,13 +191,15 @@ class TestExistingCohortParser(DbIsolatedTest):
         mock_fileexists,
         mock_datetime_added,
         mock_graphql_query,
+        connection_with_project: Connection,
+        graphql_query: GraphQLQueryFunction,
     ):
         """
         Tests ingestion for an existing sample.
         """
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
-        player = ParticipantLayer(self.connection)
+        player = ParticipantLayer(connection_with_project)
         await player.upsert_participants(
             [
                 ParticipantUpsertInternal(
@@ -220,7 +227,7 @@ class TestExistingCohortParser(DbIsolatedTest):
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project=self.project_name,
+            project=connection_with_project.project.name,
             allow_missing_files=False,
             sequencing_type='genome',
         )
@@ -235,13 +242,15 @@ class TestExistingCohortParser(DbIsolatedTest):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(0, summary.samples.insert)
-        self.assertEqual(1, summary.assays.insert)
-        self.assertEqual(1, summary.samples.update)
-        self.assertEqual(0, summary.assays.update)
+        assert summary.samples.insert == 0
+        assert summary.assays.insert == 1
+        assert summary.samples.update == 1
+        assert summary.assays.update == 0
 
-    @run_as_sync
-    async def test_get_read_filenames_no_reads_fail(self):
+    @pytest.mark.asyncio
+    async def test_get_read_filenames_no_reads_fail(
+        self, connection_with_project: Connection
+    ):
         """Test ValueError is raised when allow_missing_files is False and sequencing groups have no reads"""
 
         single_row = {Columns.MANIFEST_FLUID_X: ''}
@@ -250,19 +259,21 @@ class TestExistingCohortParser(DbIsolatedTest):
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project=self.project_name,
+            project=connection_with_project.project.name,
             allow_missing_files=False,
             sequencing_type='genome',
         )
         parser.filename_map = {}
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             # this will raise a ValueError because the allow_missing_files=False,
             # and there are no matching reads in the filename map
             await parser.get_read_filenames(sample_id='', row=single_row)
 
-    @run_as_sync
-    async def test_get_read_filenames_no_reads_pass(self):
+    @pytest.mark.asyncio
+    async def test_get_read_filenames_no_reads_pass(
+        self, connection_with_project: Connection, caplog: pytest.LogCaptureFixture
+    ):
         """Test when allow_missing_files is True and records with missing fastqs, no ValueError is raised"""
 
         single_row = {Columns.MANIFEST_FLUID_X: ''}
@@ -271,24 +282,24 @@ class TestExistingCohortParser(DbIsolatedTest):
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project=self.project_name,
+            project=connection_with_project.project.name,
             allow_missing_files=True,
             sequencing_type='genome',
         )
         parser.filename_map = {}
 
-        with self.assertLogs(level='INFO') as cm:
+        with caplog.at_level(logging.INFO):
             read_filenames = await parser.get_read_filenames(
                 sample_id='', row=single_row
             )
 
-        self.assertEqual(len(cm.output), 1)
-        self.assertIn('No read files found for ', cm.output[0])
+        assert len(caplog.records) == 1
+        assert 'No read files found for ' in caplog.records[0].message
 
-        self.assertEqual(len(read_filenames), 0)
+        assert len(read_filenames) == 0
 
-    @run_as_sync
-    async def test_genome_sequencing_type(self):
+    @pytest.mark.asyncio
+    async def test_genome_sequencing_type(self, connection_with_project: Connection):
         """Test that the sequencing type is set correctly when the --sequencing-type flag is set to 'genome''"""
 
         # Test with 'genome'
@@ -296,14 +307,14 @@ class TestExistingCohortParser(DbIsolatedTest):
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project=self.project_name,
+            project=connection_with_project.project.name,
             allow_missing_files=True,
             sequencing_type='genome',
         )
-        self.assertEqual(parser.default_sequencing.seq_type, 'genome')
+        assert parser.default_sequencing.seq_type == 'genome'
 
-    @run_as_sync
-    async def test_exome_sequencing_type(self):
+    @pytest.mark.asyncio
+    async def test_exome_sequencing_type(self, connection_with_project: Connection):
         """Test that the sequencing type is set correctly when the --sequencing-type flag is set to 'exome'"""
 
         # Test with 'exome'
@@ -311,13 +322,13 @@ class TestExistingCohortParser(DbIsolatedTest):
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project=self.project_name,
+            project=connection_with_project.project.name,
             allow_missing_files=True,
             sequencing_type='exome',
         )
-        self.assertEqual(parser.default_sequencing.seq_type, 'exome')
+        assert parser.default_sequencing.seq_type == 'exome'
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
     @patch('metamist.parser.cloudhelper.CloudHelper.datetime_added')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
@@ -328,10 +339,12 @@ class TestExistingCohortParser(DbIsolatedTest):
         mock_fileexists,
         mock_datetime_added,
         mock_graphql_query,
+        connection_with_project: Connection,
+        graphql_query: GraphQLQueryFunction,
     ):
         """Test that the sequencing type is set correctly when the --sequencing-type flag is set to 'genome' or 'exome'"""
 
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         mock_filesize.return_value = 111
         mock_fileexists.return_value = False
@@ -345,57 +358,55 @@ class TestExistingCohortParser(DbIsolatedTest):
         ]
 
         for sequencing_type in ['genome', 'exome']:
-            with self.subTest(sequencing_type=sequencing_type):
-                parser = ExistingCohortParser(
-                    include_participant_column=False,
-                    batch_number='M01',
-                    search_locations=[],
-                    project=self.project_name,
-                    allow_missing_files=False,
-                    sequencing_type=sequencing_type,
-                )
-                parser.filename_map = {
-                    'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq',
-                    'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq',
-                }
+            parser = ExistingCohortParser(
+                include_participant_column=False,
+                batch_number='M01',
+                search_locations=[],
+                project=connection_with_project.project.name,
+                allow_missing_files=False,
+                sequencing_type=sequencing_type,
+            )
+            parser.filename_map = {
+                'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq',
+                'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq',
+            }
 
-                file_contents = '\n'.join(rows)
-                participants: list[ParsedParticipant]
-                _, participants = await parser.parse_manifest(
-                    StringIO(file_contents), delimiter='\t', dry_run=True
-                )
+            file_contents = '\n'.join(rows)
+            participants: list[ParsedParticipant]
+            _, participants = await parser.parse_manifest(
+                StringIO(file_contents), delimiter='\t', dry_run=True
+            )
 
-                sample_to_add = participants[0].samples[0]
-                expected_sequence_dict = {
-                    'reference_genome': 'hg38',
-                    'platform': 'App',
-                    'concentration': 100,
-                    'volume': 100,
-                    'fluid_x_tube_id': '220405_FLUIDX1234',
-                    'reads_type': 'fastq',
-                    'reads': [
-                        {
-                            'location': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq',
-                            'basename': 'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq',
-                            'class': 'File',
-                            'checksum': None,
-                            'size': 111,
-                            'datetime_added': '2022-02-02T22:22:22',
-                        },
-                        {
-                            'location': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq',
-                            'basename': 'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq',
-                            'class': 'File',
-                            'checksum': None,
-                            'size': 111,
-                            'datetime_added': '2022-02-02T22:22:22',
-                        },
-                    ],
-                    'sequencing_platform': 'illumina',
-                    'sequencing_technology': 'short-read',
-                    'sequencing_type': f'{sequencing_type}',
-                    'batch': 'M01',
-                }
-                assay = sample_to_add.sequencing_groups[0].assays[0]
-                self.maxDiff = None
-                self.assertDictEqual(expected_sequence_dict, assay.meta)
+            sample_to_add = participants[0].samples[0]
+            expected_sequence_dict = {
+                'reference_genome': 'hg38',
+                'platform': 'App',
+                'concentration': 100,
+                'volume': 100,
+                'fluid_x_tube_id': '220405_FLUIDX1234',
+                'reads_type': 'fastq',
+                'reads': [
+                    {
+                        'location': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq',
+                        'basename': 'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R1.fastq',
+                        'class': 'File',
+                        'checksum': None,
+                        'size': 111,
+                        'datetime_added': '2022-02-02T22:22:22',
+                    },
+                    {
+                        'location': '/path/to/HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq',
+                        'basename': 'HG3F_2_220405_FLUIDX1234_Homo-sapiens_AAC-TAT_R_220208_VB_BLAH_M002_R2.fastq',
+                        'class': 'File',
+                        'checksum': None,
+                        'size': 111,
+                        'datetime_added': '2022-02-02T22:22:22',
+                    },
+                ],
+                'sequencing_platform': 'illumina',
+                'sequencing_technology': 'short-read',
+                'sequencing_type': f'{sequencing_type}',
+                'batch': 'M01',
+            }
+            assay = sample_to_add.sequencing_groups[0].assays[0]
+            assert assay.meta == expected_sequence_dict

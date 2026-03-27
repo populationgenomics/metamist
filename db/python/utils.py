@@ -88,7 +88,7 @@ def get_logger():
     if _logger:
         return _logger
 
-    for lname in ('asyncio', 'urllib3', 'databases'):
+    for lname in ('asyncio', 'urllib3'):
         logging.getLogger(lname).setLevel(logging.WARNING)
 
     _logger = logging.getLogger('sample-metadata-api')

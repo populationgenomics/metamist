@@ -359,6 +359,7 @@ class TestSequencingGroup:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
+    @pytest.mark.db_superuser
     async def test_query_with_creation_date(
         self,
         connection_with_project: Connection,
@@ -711,6 +712,7 @@ class TestSequencingGroup:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.db_superuser
     @pytest.mark.project_roles(['writer'])
     async def test_history_partial_sum(
         self, connection_with_project: Connection, test_sample: int, mock_date

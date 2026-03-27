@@ -1,19 +1,22 @@
 from tempfile import TemporaryFile
 
+import pytest
 from fastapi import HTTPException, UploadFile
 
 from api.routes import family
+from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers.family import FamilyLayer
 from models.models import PRIMARY_EXTERNAL_ORG
-from test.testbase import DbIsolatedTest, run_as_sync
 
 
-class TestFamilyImportEndpoint(DbIsolatedTest):
+class TestFamilyImportEndpoint:
     """Family testing methods"""
 
-    @run_as_sync
-    async def test_import_families_empty_file(self):
+    @pytest.mark.asyncio
+    async def test_import_families_empty_file(
+        self, connection_with_project: Connection
+    ):
         """
         Test importing families from a file where the file is empty.
         """
@@ -21,35 +24,32 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
             emptyTestFile = UploadFile(f)  # noqa: N806
 
             # Test has_header = true
-            with self.assertRaises(HTTPException) as context:
+            with pytest.raises(HTTPException) as context:
                 _ = await family.import_families(
                     emptyTestFile,
                     has_header=True,
                     delimiter='\t',
-                    connection=self.connection,
+                    connection=connection_with_project,
                 )
-            self.assertEqual(context.exception.status_code, 400)
-            self.assertIn(
-                'A header was expected but file is empty.', context.exception.detail
-            )
+            assert context.value.status_code == 400
+            assert 'A header was expected but file is empty.' in context.value.detail
 
             # Test no op when has_header = false
             response = await family.import_families(
                 emptyTestFile,
                 has_header=False,
                 delimiter='\t',
-                connection=self.connection,
+                connection=connection_with_project,
             )
-            self.assertDictEqual(
-                response,
-                {
-                    'success': True,
-                    'warnings': ['Submitted file was empty'],
-                },
-            )
+            assert response == {
+                'success': True,
+                'warnings': ['Submitted file was empty'],
+            }
 
-    @run_as_sync
-    async def test_import_families_header_no_content(self):
+    @pytest.mark.asyncio
+    async def test_import_families_header_no_content(
+        self, connection_with_project: Connection
+    ):
         """
         Test importing families from a file with a header but no data.
         """
@@ -63,18 +63,17 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
                 headerOnlyFile,
                 has_header=True,
                 delimiter='\t',
-                connection=self.connection,
+                connection=connection_with_project,
             )
-            self.assertDictEqual(
-                response,
-                {
-                    'success': True,
-                    'warnings': ['Submitted file contained a header with no data'],
-                },
-            )
+            assert response == {
+                'success': True,
+                'warnings': ['Submitted file contained a header with no data'],
+            }
 
-    @run_as_sync
-    async def test_import_families_valid_data(self):
+    @pytest.mark.asyncio
+    async def test_import_families_valid_data(
+        self, connection_with_project: Connection
+    ):
         """
         Test importing families with valid file contents.
         """
@@ -98,9 +97,9 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
                 testFile,
                 has_header=True,
                 delimiter='\t',
-                connection=self.connection,
+                connection=connection_with_project,
             )
-            self.assertDictEqual(response, {'success': True})
+            assert response == {'success': True}
 
             f.seek(0)
             # Test has_header = false
@@ -108,12 +107,14 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
                 testFile,
                 has_header=False,
                 delimiter='\t',
-                connection=self.connection,
+                connection=connection_with_project,
             )
-            self.assertDictEqual(response, {'success': True})
+            assert response == {'success': True}
 
-    @run_as_sync
-    async def test_import_families_valid_data_and_meta(self):
+    @pytest.mark.asyncio
+    async def test_import_families_valid_data_and_meta(
+        self, connection_with_project: Connection
+    ):
         """
         Test importing families with valid file contents.
         """
@@ -137,9 +138,9 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
                 testFile,
                 has_header=True,
                 delimiter='\t',
-                connection=self.connection,
+                connection=connection_with_project,
             )
-            self.assertDictEqual(response, {'success': True})
+            assert response == {'success': True}
 
             f.seek(0)
             # Test has_header = false
@@ -147,25 +148,27 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
                 testFile,
                 has_header=False,
                 delimiter='\t',
-                connection=self.connection,
+                connection=connection_with_project,
             )
-            self.assertDictEqual(response, {'success': True})
+            assert response == {'success': True}
 
             # get family and verify that meta was imported correctly
-            family_layer = FamilyLayer(self.connection)
+            family_layer = FamilyLayer(connection_with_project)
 
             family_list = await family_layer.query(
                 family.FamilyFilter(
                     external_id=GenericFilter(eq='Smith'),
-                    project=GenericFilter(eq=self.project_id),
+                    project=GenericFilter(eq=connection_with_project.project_id),
                 )
             )
-            self.assertEqual(len(family_list), 1)
+            assert len(family_list) == 1
             fam = family_list[0]
-            self.assertEqual(fam.meta, {'key1': 'value1'})
+            assert fam.meta == {'key1': 'value1'}
 
-    @run_as_sync
-    async def test_import_families_fails_on_invalid_meta(self):
+    @pytest.mark.asyncio
+    async def test_import_families_fails_on_invalid_meta(
+        self, connection_with_project: Connection
+    ):
         """
         Test importing families with valid file contents.
         """
@@ -183,20 +186,20 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
             testFile = UploadFile(f)  # noqa: N806
 
             # expect to raise ValueError due to invalid JSON in meta
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError):
                 await family.import_families(
                     testFile,
                     has_header=True,
                     delimiter='\t',
-                    connection=self.connection,
+                    connection=connection_with_project,
                 )
 
-    @run_as_sync
-    async def test_create_family_with_meta(self):
+    @pytest.mark.asyncio
+    async def test_create_family_with_meta(self, connection_with_project: Connection):
         """
         Test creating a family with meta
         """
-        family_layer = FamilyLayer(self.connection)
+        family_layer = FamilyLayer(connection_with_project)
 
         # Create a family with meta
         family_id = await family_layer.create_family(
@@ -206,26 +209,25 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
             meta={'key1': 'value1', 'nested': {'key2': 'value2'}},
         )
 
-        self.assertIsNotNone(family_id)
+        assert family_id is not None
 
         # Query the family and verify meta
         created_family = await family_layer.get_family_by_internal_id(family_id)
 
-        self.assertEqual(created_family.id, family_id)
-        self.assertEqual(
-            created_family.external_ids[PRIMARY_EXTERNAL_ORG], 'test-family'
-        )
-        self.assertEqual(created_family.description, 'Test family')
-        self.assertEqual(created_family.coded_phenotype, 'test-phenotype')
-        self.assertEqual(created_family.meta['key1'], 'value1')
-        self.assertEqual(created_family.meta['nested']['key2'], 'value2')
+        assert created_family.id == family_id
+        assert created_family.external_ids[PRIMARY_EXTERNAL_ORG] == 'test-family'
+        assert created_family.description == 'Test family'
+        assert created_family.coded_phenotype == 'test-phenotype'
+        assert created_family.meta['key1'] == 'value1'
+        assert created_family.meta['nested']['key2'] == 'value2'
 
-    @run_as_sync
-    async def test_update_family_meta(self):
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_update_family_meta(self, connection_with_project: Connection):
         """
         Test updating a family's meta data.
         """
-        family_layer = FamilyLayer(self.connection)
+        family_layer = FamilyLayer(connection_with_project)
 
         # Create a family with initial meta
         family_id = await family_layer.create_family(
@@ -244,15 +246,17 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
         # Query and verify the updated meta
         updated_family = await family_layer.get_family_by_internal_id(family_id)
 
-        self.assertEqual(updated_family.meta['initial_key'], 'updated_value')
-        self.assertEqual(updated_family.meta['new_key'], 'new_value')
+        assert updated_family.meta['initial_key'] == 'updated_value'
+        assert updated_family.meta['new_key'] == 'new_value'
 
-    @run_as_sync
-    async def test_create_family_without_meta(self):
+    @pytest.mark.asyncio
+    async def test_create_family_without_meta(
+        self, connection_with_project: Connection
+    ):
         """
         Test creating a family without meta data defaults to empty dict.
         """
-        family_layer = FamilyLayer(self.connection)
+        family_layer = FamilyLayer(connection_with_project)
 
         # Create a family without meta
         family_id = await family_layer.create_family(
@@ -264,4 +268,4 @@ class TestFamilyImportEndpoint(DbIsolatedTest):
         # Query and verify meta is empty dict
         created_family = await family_layer.get_family_by_internal_id(family_id)
 
-        self.assertEqual(created_family.meta, {})
+        assert created_family.meta == {}

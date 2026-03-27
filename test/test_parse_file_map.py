@@ -1,23 +1,31 @@
 from io import StringIO
 from unittest.mock import patch
 
+import pytest
+
 from metamist.parser.generic_parser import DefaultSequencing, ParsedParticipant
 from metamist.parser.sample_file_map_parser import SampleFileMapParser
 
-from test.testbase import DbIsolatedTest, run_as_sync
+from db.python.connect import Connection
+from test.conftest import GraphQLQueryFunction, make_graphql_query_mock
 
 
-class TestSampleMapParser(DbIsolatedTest):
+class TestSampleMapParser:
     """Test the TestSampleMapParser"""
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_single_row_fastq(self, mock_graphql_query):
+    async def test_single_row_fastq(
+        self,
+        mock_graphql_query,
+        connection_with_project: Connection,
+        graphql_query: GraphQLQueryFunction,
+    ):
         """
         Test importing a single row, forms objects and checks response
         - MOCKS: query_async
         """
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         rows = [
             'Individual ID\tFilenames',
@@ -25,7 +33,7 @@ class TestSampleMapParser(DbIsolatedTest):
         ]
         parser = SampleFileMapParser(
             search_locations=[],
-            project=self.project_name,
+            project=connection_with_project.project.name,
             default_sequencing=DefaultSequencing(),
         )
         fs = ['<sample-id>.filename-R1.fastq.gz', '<sample-id>.filename-R2.fastq.gz']
@@ -37,18 +45,18 @@ class TestSampleMapParser(DbIsolatedTest):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(1, summary.participants.insert)
-        self.assertEqual(0, summary.participants.update)
-        self.assertEqual(1, summary.samples.insert)
-        self.assertEqual(0, summary.samples.update)
-        self.assertEqual(1, summary.sequencing_groups.insert)
-        self.assertEqual(0, summary.sequencing_groups.update)
-        self.assertEqual(1, summary.assays.insert)
-        self.assertEqual(0, summary.assays.update)
+        assert summary.participants.insert == 1
+        assert summary.participants.update == 0
+        assert summary.samples.insert == 1
+        assert summary.samples.update == 0
+        assert summary.sequencing_groups.insert == 1
+        assert summary.sequencing_groups.update == 0
+        assert summary.assays.insert == 1
+        assert summary.assays.update == 0
 
         assay = participants[0].samples[0].sequencing_groups[0].assays[0]
 
-        self.assertDictEqual({}, participants[0].samples[0].meta)
+        assert participants[0].samples[0].meta == {}
         expected_sequence_dict = {
             'reads': [
                 {
@@ -73,17 +81,21 @@ class TestSampleMapParser(DbIsolatedTest):
             'sequencing_technology': 'short-read',
             'sequencing_platform': 'illumina',
         }
-        self.maxDiff = None
-        self.assertDictEqual(expected_sequence_dict, assay.meta)
+        assert assay.meta == expected_sequence_dict
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_to_external(self, mock_graphql_query):
+    async def test_to_external(
+        self,
+        mock_graphql_query,
+        connection_with_project: Connection,
+        graphql_query: GraphQLQueryFunction,
+    ):
         """
         Test importing a single row, forms objects and checks response
         - MOCKS: query_async
         """
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         rows = [
             'Individual ID\tFilenames',
@@ -91,7 +103,7 @@ class TestSampleMapParser(DbIsolatedTest):
         ]
         parser = SampleFileMapParser(
             search_locations=[],
-            project=self.project_name,
+            project=connection_with_project.project.name,
             default_sequencing=DefaultSequencing(),
         )
         fs = ['<sample-id>.filename-R1.fastq.gz', '<sample-id>.filename-R2.fastq.gz']
@@ -106,14 +118,19 @@ class TestSampleMapParser(DbIsolatedTest):
         for p in participants:
             p.to_sm()
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_two_rows_with_provided_checksums(self, mock_graphql_query):
+    async def test_two_rows_with_provided_checksums(
+        self,
+        mock_graphql_query,
+        connection_with_project: Connection,
+        graphql_query: GraphQLQueryFunction,
+    ):
         """
         Test importing a single row, forms objects and checks response
         - MOCKS: get_sample_id_map_by_external, get_sequence_ids_for_sample_ids_by_type
         """
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         rows = [
             'Individual ID\tFilenames\tChecksum',
@@ -124,7 +141,7 @@ class TestSampleMapParser(DbIsolatedTest):
         parser = SampleFileMapParser(
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
         )
         fs = [
             '<sample-id>.filename-R1.fastq.gz',
@@ -140,15 +157,14 @@ class TestSampleMapParser(DbIsolatedTest):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(2, summary.participants.insert)
-        self.assertEqual(0, summary.participants.update)
-        self.assertEqual(2, summary.samples.insert)
-        self.assertEqual(0, summary.samples.update)
-        self.assertEqual(2, summary.assays.insert)
-        self.assertEqual(0, summary.assays.update)
-        self.maxDiff = None
+        assert summary.participants.insert == 2
+        assert summary.participants.update == 0
+        assert summary.samples.insert == 2
+        assert summary.samples.update == 0
+        assert summary.assays.insert == 2
+        assert summary.assays.update == 0
 
-        self.assertDictEqual({}, participants[0].samples[0].meta)
+        assert participants[0].samples[0].meta == {}
         expected_assay1_reads = [
             {
                 'location': 'gs://BUCKET/FAKE/<sample-id>.filename-R1.fastq.gz',
@@ -168,9 +184,9 @@ class TestSampleMapParser(DbIsolatedTest):
             },
         ]
 
-        self.assertListEqual(
-            expected_assay1_reads,
-            participants[0].samples[0].sequencing_groups[0].assays[0].meta['reads'],
+        assert (
+            participants[0].samples[0].sequencing_groups[0].assays[0].meta['reads']
+            == expected_assay1_reads
         )
 
         expected_assay2_reads = [
@@ -191,19 +207,23 @@ class TestSampleMapParser(DbIsolatedTest):
                 'datetime_added': None,
             },
         ]
-        self.assertListEqual(
-            expected_assay2_reads,
-            participants[1].samples[0].sequencing_groups[0].assays[0].meta['reads'],
+        assert (
+            participants[1].samples[0].sequencing_groups[0].assays[0].meta['reads']
+            == expected_assay2_reads
         )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_valid_rna_rows(self, mock_graphql_query):
+    async def test_valid_rna_rows(
+        self,
+        mock_graphql_query,
+        connection_with_project: Connection,
+        graphql_query: GraphQLQueryFunction,
+    ):
         """
         Test importing a single row of rna data
         """
-
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         rows = [
             'Sample ID\tFilenames\tType\tfacility\tlibrary\tend_type\tread_length',
@@ -215,7 +235,7 @@ class TestSampleMapParser(DbIsolatedTest):
         parser = SampleFileMapParser(
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
         )
         fs = [
             '<sample-id>.filename-R1.fastq.gz',
@@ -231,46 +251,43 @@ class TestSampleMapParser(DbIsolatedTest):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(0, summary.participants.insert)
-        self.assertEqual(0, summary.participants.update)
-        self.assertEqual(2, summary.samples.insert)
-        self.assertEqual(0, summary.samples.update)
-        self.assertEqual(2, summary.assays.insert)
-        self.assertEqual(0, summary.assays.update)
-        self.maxDiff = None
+        assert summary.participants.insert == 0
+        assert summary.participants.update == 0
+        assert summary.samples.insert == 2
+        assert summary.samples.update == 0
+        assert summary.assays.insert == 2
+        assert summary.assays.update == 0
 
-        self.assertEqual('polyarna', samples[0].sequencing_groups[0].sequencing_type)
+        assert samples[0].sequencing_groups[0].sequencing_type == 'polyarna'
         expected_sg1_meta = {
             'sequencing_facility': 'VCGS',
             'sequencing_library': 'TSStrmRNA',
             'read_end_type': 'paired',
             'read_length': 151,
         }
-        self.assertDictEqual(
-            expected_sg1_meta,
-            samples[0].sequencing_groups[0].meta,
-        )
+        assert samples[0].sequencing_groups[0].meta == expected_sg1_meta
 
-        self.assertEqual('totalrna', samples[1].sequencing_groups[0].sequencing_type)
+        assert samples[1].sequencing_groups[0].sequencing_type == 'totalrna'
         expected_sg2_meta = {
             'sequencing_facility': 'VCGS',
             'sequencing_library': 'TSStrtRNA',
             'read_end_type': 'paired',
             'read_length': 151,
         }
-        self.assertDictEqual(
-            expected_sg2_meta,
-            samples[1].sequencing_groups[0].meta,
-        )
+        assert samples[1].sequencing_groups[0].meta == expected_sg2_meta
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_invalid_rna_row(self, mock_graphql_query):
+    async def test_invalid_rna_row(
+        self,
+        mock_graphql_query,
+        connection_with_project: Connection,
+        graphql_query: GraphQLQueryFunction,
+    ):
         """
         Test importing a single row of rna data
         """
-
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         rows = [
             'Sample ID\tFilenames\tType',
@@ -280,7 +297,7 @@ class TestSampleMapParser(DbIsolatedTest):
         parser = SampleFileMapParser(
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
         )
         fs = [
             '<sample-id>.filename-R1.fastq.gz',
@@ -290,19 +307,23 @@ class TestSampleMapParser(DbIsolatedTest):
         parser.skip_checking_gcs_objects = True
 
         file_contents = '\n'.join(rows)
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             _, _ = await parser.parse_manifest(
                 StringIO(file_contents), delimiter='\t', dry_run=True
             )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_rna_row_with_default_field_values(self, mock_graphql_query):
+    async def test_rna_row_with_default_field_values(
+        self,
+        mock_graphql_query,
+        connection_with_project: Connection,
+        graphql_query: GraphQLQueryFunction,
+    ):
         """
         Test importing a single row of rna data
         """
-
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         rows = [
             'Sample ID\tFilenames\tType',
@@ -312,7 +333,7 @@ class TestSampleMapParser(DbIsolatedTest):
         parser = SampleFileMapParser(
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
             default_sequencing=DefaultSequencing(facility='VCGS', library='TSStrmRNA'),
             default_read_end_type='paired',
             default_read_length=151,
@@ -329,22 +350,18 @@ class TestSampleMapParser(DbIsolatedTest):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(0, summary.participants.insert)
-        self.assertEqual(0, summary.participants.update)
-        self.assertEqual(1, summary.samples.insert)
-        self.assertEqual(0, summary.samples.update)
-        self.assertEqual(1, summary.assays.insert)
-        self.assertEqual(0, summary.assays.update)
-        self.maxDiff = None
+        assert summary.participants.insert == 0
+        assert summary.participants.update == 0
+        assert summary.samples.insert == 1
+        assert summary.samples.update == 0
+        assert summary.assays.insert == 1
+        assert summary.assays.update == 0
 
-        self.assertEqual('polyarna', samples[0].sequencing_groups[0].sequencing_type)
+        assert samples[0].sequencing_groups[0].sequencing_type == 'polyarna'
         expected_sg1_meta = {
             'sequencing_facility': 'VCGS',
             'sequencing_library': 'TSStrmRNA',
             'read_end_type': 'paired',
             'read_length': 151,
         }
-        self.assertDictEqual(
-            expected_sg1_meta,
-            samples[0].sequencing_groups[0].meta,
-        )
+        assert samples[0].sequencing_groups[0].meta == expected_sg1_meta

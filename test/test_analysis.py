@@ -187,7 +187,6 @@ class TestAnalysis:
 
         assert expected == analyses
 
-    @pytest.mark.skip('prepare_query_from_dict_field not implemented')
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_get_analysis_by_meta_isnull(self):
         """
@@ -230,7 +229,6 @@ class TestAnalysis:
 
         assert expected == analyses
 
-    @pytest.mark.skip('prepare_query_from_dict_field not implemented')
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_get_analysis_by_meta_in_(self):
         """
@@ -386,7 +384,6 @@ class TestAnalysis:
 
         assert test_timestamp == init_analysis[0].timestamp_completed
 
-    @pytest.mark.skip('output_file.py not migrated yet')
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_update_analysis(self):
         """

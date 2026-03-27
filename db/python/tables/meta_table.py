@@ -8,7 +8,6 @@ from typing import Any
 import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
-from databases.interfaces import Record
 
 from db.python.tables.base import DbBase
 from models.models import PRIMARY_EXTERNAL_ORG
@@ -31,20 +30,20 @@ class MetaTable(DbBase):
         required because duckdb doesn't support column names which are an empty string.
         """
         return t"""
-            JSON_OBJECT_AGG(
+            (JSON_OBJECT_AGG(
                 CASE
                     WHEN {table_alias:i}.name = {PRIMARY_EXTERNAL_ORG}
                     THEN {EXTERNAL_ORG_SENTINEL}
                     ELSE {table_alias:i}.name
                 END,
                 {table_alias:i}.external_id
-            )::text AS external_ids
+            ) filter (where {table_alias:i}.name is not null))::text  AS external_ids
         """
 
     async def entity_meta_table(
         self,
         query: Template,
-        row_getter: Callable[[Record], dict[str, Any]],
+        row_getter: Callable[[dict[str, Any]], dict[str, Any]],
         has_external_ids: bool,
         has_meta: bool,
     ):

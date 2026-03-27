@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+import urllib.parse
 from collections.abc import Iterable
 from contextlib import asynccontextmanager
 
@@ -313,7 +314,7 @@ class CredentialedDatabaseConfiguration:
         u_p = self.username
 
         if self.password:
-            u_p += f':{self.password}'
+            u_p += f':{urllib.parse.quote(self.password)}'
         if self.port:
             _host += f':{self.port}'
 
@@ -334,7 +335,9 @@ async def configure_pg_connection(connection: AsyncConnection):
     """
     async with connection:
         await connection.set_autocommit(True)
-        await connection.execute(f'SET search_path TO {MAIN_SCHEMA}, {HISTORY_SCHEMA};')
+        await connection.execute(
+            f'SET search_path TO {MAIN_SCHEMA}, {HISTORY_SCHEMA}, public;'
+        )
 
         # register enums on the connection
         project_member_role_info = await EnumInfo.fetch(

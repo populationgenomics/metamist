@@ -217,14 +217,14 @@ app.openapi = get_openapi_schema_func(app, _VERSION)  # type: ignore[assignment]
 if __name__ == '__main__':
     import logging
 
-    import uvicorn
+    from hypercorn.config import Config
+    from hypercorn.run import run
 
     logging.getLogger('watchfiles').setLevel(logging.WARNING)
     logging.getLogger('watchfiles.main').setLevel(logging.WARNING)
 
-    uvicorn.run(
-        'api.server:app',
-        host='0.0.0.0',
-        port=int(os.getenv('PORT', '8000')),
-        reload=True,
-    )
+    config = Config()
+    config.bind = [f'0.0.0.0:{os.getenv("PORT", "8000")}']
+    config.use_reloader = True
+    config.application_path = 'api.server:app'
+    run(config)

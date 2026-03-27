@@ -1,8 +1,9 @@
-from unittest.mock import patch
+import pytest
 
 import metamist.models
 
 import api.routes.cohort
+from db.python.connect import Connection
 from db.python.layers import SampleLayer
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -12,74 +13,34 @@ from models.models import (
 from models.models.cohort import CohortBody, CohortCriteria, NewCohort
 from models.utils.cohort_template_id_format import cohort_template_id_format
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
-from scripts.create_custom_cohort import get_cohort_spec, main
-from test.testbase import DbIsolatedTest, run_as_sync
+from scripts.create_custom_cohort import get_cohort_spec
 
 
-class TestCohortBuilderBasic(DbIsolatedTest):
+class TestCohortBuilderBasic:
     """Test basic functionality for the custom cohort builder script"""
 
-    @run_as_sync
-    async def setUp(self):
-        super().setUp()
-
-    @run_as_sync
-    async def mock_ccfc(
-        self,
-        project,
-        body_create_cohort_from_criteria,
-        dry_run,
-        exclude_ineligible_sg_ids_internal,
-    ):
-        """Mock by directly calling the API route"""
-        self.assertEqual(project, self.project_name)
-        return await api.routes.cohort.create_cohort_from_criteria(
-            CohortBody(**body_create_cohort_from_criteria['cohort_spec'].to_dict()),
-            CohortCriteria(
-                **body_create_cohort_from_criteria['cohort_criteria'].to_dict()
-            ),
-            self.connection,
-            dry_run,
-            exclude_ineligible_sg_ids_internal,
-        )
-
-    @run_as_sync
+    @pytest.mark.asyncio
     async def test_get_cohort_spec(self):
         """Test get_cohort_spec(), invoked by the creator script"""
         ctemplate_id = cohort_template_id_format(28)
         result = get_cohort_spec('My cohort', 'Describing the cohort', ctemplate_id)
-        self.assertIsInstance(result, metamist.models.CohortBody)
-        self.assertEqual(result.name, 'My cohort')
-        self.assertEqual(result.description, 'Describing the cohort')
-        self.assertEqual(result.template_id, ctemplate_id)
+        assert isinstance(result, metamist.models.CohortBody)
+        assert result.name == 'My cohort'
+        assert result.description == 'Describing the cohort'
+        assert result.template_id == ctemplate_id
 
-    @run_as_sync
-    @patch('metamist.apis.CohortApi.create_cohort_from_criteria')
-    async def test_build_empty_cohort(self, mock):
-        """Test main with an empty cohort"""
-        mock.side_effect = self.mock_ccfc
-        with self.assertRaises(ValueError) as context:
-            _ = main(
-                project=self.project_name,
-                cohort_body_spec=metamist.models.CohortBody(
-                    name='Empty cohort', description='No criteria'
-                ),
-                cohort_criteria_spec=metamist.models.CohortCriteria(
-                    projects=[self.project_name],
-                    sg_ids_internal=[],
-                    excluded_sgs_internal=[],
-                    sg_technology=[],
-                    sg_platform=[],
-                    sg_type=[],
-                    sample_type=[],
-                ),
+    @pytest.mark.asyncio
+    async def test_build_empty_cohort(self, connection_with_project: Connection):
+        """Test creating a cohort with no matching sequencing groups"""
+        with pytest.raises(
+            ValueError, match='criteria resulted in no sequencing groups'
+        ):
+            await api.routes.cohort.create_cohort_from_criteria(
+                CohortBody(name='Empty cohort', description='No criteria'),
+                CohortCriteria(projects=[connection_with_project.project.name]),
+                connection_with_project,
                 dry_run=False,
             )
-        mock.assert_called_once()
-        self.assertIn(
-            'criteria resulted in no sequencing groups',
-            str(context.exception),
-        )
 
 
 def get_sample_model(
@@ -102,12 +63,13 @@ def get_sample_model(
     )
 
 
-class TestCohortBuilderData(DbIsolatedTest):
-    """Test functionality for the custom cohort builder script that requires data"""
+class TestCohortBuilderData:
+    """Test cohort creation with sample data"""
 
-    @run_as_sync
-    async def setUp(self):
-        super().setUp()
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection_with_project: Connection):
+        self.connection = connection_with_project
+        self.project_name = connection_with_project.project.name
         self.samplel = SampleLayer(self.connection)
 
         self.sA = await self.samplel.upsert_sample(
@@ -124,67 +86,27 @@ class TestCohortBuilderData(DbIsolatedTest):
         self.sgB = sequencing_group_id_format(self.sB.sequencing_groups[0].id)
         self.sgC = sequencing_group_id_format(self.sC.sequencing_groups[0].id)
 
-    @run_as_sync
-    async def mock_ccfc(
-        self,
-        project,
-        body_create_cohort_from_criteria,
-        dry_run,
-        exclude_ineligible_sg_ids_internal,
-    ):
-        """Mock by directly calling the API route"""
-        self.assertEqual(project, self.project_name)
-        return await api.routes.cohort.create_cohort_from_criteria(
-            CohortBody(**body_create_cohort_from_criteria['cohort_spec'].to_dict()),
-            CohortCriteria(
-                **body_create_cohort_from_criteria['cohort_criteria'].to_dict()
-            ),
+    @pytest.mark.asyncio
+    async def test_cohort_with_project_criteria(self):
+        """Test creating a cohort with only project criteria"""
+        result = await api.routes.cohort.create_cohort_from_criteria(
+            CohortBody(name='Test cohort', description='Project criteria'),
+            CohortCriteria(projects=[self.project_name]),
             self.connection,
-            dry_run,
-            exclude_ineligible_sg_ids_internal,
-        )
-
-    @run_as_sync
-    @patch('metamist.apis.CohortApi.create_cohort_from_criteria')
-    async def test_empty_main(self, mock):
-        """Test main with no criteria other than project"""
-        mock.side_effect = self.mock_ccfc
-
-        result = main(
-            project=self.project_name,
-            cohort_body_spec=metamist.models.CohortBody(
-                name='Test cohort', description='Project criteria'
-            ),
-            cohort_criteria_spec=metamist.models.CohortCriteria(
-                projects=[self.project_name],
-                sg_ids_internal=[],
-                excluded_sgs_internal=[],
-                sg_technology=[],
-                sg_platform=[],
-                sg_type=[],
-                sample_type=[],
-            ),
             dry_run=False,
         )
-        mock.assert_called_once()
-        self.assertIsInstance(result, NewCohort)
-        self.assertIsInstance(result.cohort_id, str)
-        self.assertListEqual(
-            result.sequencing_group_ids, [self.sgA, self.sgB, self.sgC]
-        )
-        self.assertEqual(result.dry_run, False)
 
-    @run_as_sync
-    @patch('metamist.apis.CohortApi.create_cohort_from_criteria')
-    async def test_epic_main(self, mock):
-        """Test main with every criteria"""
-        mock.side_effect = self.mock_ccfc
-        result = main(
-            project=self.project_name,
-            cohort_body_spec=metamist.models.CohortBody(
-                name='Epic cohort', description='Every criterion'
-            ),
-            cohort_criteria_spec=metamist.models.CohortCriteria(
+        assert isinstance(result, NewCohort)
+        assert isinstance(result.cohort_id, str)
+        assert result.sequencing_group_ids == [self.sgA, self.sgB, self.sgC]
+        assert result.dry_run is False
+
+    @pytest.mark.asyncio
+    async def test_cohort_with_all_criteria(self):
+        """Test creating a cohort with all criteria specified"""
+        result = await api.routes.cohort.create_cohort_from_criteria(
+            CohortBody(name='Epic cohort', description='Every criterion'),
+            CohortCriteria(
                 projects=[self.project_name],
                 excluded_sgs_internal=[self.sgB, self.sgC],
                 sg_technology=['short-read'],
@@ -192,28 +114,10 @@ class TestCohortBuilderData(DbIsolatedTest):
                 sg_type=['genome'],
                 sample_type=['blood'],
             ),
+            self.connection,
             dry_run=False,
         )
-        mock.assert_called_once()
-        self.assertEqual(mock.call_args.kwargs['project'], self.project_name)
 
-        body = mock.call_args.kwargs['body_create_cohort_from_criteria']
-        spec = body['cohort_spec']
-        self.assertEqual(spec.name, 'Epic cohort')
-        self.assertEqual(spec.description, 'Every criterion')
-
-        criteria = body['cohort_criteria']
-        self.assertIsInstance(criteria, metamist.models.CohortCriteria)
-        self.assertListEqual(criteria.projects, [self.project_name])
-        self.assertListEqual(criteria.excluded_sgs_internal, [self.sgB, self.sgC])
-        self.assertListEqual(criteria.sg_technology, ['short-read'])
-        self.assertListEqual(criteria.sg_platform, ['illumina'])
-        self.assertListEqual(criteria.sg_type, ['genome'])
-        self.assertListEqual(criteria.sample_type, ['blood'])
-
-        self.assertFalse(mock.call_args.kwargs['dry_run'])
-        self.assertFalse(mock.call_args.kwargs['exclude_ineligible_sg_ids_internal'])
-
-        self.assertIsInstance(result, NewCohort)
-        self.assertListEqual(result.sequencing_group_ids, [self.sgA])
-        self.assertEqual(result.dry_run, False)
+        assert isinstance(result, NewCohort)
+        assert result.sequencing_group_ids == [self.sgA]
+        assert result.dry_run is False

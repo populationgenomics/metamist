@@ -2,6 +2,8 @@ import datetime
 import json
 from unittest.mock import patch
 
+import pytest
+
 from api.routes import billing
 from models.models import (
     AnalysisCostRecord,
@@ -11,14 +13,13 @@ from models.models import (
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 )
-from test.testbase import run_as_sync
 from test.testbqbase import BqTest
 
 
 TEST_API_BILLING_USER = 'test_user'
 
 
-class TestApiBilling(BqTest):
+class TestApiBilling:
     """
     Test API Billing routes
     Billing routes are only calling layer functions and returning data it received
@@ -28,26 +29,32 @@ class TestApiBilling(BqTest):
     Billing Layer and BQ Tables should be testing those
     """
 
-    def setUp(self):
-        super().setUp()
+    @pytest.fixture(autouse=True)
+    def setup_bq_test(self):
+        # Initialize BqTest functionality directly
+        bq_test = BqTest()
+        bq_test.set_up()
+        self.layer = bq_test.layer
 
         # make billing enabled by default for all the calls
         patcher = patch('api.routes.billing.is_billing_enabled', return_value=True)
         self.mockup_is_billing_enabled = patcher.start()
+        yield
+        patcher.stop()
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('api.routes.billing.is_billing_enabled', return_value=False)
     async def test_get_gcp_projects_no_billing(self, _mockup_is_billing_enabled):
         """
         Test get_gcp_projects function
         This function should raise ValueError if billing is not enabled
         """
-        with self.assertRaises(ValueError) as context:
+        with pytest.raises(ValueError) as context:
             await billing.get_gcp_projects('test_user')
 
-        self.assertTrue('Billing is not enabled' in str(context.exception))
+        assert 'Billing is not enabled' in str(context.value)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('api.routes.billing._get_billing_layer_from')
     @patch('db.python.layers.billing.BillingLayer.get_cost_by_ar_guid')
     async def test_get_cost_by_ar_guid(
@@ -82,11 +89,11 @@ class TestApiBilling(BqTest):
             ar_guid, author=TEST_API_BILLING_USER
         )
         resp_json = json.loads(response.body.decode('utf-8'))
-        self.assertEqual(1, len(resp_json))
+        assert len(resp_json) == 1
 
-        self.assertDictEqual(mockup_record_json, resp_json[0])
+        assert mockup_record_json == resp_json[0]
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('api.routes.billing._get_billing_layer_from')
     @patch('db.python.layers.billing.BillingLayer.get_cost_by_batch_id')
     async def test_get_cost_by_batch_id(
@@ -135,10 +142,10 @@ class TestApiBilling(BqTest):
         )
         resp_json = json.loads(response.body.decode('utf-8'))
 
-        self.assertEqual(1, len(resp_json))
-        self.assertDictEqual(mockup_record_json, resp_json[0])
+        assert len(resp_json) == 1
+        assert mockup_record_json == resp_json[0]
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('api.routes.billing._get_billing_layer_from')
     @patch('db.python.layers.billing.BillingLayer.get_total_cost')
     async def test_get_total_cost(self, mock_get_total_cost, mock_get_billing_layer):
@@ -151,9 +158,9 @@ class TestApiBilling(BqTest):
         mock_get_billing_layer.return_value = self.layer
         mock_get_total_cost.return_value = mockup_record
         records = await billing.get_total_cost(query, author=TEST_API_BILLING_USER)
-        self.assertEqual(expected, records)
+        assert expected == records
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('api.routes.billing._get_billing_layer_from')
     @patch('db.python.layers.billing.BillingLayer.get_running_cost_with_filters')
     async def test_get_running_cost(
@@ -182,12 +189,12 @@ class TestApiBilling(BqTest):
             query=query,
             author=TEST_API_BILLING_USER,
         )
-        self.assertEqual(mockup_record, records)
+        assert mockup_record == records
 
         # Verify the layer method was called with the query object
         mock_get_running_cost_with_filters.assert_called_once_with(query)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('api.routes.billing._get_billing_layer_from')
     @patch('db.python.layers.billing.BillingLayer.get_running_cost_with_filters')
     async def test_get_running_cost_without_filters(
@@ -216,7 +223,7 @@ class TestApiBilling(BqTest):
             query=query,
             author=TEST_API_BILLING_USER,
         )
-        self.assertEqual(mockup_record, records)
+        assert mockup_record == records
 
         # Verify the layer method was called with the query object
         mock_get_running_cost_with_filters.assert_called_once_with(query)
@@ -239,9 +246,9 @@ class TestApiBilling(BqTest):
         mockup_records = ['RECORD1', 'RECORD2']
         mock_layer_function.return_value = mockup_records
         records = await api_function(author=TEST_API_BILLING_USER)
-        self.assertEqual(mockup_records, records)
+        assert mockup_records == records
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('db.python.layers.billing.BillingLayer.get_gcp_projects')
     async def test_get_gcp_projects(self, mock_get_gcp_projects):
         """
@@ -249,7 +256,7 @@ class TestApiBilling(BqTest):
         """
         await self.call_api_function(billing.get_gcp_projects, mock_get_gcp_projects)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('db.python.layers.billing.BillingLayer.get_topics')
     async def test_get_topics(self, mock_get_topics):
         """
@@ -257,7 +264,7 @@ class TestApiBilling(BqTest):
         """
         await self.call_api_function(billing.get_topics, mock_get_topics)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('db.python.layers.billing.BillingLayer.get_cost_categories')
     async def test_get_cost_categories(self, mock_get_cost_categories):
         """
@@ -267,7 +274,7 @@ class TestApiBilling(BqTest):
             billing.get_cost_categories, mock_get_cost_categories
         )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('db.python.layers.billing.BillingLayer.get_skus')
     async def test_get_skus(self, mock_get_skus):
         """
@@ -275,7 +282,7 @@ class TestApiBilling(BqTest):
         """
         await self.call_api_function(billing.get_skus, mock_get_skus)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('db.python.layers.billing.BillingLayer.get_datasets')
     async def test_get_datasets(self, mock_get_datasets):
         """
@@ -283,7 +290,7 @@ class TestApiBilling(BqTest):
         """
         await self.call_api_function(billing.get_datasets, mock_get_datasets)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('db.python.layers.billing.BillingLayer.get_sequencing_types')
     async def test_get_sequencing_types(self, mock_get_sequencing_types):
         """
@@ -293,7 +300,7 @@ class TestApiBilling(BqTest):
             billing.get_sequencing_types, mock_get_sequencing_types
         )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('db.python.layers.billing.BillingLayer.get_stages')
     async def test_get_stages(self, mock_get_stages):
         """
@@ -301,7 +308,7 @@ class TestApiBilling(BqTest):
         """
         await self.call_api_function(billing.get_stages, mock_get_stages)
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('db.python.layers.billing.BillingLayer.get_sequencing_groups')
     async def test_get_sequencing_groups(self, mock_get_sequencing_groups):
         """
@@ -311,7 +318,7 @@ class TestApiBilling(BqTest):
             billing.get_sequencing_groups, mock_get_sequencing_groups
         )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('db.python.layers.billing.BillingLayer.get_compute_categories')
     async def test_get_compute_categories(self, mock_get_compute_categories):
         """
@@ -321,7 +328,7 @@ class TestApiBilling(BqTest):
             billing.get_compute_categories, mock_get_compute_categories
         )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('db.python.layers.billing.BillingLayer.get_cromwell_sub_workflow_names')
     async def test_get_cromwell_sub_workflow_names(
         self, mock_get_cromwell_sub_workflow_names
@@ -334,7 +341,7 @@ class TestApiBilling(BqTest):
             mock_get_cromwell_sub_workflow_names,
         )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('db.python.layers.billing.BillingLayer.get_wdl_task_names')
     async def test_get_wdl_task_names(self, mock_get_wdl_task_names):
         """
@@ -344,7 +351,7 @@ class TestApiBilling(BqTest):
             billing.get_wdl_task_names, mock_get_wdl_task_names
         )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('db.python.layers.billing.BillingLayer.get_invoice_months')
     async def test_get_invoice_months(self, mock_get_invoice_months):
         """
@@ -354,7 +361,7 @@ class TestApiBilling(BqTest):
             billing.get_invoice_months, mock_get_invoice_months
         )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('db.python.layers.billing.BillingLayer.get_namespaces')
     async def test_get_namespaces(self, mock_get_namespaces):
         """

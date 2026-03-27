@@ -18,6 +18,7 @@ from models.models.project import Project, ProjectId, ProjectMemberRole
 
 
 EXPECTED_AUDIENCE = getenv('SM_OAUTHAUDIENCE')
+SM_LEGACY_PROXY_SA = getenv('SM_LEGACY_PROXY_SA')
 
 
 def get_jwt_from_request(request: Request) -> str | None:
@@ -27,6 +28,15 @@ def get_jwt_from_request(request: Request) -> str | None:
     so it doesn't show up in the swagger parameters section
     """
     return request.headers.get('x-goog-iap-jwt-assertion')
+
+
+def get_sm_legacy_proxy_author(request: Request) -> str | None:
+    """
+    If this is a request proxied through the old cloud run instance, the author
+    will be passed as a header. This should only be trusted if the request is
+    authenticated with the known correct service account.
+    """
+    return request.headers.get('sm-legacy-proxy-author')
 
 
 def get_ar_guid(request: Request) -> str | None:
@@ -58,26 +68,38 @@ def get_on_behalf_of(request: Request) -> str | None:
 def authenticate(
     token: HTTPAuthorizationCredentials | None = Depends(HTTPBearer(auto_error=False)),
     x_goog_iap_jwt_assertion: str | None = Depends(get_jwt_from_request),
+    sm_legacy_proxy_author: str | None = Depends(get_sm_legacy_proxy_author),
 ) -> str:
     """
     If a token (OR Google IAP auth jwt) is provided,
     return the email, else raise an Exception
     """
+    author: str | None = None
+
     if x_goog_iap_jwt_assertion:
         # We have to PREFER the IAP's identity, otherwise you could have a case where
         # the JWT is forged, but IAP lets it through and authenticates, but then we take
         # the identity then without checking.
-        return validate_iap_jwt_and_get_email(
+        author = validate_iap_jwt_and_get_email(
             x_goog_iap_jwt_assertion, audience=EXPECTED_AUDIENCE
         )
 
-    if token:
-        return email_from_id_token(token.credentials)
+    elif token:
+        author = email_from_id_token(token.credentials)
 
-    if default_user := get_default_user():
+    elif default_user := get_default_user():
         # this should only happen in LOCAL environments
         logging.info(f'Using {default_user} as authenticated user')
-        return default_user
+        author = default_user
+
+    # If this request has come from the old sample metadata cloud run service, which
+    # now just proxies requests to this new service, then we want to act as the user
+    # that the proxy is sending us.
+    if sm_legacy_proxy_author and SM_LEGACY_PROXY_SA and author == SM_LEGACY_PROXY_SA:
+        author = sm_legacy_proxy_author
+
+    if author:
+        return author
 
     raise HTTPException(status_code=401, detail='Not authenticated :(')
 

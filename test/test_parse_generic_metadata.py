@@ -3,6 +3,8 @@ from datetime import datetime
 from io import StringIO
 from unittest.mock import patch
 
+import pytest
+
 from metamist.graphql import configure_sync_client, validate
 from metamist.parser.generic_metadata_parser import (
     DefaultSequencing,
@@ -29,7 +31,7 @@ from models.models import (
 )
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
-from test.testbase import DbIsolatedTest, run_as_sync
+from test.conftest import make_graphql_query_mock
 
 
 def _get_basic_participant_to_upsert():
@@ -108,17 +110,19 @@ class TestValidateParserQueries(unittest.TestCase):
         validate(QUERY_MATCH_ASSAYS, client=client)
 
 
-class TestParseGenericMetadata(DbIsolatedTest):
+class TestParseGenericMetadata:
     """Test the GenericMetadataParser"""
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
     @patch('os.path.getsize')
-    async def test_key_map(self, mock_stat_size, mock_graphql_query):
+    async def test_key_map(
+        self, mock_stat_size, mock_graphql_query, connection_with_project, graphql_query
+    ):
         """
         Test the flexible key map + other options
         """
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
         mock_stat_size.return_value = 111
 
         rows = [
@@ -141,7 +145,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
         )
         parser.skip_checking_gcs_objects = True
         parser.filename_map = {
@@ -153,10 +157,10 @@ class TestParseGenericMetadata(DbIsolatedTest):
             StringIO('\n'.join(rows)), delimiter=',', dry_run=True
         )
 
-        self.assertEqual(1, summary.samples.insert)
-        self.assertEqual(1, summary.assays.insert)
-        self.assertEqual(0, summary.samples.update)
-        self.assertEqual(0, summary.assays.update)
+        assert summary.samples.insert == 1
+        assert summary.assays.insert == 1
+        assert summary.samples.update == 0
+        assert summary.assays.update == 0
 
         parser.ignore_extra_keys = False
         rows = [
@@ -165,28 +169,32 @@ class TestParseGenericMetadata(DbIsolatedTest):
             '<sample-id>,<sample-id>-R2.fastq.gz,read-all-about-it',
         ]
 
-        try:
-            _ = await parser.parse_manifest(
+        with pytest.raises(
+            ValueError, match="Key 'extra' not found in provided key map: fn, sample"
+        ):
+            await parser.parse_manifest(
                 StringIO('\n'.join(rows)), delimiter=',', dry_run=True
             )
-        except ValueError as e:
-            self.assertEqual(
-                "Key 'extra' not found in provided key map: fn, sample", str(e)
-            )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
     @patch('metamist.parser.cloudhelper.CloudHelper.datetime_added')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
     async def test_single_row(
-        self, mock_filesize, mock_fileexists, mock_datetime_added, mock_graphql_query
+        self,
+        mock_filesize,
+        mock_fileexists,
+        mock_datetime_added,
+        mock_graphql_query,
+        connection_with_project,
+        graphql_query,
     ):
         """
         Test importing a single row, forms objects and checks response
         - MOCKS: get_sample_id_map_by_external, get_assay_ids_for_sample_ids_by_type
         """
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         mock_filesize.return_value = 111
         mock_fileexists.return_value = False
@@ -214,7 +222,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
                 'raw_data.MEDIAN_COVERAGE': 'median_coverage',
             },
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
             reads_column='CRAM',
             gvcf_column='GVCF',
         )
@@ -229,13 +237,13 @@ class TestParseGenericMetadata(DbIsolatedTest):
             StringIO(file_contents), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(1, summary.samples.insert)
-        self.assertEqual(1, summary.assays.insert)
-        self.assertEqual(0, summary.samples.update)
-        self.assertEqual(0, summary.assays.update)
-        self.assertEqual(1, summary.analyses.insert)
+        assert summary.samples.insert == 1
+        assert summary.assays.insert == 1
+        assert summary.samples.update == 0
+        assert summary.assays.update == 0
+        assert summary.analyses.insert == 1
 
-        self.assertDictEqual({'centre': 'KCCG'}, samples[0].meta)
+        assert samples[0].meta == {'centre': 'KCCG'}
         expected_assay_dict = {
             'qc': {
                 'median_insert_size': 400,
@@ -270,29 +278,26 @@ class TestParseGenericMetadata(DbIsolatedTest):
                 }
             ],
         }
-        self.assertDictEqual(assay_group_dict, samples[0].sequencing_groups[0].meta)
-        self.assertDictEqual(
-            expected_assay_dict, samples[0].sequencing_groups[0].assays[0].meta
-        )
+        assert assay_group_dict == samples[0].sequencing_groups[0].meta
+        assert expected_assay_dict == samples[0].sequencing_groups[0].assays[0].meta
         analysis = samples[0].sequencing_groups[0].analyses[0]
-        self.assertDictEqual(
-            {
-                'median_insert_size': 400,
-                'median_coverage': 30,
-                'freemix': 0.01,
-                'pct_chimeras': 0.01,
-            },
-            analysis.meta,
-        )
+        assert analysis.meta == {
+            'median_insert_size': 400,
+            'median_coverage': 30,
+            'freemix': 0.01,
+            'pct_chimeras': 0.01,
+        }
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_rows_with_participants(self, mock_graphql_query):
+    async def test_rows_with_participants(
+        self, mock_graphql_query, connection_with_project, graphql_query
+    ):
         """
         Test importing a single row with a participant id, forms objects and checks response
         - MOCKS: query_async
         """
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         rows = [
             'Individual ID\tSample ID\tFilenames\tType',
@@ -317,7 +322,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
         )
 
         parser.skip_checking_gcs_objects = True
@@ -342,13 +347,13 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         participants: list[ParsedParticipant] = prows
 
-        self.assertEqual(3, summary.participants.insert)
-        self.assertEqual(0, summary.participants.update)
-        self.assertEqual(4, summary.samples.insert)
-        self.assertEqual(0, summary.samples.update)
-        self.assertEqual(5, summary.assays.insert)
-        self.assertEqual(0, summary.assays.update)
-        self.assertEqual(0, summary.analyses.insert)
+        assert summary.participants.insert == 3
+        assert summary.participants.update == 0
+        assert summary.samples.insert == 4
+        assert summary.samples.update == 0
+        assert summary.assays.insert == 5
+        assert summary.assays.update == 0
+        assert summary.analyses.insert == 0
 
         expected_assay_dict = {
             'reads': [
@@ -375,17 +380,18 @@ class TestParseGenericMetadata(DbIsolatedTest):
             'sequencing_type': 'genome',
         }
         assay = participants[0].samples[0].sequencing_groups[0].assays[0]
-        self.maxDiff = None
-        self.assertDictEqual(expected_assay_dict, assay.meta)
+        assert expected_assay_dict == assay.meta
 
         # Check that both of Demeter's assays are there
-        self.assertEqual(participants[0].primary_external_id, 'Demeter')
-        self.assertEqual(len(participants[0].samples), 1)
-        self.assertEqual(len(participants[0].samples[0].sequencing_groups), 2)
+        assert participants[0].primary_external_id == 'Demeter'
+        assert len(participants[0].samples) == 1
+        assert len(participants[0].samples[0].sequencing_groups) == 2
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_rows_with_valid_participant_meta(self, mock_graphql_query):
+    async def test_rows_with_valid_participant_meta(
+        self, mock_graphql_query, connection_with_project, graphql_query
+    ):
         """
         Test importing a several rows with a participant metadata (reported gender, sex and karyotype),
         forms objects and checks response
@@ -393,7 +399,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
         get_assay_ids_for_sample_ids_by_type
         """
 
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         rows = [
             'Individual ID\tSample ID\tSex\tGender\tKaryotype',
@@ -416,7 +422,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             reported_gender_column='Gender',
             karyotype_column='Karyotype',
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
         )
 
         # Call generic parser
@@ -433,28 +439,30 @@ class TestParseGenericMetadata(DbIsolatedTest):
         # pluto = p_by_name['Pluto']
 
         # Assert that the participant meta is there.
-        self.assertEqual(demeter.reported_gender, 'Non-binary')
-        self.assertEqual(demeter.reported_sex, 1)
-        self.assertEqual(demeter.karyotype, 'XY')
-        self.assertEqual(apollo.reported_gender, 'Female')
-        self.assertEqual(apollo.reported_sex, 2)
-        self.assertEqual(apollo.karyotype, 'XX')
-        self.assertEqual(athena.reported_sex, 2)
-        self.assertIsNone(athena.reported_gender)
-        self.assertIsNone(athena.karyotype)
-        self.assertEqual(dionysus.reported_gender, 'Male')
-        self.assertEqual(dionysus.karyotype, 'XX')
+        assert demeter.reported_gender == 'Non-binary'
+        assert demeter.reported_sex == 1
+        assert demeter.karyotype == 'XY'
+        assert apollo.reported_gender == 'Female'
+        assert apollo.reported_sex == 2
+        assert apollo.karyotype == 'XX'
+        assert athena.reported_sex == 2
+        assert athena.reported_gender is None
+        assert athena.karyotype is None
+        assert dionysus.reported_gender == 'Male'
+        assert dionysus.karyotype == 'XX'
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_rows_with_invalid_participant_meta(self, mock_graphql_query):
+    async def test_rows_with_invalid_participant_meta(
+        self, mock_graphql_query, connection_with_project, graphql_query
+    ):
         """
         Test importing a single rows with invalid participant metadata,
         forms objects and checks response
         - MOCKS: get_sample_id_map_by_external, get_participant_id_map_by_external_ids
         """
 
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         rows = [
             'Individual ID\tSample ID\tSex\tKaryotype',
@@ -472,24 +480,25 @@ class TestParseGenericMetadata(DbIsolatedTest):
             reported_sex_column='Sex',
             karyotype_column='Karyotype',
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
         )
 
         # Call generic parser
         file_contents = '\n'.join(rows)
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             await parser.parse_manifest(
                 StringIO(file_contents), delimiter='\t', dry_run=True
             )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_lrs_rows_with_arbitrary_assay_meta_columns(self, mock_graphql_query):
+    async def test_lrs_rows_with_arbitrary_assay_meta_columns(
+        self, mock_graphql_query, connection_with_project, graphql_query
+    ):
         """
         Test importing rows of long read sequencing data with arbitrary assay metadata columns
         """
-        mock_graphql_query.side_effect = self.run_graphql_query_async
-        self.maxDiff = None
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
         rows = [
             'Individual ID\tSample ID\tFilename\tAssay Meta 1\tAssay Meta 2',
             'Athena\tsample_id003\t"sample_id003.filename-01-R1.fastq.gz,sample_id003.filename-01-R2.fastq.gz"\tTrue\tsome_value',
@@ -510,7 +519,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
                 platform='pacbio',
             ),
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
             skip_checking_gcs_objects=True,
         )
 
@@ -593,11 +602,11 @@ class TestParseGenericMetadata(DbIsolatedTest):
         assay_2 = participants[0].samples[0].sequencing_groups[0].assays[1]
         sg = participants[0].samples[0].sequencing_groups[0]
 
-        self.assertDictEqual(expected_assay_1_dict, assay_1.meta)
-        self.assertDictEqual(expected_assay_2_dict, assay_2.meta)
-        self.assertDictEqual(expected_sg_dict, sg.meta)
+        assert expected_assay_1_dict == assay_1.meta
+        assert expected_assay_2_dict == assay_2.meta
+        assert expected_sg_dict == sg.meta
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
@@ -608,13 +617,15 @@ class TestParseGenericMetadata(DbIsolatedTest):
         mock_filesize,
         mock_fileexists,
         mock_graphql_query,
+        connection_with_project,
+        graphql_query,
     ):
         """
         Test importing a single row with a cram with no reference
         This should throw an exception
         """
 
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         mock_filecontents.return_value = 'testmd5'
         mock_filesize.return_value = 111
@@ -634,7 +645,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
             skip_checking_gcs_objects=True,
         )
 
@@ -642,28 +653,32 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         # Call generic parser
         file_contents = '\n'.join(rows)
-        with self.assertRaises(ValueError) as ctx:
+        with pytest.raises(
+            ValueError,
+            match="Reads type for 'sample_id003' is CRAM, but a reference is not defined, please set the default reference assembly path",
+        ):
             await parser.parse_manifest(
                 StringIO(file_contents), delimiter='\t', dry_run=True
             )
-        self.assertEqual(
-            "Reads type for 'sample_id003' is CRAM, but a reference is not defined, please set the default reference assembly path",
-            str(ctx.exception),
-        )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
     async def test_cram_with_default_reference(
-        self, mock_filesize, mock_fileexists, mock_graphql_query
+        self,
+        mock_filesize,
+        mock_fileexists,
+        mock_graphql_query,
+        connection_with_project,
+        graphql_query,
     ):
         """
         Test importing a single row with a cram with no reference
         This should throw an exception
         """
 
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         mock_filesize.return_value = 111
         mock_fileexists.return_value = True
@@ -682,7 +697,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
             default_reference_assembly_location='gs://path/file.fasta',
         )
         parser.skip_checking_gcs_objects = True
@@ -718,23 +733,27 @@ class TestParseGenericMetadata(DbIsolatedTest):
             ],
         }
 
-        self.assertDictEqual(
-            expected,
-            samples[0].sequencing_groups[0].assays[0].meta['reference_assembly'],
+        assert (
+            expected
+            == samples[0].sequencing_groups[0].assays[0].meta['reference_assembly']
         )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     async def test_cram_with_row_level_reference(
-        self, mock_fileexists, mock_graphql_query
+        self,
+        mock_fileexists,
+        mock_graphql_query,
+        connection_with_project,
+        graphql_query,
     ):
         """
         Test importing a single row with a cram with no reference
         This should throw an exception
         """
 
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         mock_fileexists.return_value = True
 
@@ -753,7 +772,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
             reference_assembly_location_column='Ref',
             # default_reference_assembly_location='gs://path/file.fasta',
         )
@@ -790,23 +809,27 @@ class TestParseGenericMetadata(DbIsolatedTest):
             ],
         }
 
-        self.assertDictEqual(
-            expected,
-            samples[0].sequencing_groups[0].assays[0].meta['reference_assembly'],
+        assert (
+            expected
+            == samples[0].sequencing_groups[0].assays[0].meta['reference_assembly']
         )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     async def test_cram_with_multiple_row_level_references(
-        self, mock_fileexists, mock_graphql_query
+        self,
+        mock_fileexists,
+        mock_graphql_query,
+        connection_with_project,
+        graphql_query,
     ):
         """
         Test importing a single row with a cram with no reference
         This should throw an exception
         """
 
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         mock_fileexists.return_value = True
 
@@ -825,7 +848,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
             reference_assembly_location_column='Ref',
             # default_reference_assembly_location='gs://path/file.fasta',
         )
@@ -840,30 +863,36 @@ class TestParseGenericMetadata(DbIsolatedTest):
         # Call generic parser
         file_contents = '\n'.join(rows)
 
-        with self.assertRaises(ValueError) as ctx:
+        with pytest.raises(
+            ValueError,
+            match='Multiple reference assemblies were defined for sample_id003: ref.fa, ref2.fa',
+        ):
             await parser.parse_manifest(
                 StringIO(file_contents), delimiter='\t', dry_run=True
             )
-        self.assertEqual(
-            'Multiple reference assemblies were defined for sample_id003: ref.fa, ref2.fa',
-            str(ctx.exception),
-        )
 
-    @run_as_sync
+    @pytest.mark.project_roles(['reader', 'writer'])
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
     @patch('metamist.parser.cloudhelper.CloudHelper.datetime_added')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_exists')
     @patch('metamist.parser.cloudhelper.CloudHelper.file_size')
     async def test_matching_sequencing_groups_and_assays(
-        self, mock_filesize, mock_fileexists, mock_datetime_added, mock_graphql_query
+        self,
+        mock_filesize,
+        mock_fileexists,
+        mock_datetime_added,
+        mock_graphql_query,
+        connection_with_project,
+        graphql_query,
     ):
         """Test basic import with data that exists in the database"""
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
         mock_filesize.return_value = 111
         mock_fileexists.return_value = False
         mock_datetime_added.return_value = datetime.fromisoformat('2022-02-02T22:22:22')
 
-        player = ParticipantLayer(self.connection)
+        player = ParticipantLayer(connection_with_project)
         participant = await player.upsert_participant(
             _get_basic_participant_to_upsert()
         )
@@ -889,7 +918,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             assay_meta_map={},
             qc_meta_map={},
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
         )
 
         parser.filename_map = {f: '/path/to/' + f for f in filenames}
@@ -898,20 +927,20 @@ class TestParseGenericMetadata(DbIsolatedTest):
             StringIO('\n'.join(rows)), delimiter='\t', dry_run=True
         )
 
-        self.assertEqual(1, summary.participants.update)
-        self.assertEqual(1, summary.samples.update)
-        self.assertEqual(1, summary.sequencing_groups.update)
-        self.assertEqual(1, summary.assays.update)
-        self.assertEqual(0, summary.participants.insert)
-        self.assertEqual(0, summary.samples.insert)
-        self.assertEqual(0, summary.sequencing_groups.insert)
-        self.assertEqual(0, summary.assays.insert)
+        assert summary.participants.update == 1
+        assert summary.samples.update == 1
+        assert summary.sequencing_groups.update == 1
+        assert summary.assays.update == 1
+        assert summary.participants.insert == 0
+        assert summary.samples.insert == 0
+        assert summary.sequencing_groups.insert == 0
+        assert summary.assays.insert == 0
 
         parsed_p: ParsedParticipant = parsed_files[0]
-        self.assertEqual(participant.id, parsed_p.internal_pid)
-        self.assertEqual(
-            sample_id_format(participant.samples[0].id),
-            parsed_p.samples[0].internal_sid,
+        assert participant.id == parsed_p.internal_pid
+        assert (
+            sample_id_format(participant.samples[0].id)
+            == parsed_p.samples[0].internal_sid
         )
 
         sg: SequencingGroupUpsertInternal = participant.samples[0].sequencing_groups[0]
@@ -919,17 +948,17 @@ class TestParseGenericMetadata(DbIsolatedTest):
             parsed_files[0].samples[0].sequencing_groups[0]
         )
 
-        self.assertEqual(
-            sequencing_group_id_format(sg.id), sg_parsed.internal_seqgroup_id
-        )
-        self.assertEqual(len(sg.assays), len(sg_parsed.assays))
-        self.assertEqual(sg.assays[0].id, sg_parsed.assays[0].internal_id)
+        assert sequencing_group_id_format(sg.id) == sg_parsed.internal_seqgroup_id
+        assert len(sg.assays) == len(sg_parsed.assays)
+        assert sg.assays[0].id == sg_parsed.assays[0].internal_id
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_ora_fastqs_with_ref(self, mock_graphql_query):
+    async def test_ora_fastqs_with_ref(
+        self, mock_graphql_query, connection_with_project, graphql_query
+    ):
         """Test importing fastq.ora files with an ora reference"""
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
         # Test 1 with ORA Reference in the manifest
         filenames = [
             'sample_id001.filename-R1.fastq.ora',
@@ -951,7 +980,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             reads_column='Filename',
             ora_reference_assembly_location_column='ORA Reference',
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
             skip_checking_gcs_objects=True,
         )
 
@@ -999,9 +1028,9 @@ class TestParseGenericMetadata(DbIsolatedTest):
 
         assay = participants[0].samples[0].sequencing_groups[0].assays[0]
 
-        self.assertDictEqual(expected_assay_dict, assay.meta)
+        assert expected_assay_dict == assay.meta
 
-        self.assertDictEqual(expected_assay_dict, assay.meta)
+        assert expected_assay_dict == assay.meta
 
         # Test 2 with default ORA Reference in the parser
         parser = GenericMetadataParser(
@@ -1010,7 +1039,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             sample_primary_eid_column='Sample ID',
             reads_column='Filename',
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
             ora_reference_assembly_location=ora_ref,
             skip_checking_gcs_objects=True,
         )
@@ -1027,13 +1056,15 @@ class TestParseGenericMetadata(DbIsolatedTest):
         )
         participants_: list[ParsedParticipant] = prows
         assay = participants_[0].samples[0].sequencing_groups[0].assays[0]
-        self.assertDictEqual(expected_assay_dict, assay.meta)
+        assert expected_assay_dict == assay.meta
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_ora_fastqs_no_ref(self, mock_graphql_query):
+    async def test_ora_fastqs_no_ref(
+        self, mock_graphql_query, connection_with_project, graphql_query
+    ):
         """Test importing fastq.ora files with no ora reference, should throw an exception"""
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
         filenames = [
             'sample_id001.filename-R1.fastq.ora',
             'sample_id001.filename-R2.fastq.ora',
@@ -1051,27 +1082,25 @@ class TestParseGenericMetadata(DbIsolatedTest):
             sample_primary_eid_column='Sample ID',
             reads_column='Filename',
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
             skip_checking_gcs_objects=True,
         )
 
         parser.filename_map = {f: '/path/to/' + f for f in filenames}
         file_contents = '\n'.join(rows)
 
-        with self.assertRaises(ValueError) as ctx:
+        with pytest.raises(ValueError, match='Missing ORA reference for fastq_ora'):
             await parser.parse_manifest(
                 StringIO(file_contents), delimiter='\t', dry_run=True
             )
-        self.assertEqual(
-            'Missing ORA reference for fastq_ora',
-            str(ctx.exception),
-        )
 
-    @run_as_sync
+    @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
-    async def test_ora_fastqs_mutliple_refs(self, mock_graphql_query):
+    async def test_ora_fastqs_mutliple_refs(
+        self, mock_graphql_query, connection_with_project, graphql_query
+    ):
         """Test importing fastq.ora files multiple reference files for the same sample, should throw an exception"""
-        mock_graphql_query.side_effect = self.run_graphql_query_async
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
         filenames = [
             'sample_id001.filename-R1.fastq.ora',
             'sample_id001.filename-R2.fastq.ora',
@@ -1094,24 +1123,23 @@ class TestParseGenericMetadata(DbIsolatedTest):
             reads_column='Filename',
             ora_reference_assembly_location_column='ORA Reference',
             # doesn't matter, we're going to mock the call anyway
-            project=self.project_name,
+            project=connection_with_project.project.name,
             skip_checking_gcs_objects=True,
         )
 
         parser.filename_map = {f: '/path/to/' + f for f in filenames}
         file_contents = '\n'.join(rows)
 
-        with self.assertRaises(ValueError) as ctx:
+        with pytest.raises(
+            ValueError,
+            match='Multiple ORA references were defined for sample_id001: gs://path/to/ora_reference1.tar, gs://path/to/ora_reference2.tar',
+        ):
             await parser.parse_manifest(
                 StringIO(file_contents), delimiter='\t', dry_run=True
             )
-        self.assertEqual(
-            'Multiple ORA references were defined for sample_id001: gs://path/to/ora_reference1.tar, gs://path/to/ora_reference2.tar',
-            str(ctx.exception),
-        )
 
 
-class FastqPairMatcher(unittest.TestCase):
+class TestFastqPairMatcher:
     """Test Fastq pair matching logic explictly"""
 
     def test_simple(self):
@@ -1123,9 +1151,9 @@ class FastqPairMatcher(unittest.TestCase):
 
         grouped = GenericMetadataParser.parse_fastqs_structure(entries)
 
-        self.assertEqual(1, len(grouped))
-        self.assertEqual(2, len(grouped[0]))
-        self.assertListEqual(sorted(grouped[0]), grouped[0])
+        assert len(grouped) == 1
+        assert len(grouped[0]) == 2
+        assert sorted(grouped[0]) == grouped[0]
 
     def test_post_r_value_matcher(self):
         """Test entries with post R values, eg: R1_001.fastq"""
@@ -1138,9 +1166,9 @@ class FastqPairMatcher(unittest.TestCase):
 
         grouped = GenericMetadataParser.parse_fastqs_structure(entries)
 
-        self.assertEqual(2, len(grouped))
-        self.assertEqual(2, len(grouped[0]))
+        assert len(grouped) == 2
+        assert len(grouped[0]) == 2
 
         # check that the 002 got grouped together
-        self.assertIn('002', grouped[1][0])
-        self.assertIn('002', grouped[1][1])
+        assert '002' in grouped[1][0]
+        assert '002' in grouped[1][1]

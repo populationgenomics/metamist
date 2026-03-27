@@ -1,0 +1,4 @@
+extend = "../ruff.toml"
+# Make sure linting/formatting changes don't break compatibility with
+# python 3.10 which many scripts will be run on
+target-version = "py310"

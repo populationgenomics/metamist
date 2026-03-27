@@ -36,9 +36,6 @@ def query_parquet(tables: dict[str, BytesIO], query: str) -> list[dict[str, Any]
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(
-    reason="Tests won't work until we finish migrating participants and samples"
-)
 class TestMetaTable:
     """Test meta table operations"""
 

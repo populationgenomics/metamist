@@ -8,6 +8,7 @@ import logging
 import os
 import re
 
+from api.utils import group_by
 from google.api_core.exceptions import NotFound
 from google.cloud import storage
 
@@ -17,8 +18,6 @@ from metamist.model.analysis_status import AnalysisStatus
 from metamist.model.analysis_type import AnalysisType
 from metamist.model.analysis_update_model import AnalysisUpdateModel
 from metamist.parser.generic_parser import chunk
-
-from api.utils import group_by
 
 
 logger = logging.getLogger(__name__)

@@ -97,6 +97,7 @@ class AssayLayer(BaseLayer):
                 assay_type=assay.type,
                 meta=assay.meta,
                 external_ids=assay.external_ids,
+                project=list(project_ids)[0],
             )
             assay.id = seq_id
         else:
@@ -113,6 +114,7 @@ class AssayLayer(BaseLayer):
                 assay_type=assay.type,
                 sample_id=assay.sample_id,
                 external_ids=assay.external_ids,
+                project=list(project_ids)[0],
             )
         return assay
 

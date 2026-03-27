@@ -1,8 +1,6 @@
 -- migrate:up
 
 
-CREATE SCHEMA IF NOT EXISTS main;
-
 SET search_path TO main;
 
 -- Create custom enum types

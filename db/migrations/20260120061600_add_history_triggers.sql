@@ -1,7 +1,10 @@
 -- migrate:up
 
-CREATE EXTENSION IF NOT EXISTS temporal_tables;
-SET search_path TO history, main;
+CREATE EXTENSION IF NOT EXISTS temporal_tables SCHEMA public;
+-- Allow users that can connect to the db to use the versioning function
+GRANT EXECUTE ON FUNCTION public.versioning TO metamist_connect;
+
+SET search_path TO history, main, public;
 
 CREATE TRIGGER versioning_trigger BEFORE INSERT OR UPDATE OR DELETE ON main.analysis FOR EACH ROW EXECUTE PROCEDURE versioning('sys_period', 'history.analysis_history', true);
 CREATE TRIGGER versioning_trigger BEFORE INSERT OR UPDATE OR DELETE ON main.analysis_cohort FOR EACH ROW EXECUTE PROCEDURE versioning('sys_period', 'history.analysis_cohort_history', true);

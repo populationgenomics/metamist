@@ -54,13 +54,6 @@ jobs:
         working-directory: ./web
         run: npm run lint
 
-      - name: 'build image'
-        run: |
-          docker build \
-            --build-arg SM_ENVIRONMENT=local \
-            --tag $SM_DOCKER \
-            -f deploy/api/Dockerfile \
-            .
 
       - name: Build + install packages
         run: |

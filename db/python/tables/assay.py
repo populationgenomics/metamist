@@ -405,12 +405,21 @@ class AssayTable(DbBase):
                         iter(await self.get_projects_by_assay_ids([assay_id]))
                     )
 
+                    # Use MERGE to handle both the primary key (assay_id, name) and
+                    # the unique index (project, external_id) conflicts.
+                    # Mimics MariaDB ON DUPLICATE KEY UPDATE behavior.
                     _update_query = """
-                        INSERT INTO assay_external_id (project, assay_id, external_id, name, audit_log_id)
-                            VALUES (%(project)s, %(assay_id)s, %(external_id)s, %(name)s, %(audit_log_id)s)
-                            ON CONFLICT (assay_id, name) DO UPDATE SET
-                                external_id = EXCLUDED.external_id,
-                                audit_log_id = EXCLUDED.audit_log_id
+                        MERGE INTO assay_external_id AS target
+                        USING (SELECT %(project)s AS project, %(assay_id)s AS assay_id, %(external_id)s AS external_id,
+                                      %(name)s AS name, %(audit_log_id)s AS audit_log_id) AS source
+                        ON (target.assay_id = source.assay_id AND target.name = source.name)
+                           OR (target.project = source.project AND target.external_id = source.external_id)
+                        WHEN MATCHED THEN
+                            UPDATE SET external_id = source.external_id,
+                                       audit_log_id = source.audit_log_id
+                        WHEN NOT MATCHED THEN
+                            INSERT (project, assay_id, external_id, name, audit_log_id)
+                            VALUES (source.project, source.assay_id, source.external_id, source.name, source.audit_log_id)
                     """
                     audit_log_id = await self.audit_log_id()
                     values: list[dict[str, Any]] = [

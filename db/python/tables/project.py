@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any
 
 from psycopg import sql
 from psycopg.rows import class_row
+from psycopg.types.json import Jsonb
 
 from db.python.utils import Forbidden, get_logger
 from models.models.project import (
@@ -194,7 +195,7 @@ class ProjectPermissionsTable:
 
         if meta is not None and len(meta) > 0:
             setters.append(
-                t"meta = json_merge_patch(COALESCE(meta, '{{}}'::jsonb),  {meta})"
+                t"meta = json_merge_patch(COALESCE(meta, '{{}}'::jsonb),  {Jsonb(meta)})"
             )
         fields_str = sql.SQL(',').join(setters)
 
