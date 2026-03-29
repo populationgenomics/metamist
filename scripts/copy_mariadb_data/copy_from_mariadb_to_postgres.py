@@ -925,6 +925,13 @@ def main(
     # for enums
     drop_other_connections(postgres_creds)
 
+    if click.confirm(
+        'All steps completed, do you want to remove the local parquet data files? (recommended, unless you need to insert this exact data again)',
+        default=True,
+    ):
+        for f in data_dir.glob('*.parquet'):
+            f.unlink()
+
     click.echo('Done!')
 
 
