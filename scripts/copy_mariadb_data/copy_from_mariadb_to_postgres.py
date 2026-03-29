@@ -299,6 +299,7 @@ tables = [
             ColumnInfo(source_name='description'),
             ColumnInfo(source_name='coded_phenotype'),
             ColumnInfo(source_name='author'),
+            ColumnInfo(source_name='meta', is_json=True),
             ColumnInfo(source_name='audit_log_id'),
         ],
     ),
