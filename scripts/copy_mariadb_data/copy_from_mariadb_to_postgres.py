@@ -658,9 +658,6 @@ identity_tables = [
 
 def reset_identity_sequences():
     """Reset PostgreSQL identity sequences to the max value in each table."""
-    # duck.execute("""
-    # ATTACH '' AS pg_db (TYPE postgres);
-    # """)
 
     for table_name, column_name in identity_tables:
         print(f'Resetting sequence for {table_name}.{column_name}...')
