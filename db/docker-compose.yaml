@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: metamist_superuser
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-metamist_password}
       POSTGRES_DB: metamist
-      DATABASE_URL: postgres://metamist_superuser:${POSTGRES_PASSWORD:-metamist_password}@localhost:5432/metamist?sslmode=disable&search_path=public
+      DATABASE_URL: postgres://metamist_superuser:${POSTGRES_PASSWORD:-metamist_password}@localhost:5432/metamist?sslmode=disable&search_path=public,main,history
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:

@@ -1,8 +1,8 @@
 -- migrate:up
 SET search_path TO main;
 
-INSERT INTO "group" (name) VALUES ('project-creators') ON CONFLICT (id) DO NOTHING;
-INSERT INTO "group" (name) VALUES ('members-admin') ON CONFLICT (id) DO NOTHING;
+INSERT INTO "group" (name) VALUES ('project-creators') ON CONFLICT DO NOTHING;
+INSERT INTO "group" (name) VALUES ('members-admin') ON CONFLICT DO NOTHING;
 INSERT INTO assay_type (id, name) VALUES ('sequencing', 'sequencing') ON CONFLICT (id) DO NOTHING;
 INSERT INTO sample_type (id, name) VALUES ('blood', 'blood') ON CONFLICT (id) DO NOTHING;
 INSERT INTO sample_type (id, name) VALUES ('saliva', 'saliva') ON CONFLICT (id) DO NOTHING;
