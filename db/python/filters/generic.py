@@ -39,6 +39,16 @@ def get_hashable_value(value):  # noqa: PLR0911
     return hash(value)
 
 
+def join_sql_with_AND(clauses: list[Template]) -> Template:  # noqa: N802 allow ..._AND name
+    """Join SQL snippets with AND, dropping redundant '...AND TRUE AND...' entries"""
+
+    def _literally_true(s: Template):
+        return len(s.strings) == 1 and s.strings[0] == 'TRUE'
+
+    nontrivial = [sql for sql in clauses if not _literally_true(sql)]
+    return sql.SQL(' AND ').join(nontrivial) if len(nontrivial) > 0 else t'TRUE'
+
+
 class GenericFilter[T](SMBase):
     """
     Generic filter for eq, in_ (in) and nin (not in)
@@ -101,7 +111,7 @@ class GenericFilter[T](SMBase):
         """Override to ensure we can hash this object"""
         return hash(self.get_hashable_value())
 
-    def to_sql(self, column: str | Template) -> Template | None:
+    def to_sql(self, column: str | Template) -> Template:
         """
         Convert to SQL, and avoid SQL injection.
 
@@ -115,7 +125,7 @@ class GenericFilter[T](SMBase):
         Returns:
             Template
         """
-        filters: list[Template | None] = []
+        filters: list[Template] = []
 
         # MARIADB BACKWARDS COMPATIBILITY:
         # Goal: Make all string comparisions case insensitive
@@ -195,11 +205,7 @@ class GenericFilter[T](SMBase):
             else:
                 filters.append(t'{column_query:q} IS NOT NULL')
 
-        filters_rm_none: list[Template] = [f for f in filters if f is not None]
-        if len(filters_rm_none) == 0:
-            return None
-
-        return sql.SQL(' AND ').join(filters_rm_none)
+        return join_sql_with_AND(filters)
 
     def transform(self, func: Callable[[T], X]) -> GenericFilter[X]:
         """
@@ -329,7 +335,7 @@ class GenericFilterModel:
         field_overrides: Mapping[str, str | Template] | None = None,
         only: list[str] | None = None,
         exclude: list[str] | None = None,
-    ) -> Template | None:
+    ) -> Template:
         """Convert the model to SQL, and avoid SQL injection"""
 
         _foverrides = field_overrides or {}
@@ -344,7 +350,7 @@ class GenericFilterModel:
             )
 
         fields = dataclasses.fields(self)
-        filters: list[Template | None] = []
+        filters: list[Template] = []
         for field in fields:
             if only and field.name not in only:
                 continue
@@ -366,18 +372,13 @@ class GenericFilterModel:
                         f'Filter {field.name} must be a GenericFilter or dict[str, GenericFilter]'
                     )
 
-        filters_rm_none: list[Template] = [f for f in filters if f is not None]
-
-        if len(filters_rm_none) == 0:
-            return None
-
-        return sql.SQL(' AND ').join(filters_rm_none)
+        return join_sql_with_AND(filters)
 
 
 def prepare_query_from_dict_field(
     filter_: dict[str, Any],
     column_name: str | Template,
-) -> Template | None:
+) -> Template:
     """
     Prepare a SQL query from a dict field, which is a dict of GenericFilters.
     Usually this is a JSON field in the database that we want to query on.
@@ -425,7 +426,5 @@ def prepare_query_from_dict_field(
                 LEFT JOIN LATERAL jsonb_path_query({column_query:q}, ('$.' || {key})::jsonpath) a ON TRUE
                 where {_inner_query:q}
             )""")
-    if not conditionals:
-        return None
 
-    return sql.SQL(' AND ').join(conditionals)
+    return join_sql_with_AND(conditionals)

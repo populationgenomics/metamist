@@ -10,7 +10,7 @@ from psycopg import DatabaseError, sql
 from psycopg.rows import class_row
 from psycopg.types.json import Jsonb
 
-from db.python.filters import GenericFilter
+from db.python.filters import GenericFilter, join_sql_with_AND
 from db.python.filters.sample import SampleFilter
 from db.python.tables.base import DbBase
 from db.python.tables.meta_table import MetaTable
@@ -51,7 +51,7 @@ class SampleTable(DbBase):
             FROM sample ss
         """
 
-        wheres: list[Template | None] = []
+        wheres: list[Template] = []
 
         # Mandatory filters that apply to the sample table
         wheres.append(
@@ -113,8 +113,7 @@ class SampleTable(DbBase):
             query_template += t' INNER JOIN assay a ON a.sample_id = ss.id'
 
         # WHERE
-        wheres = [w for w in wheres if w is not None]
-        wheres_sql = sql.SQL(' AND ').join(wheres)
+        wheres_sql = join_sql_with_AND(wheres)
         query_template += t' WHERE {wheres_sql:q}' if len(wheres) > 0 else t''
 
         # ORDER BY, LIMIT, OFFSET
