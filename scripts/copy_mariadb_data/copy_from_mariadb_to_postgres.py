@@ -3,6 +3,7 @@
 #   "duckdb",
 #   "click",
 #   "google-cloud-secret-manager",
+#   "prettytable",
 # ]
 # ///
 
@@ -21,6 +22,7 @@ from typing import Any
 import click
 import duckdb
 from google.cloud import secretmanager
+from prettytable import PrettyTable
 
 
 @dataclass
@@ -656,6 +658,57 @@ identity_tables = [
 ]
 
 
+def validate_data_copy(mariadb_creds: DbCreds):
+    """Validate data copy by comparing row counts."""
+
+    click.echo('\n--- Data Validation ---')
+    table_output = PrettyTable()
+    table_output.field_names = [
+        'Table',
+        'MariaDB Main',
+        'Postgres Main',
+        'MariaDB History',
+        'Postgres History',
+    ]
+    table_output.align['Table'] = 'l'
+
+    for table in tables:
+        if table.name in skip_tables:
+            continue
+
+        # Get MariaDB Main Count
+        mariadb_main = duck.execute(
+            f"SELECT * FROM mysql_query('mysql_db', 'SELECT count(*) FROM {mariadb_creds.database}.{table.name}')"
+        ).fetchone()[0]
+
+        # Get Postgres Main Count
+        pg_main = duck.execute(
+            f'SELECT count(*) FROM pg_db.main."{table.name}"'
+        ).fetchone()[0]
+
+        if table.has_system_versioning:
+            # Get MariaDB Total and calculate History
+            mariadb_total = duck.execute(
+                f"SELECT * FROM mysql_query('mysql_db', 'SELECT count(*) FROM {mariadb_creds.database}.{table.name} FOR SYSTEM_TIME ALL')"
+            ).fetchone()[0]
+            mariadb_history = mariadb_total - mariadb_main
+
+            # Get Postgres History Count
+            pg_history = duck.execute(
+                f'SELECT count(*) FROM pg_db.history."{table.name}_history"'
+            ).fetchone()[0]
+        else:
+            mariadb_history = 'N/A'
+            pg_history = 'N/A'
+
+        table_output.add_row(
+            [table.name, mariadb_main, pg_main, mariadb_history, pg_history]
+        )
+
+    click.echo(table_output)
+    click.echo('\n')
+
+
 def reset_identity_sequences():
     """Reset PostgreSQL identity sequences to the max value in each table."""
 
@@ -893,6 +946,9 @@ def main(
         download_mariadb_data(mariadb_creds=mariadb_creds)
     else:
         click.echo('Using local data (skipping MariaDB download)...')
+        duck.execute(
+            f"ATTACH 'database={mariadb_creds.database}' AS mysql_db (TYPE mysql);"
+        )
 
     # 6. Data Insertion
     # attach postgres database
@@ -906,6 +962,9 @@ def main(
     # 7. Finalization (Identity Sequences)
     click.echo('Resetting identity sequences...')
     reset_identity_sequences()
+
+    # 7.5 Validation
+    validate_data_copy(mariadb_creds=mariadb_creds)
 
     # 8. Final DB Migrations
     if click.confirm(
