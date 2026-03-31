@@ -25,6 +25,12 @@ def init_auth():
     """Initialize metamist auth by caching the Google identity token."""
     config = get_config()
 
+    if config.env == 'local':
+        click.echo(
+            'Auth cannot be initialized for local environent. Choose a development or production environment before runing `auth init`.'
+        )
+        return
+
     # Get oauth desktop credentials from gcloud secret
     config.get_desktop_oauth_creds(do_secret_fetch=True)
 
