@@ -667,10 +667,12 @@ def validate_data_copy(mariadb_creds: DbCreds):
         'Table',
         'MariaDB Main',
         'Postgres Main',
+        'Main diff',
         'MariaDB History',
         'Postgres History',
+        'History diff',
     ]
-    table_output.align['Table'] = 'l'
+    table_output.align['Table'] = 'r'
 
     for table in tables:
         if table.name in skip_tables:
@@ -702,7 +704,17 @@ def validate_data_copy(mariadb_creds: DbCreds):
             pg_history = 'N/A'
 
         table_output.add_row(
-            [table.name, mariadb_main, pg_main, mariadb_history, pg_history]
+            [
+                table.name,
+                mariadb_main,
+                pg_main,
+                pg_main - mariadb_main,
+                mariadb_history,
+                pg_history,
+                pg_history - mariadb_history
+                if pg_history != 'N/A' and mariadb_history != 'N/A'
+                else 'N/A',
+            ]
         )
 
     click.echo(table_output)
