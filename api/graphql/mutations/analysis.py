@@ -15,15 +15,13 @@ from models.models.project import FullWriteAccessRoles
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLAnalysis
 
-AnalysisStatusType = strawberry.enum(AnalysisStatus)  # type: ignore [misc]
-
 
 @strawberry.input
 class AnalysisInput:
     """Analysis input"""
 
     type: str
-    status: AnalysisStatusType  # type: ignore [assignment]
+    status: AnalysisStatus
     output: str | None = None
     outputs: strawberry.scalars.JSON | None = None
     sequencing_group_ids: list[str] | None = None
@@ -38,7 +36,7 @@ class AnalysisInput:
 class AnalysisUpdateInput:
     """Analysis update input"""
 
-    status: AnalysisStatusType | None = None  # type: ignore [assignment]
+    status: AnalysisStatus | None = None
     output: str | None = None
     outputs: strawberry.scalars.JSON | None = None
     meta: strawberry.scalars.JSON | None = None

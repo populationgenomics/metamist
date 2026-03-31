@@ -108,9 +108,6 @@ for enum in enum_tables.__dict__.values():
 
 GraphQLEnum = strawberry.type(type('GraphQLEnum', (object,), enum_methods))
 
-GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)  # type: ignore
-GraphQLCohortStatus: type = strawberry.enum(CohortStatus)
-
 
 # Create cohort GraphQL model
 @strawberry.type
@@ -121,7 +118,7 @@ class GraphQLCohort:
     name: str
     description: str
     author: str
-    status: GraphQLCohortStatus
+    status: CohortStatus
 
     project_id: strawberry.Private[int]
 
@@ -599,7 +596,7 @@ class GraphQLProject:
         self,
         info: Info[GraphQLContext, Query],
         root: Project,
-        status: GraphQLFilter[GraphQLAnalysisStatus] | None = None,
+        status: GraphQLFilter[AnalysisStatus] | None = None,
         type: GraphQLFilter[str] | None = None,
         meta: GraphQLMetaFilter | None = None,
         active: GraphQLFilter[bool] | None = None,
@@ -640,7 +637,7 @@ class GraphQLProject:
         author: GraphQLFilter[str] | None = None,
         template_id: GraphQLFilter[str] | None = None,
         timestamp: GraphQLFilter[datetime.datetime] | None = None,
-        status: GraphQLFilter[GraphQLCohortStatus] | None = None,
+        status: GraphQLFilter[CohortStatus] | None = None,
     ) -> list[GraphQLCohort]:
         async with info.context['get_connection']() as connection:
             c_filter = CohortFilter(
@@ -1184,7 +1181,7 @@ class GraphQLSequencingGroup:
         self,
         info: Info[GraphQLContext, Query],
         root: GraphQLSequencingGroup,
-        status: GraphQLFilter[GraphQLAnalysisStatus] | None = None,
+        status: GraphQLFilter[AnalysisStatus] | None = None,
         type: GraphQLFilter[str] | None = None,
         meta: GraphQLMetaFilter | None = None,
         active: GraphQLFilter[bool] | None = None,
@@ -1478,7 +1475,7 @@ class Query:  # entry point to graphql.
         name: GraphQLFilter[str] | None = None,
         author: GraphQLFilter[str] | None = None,
         template_id: GraphQLFilter[str] | None = None,
-        status: GraphQLFilter[GraphQLCohortStatus] | None = None,
+        status: GraphQLFilter[CohortStatus] | None = None,
     ) -> list[GraphQLCohort]:
         async with info.context['get_connection']() as connection:
             cohort_layer = CohortLayer(connection)

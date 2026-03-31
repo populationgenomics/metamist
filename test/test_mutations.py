@@ -1,6 +1,5 @@
 import pytest
 
-from api.graphql.mutations.analysis import AnalysisStatusType
 from db.python.connect import Connection
 from db.python.filters.generic import GenericFilter
 from db.python.layers.analysis import AnalysisLayer
@@ -550,7 +549,7 @@ class TestMutations:
             variables={
                 'project': self.project_name,
                 'sequencingGroupIds': [self.genome_sequencing_group_id_external],
-                'status': AnalysisStatusType.UNKNOWN.name,
+                'status': AnalysisStatus.UNKNOWN.name,
                 'type': 'analysis-runner',
             },
         )
@@ -594,7 +593,7 @@ class TestMutations:
             UPDATE_ANALYSIS_MUTATION,
             variables={
                 'analysisId': analysis,
-                'status': AnalysisStatusType.COMPLETED.name,
+                'status': AnalysisStatus.COMPLETED.name,
                 'meta': {'test': 'test'},
             },
         )

@@ -29,8 +29,6 @@ if TYPE_CHECKING:
         GraphQLCohortTemplate,
     )
 
-GraphQLCohortUpdateStatus: type = strawberry.enum(CohortUpdateStatus)
-
 
 @strawberry.input
 class CohortCriteriaInput:
@@ -70,7 +68,7 @@ class CohortUpdateBodyInput:
 
     name: str | None = None
     description: str | None = None
-    status: GraphQLCohortUpdateStatus | None = None
+    status: CohortUpdateStatus | None = None
 
 
 @strawberry.type
