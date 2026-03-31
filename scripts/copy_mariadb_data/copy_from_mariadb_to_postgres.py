@@ -672,7 +672,8 @@ def validate_data_copy(mariadb_creds: DbCreds):
         'Postgres History',
         'History diff',
     ]
-    table_output.align['Table'] = 'r'
+    table_output.align = 'r'
+    table_output.align['Table'] = 'l'
 
     for table in tables:
         if table.name in skip_tables:
