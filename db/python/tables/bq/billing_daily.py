@@ -16,7 +16,7 @@ class BillingDailyTable(BillingBaseTable):
         """Get table name"""
         return self.table_name
 
-    async def get_topics(self):
+    async def get_topics(self) -> list[str]:
         """Get all topics in database"""
 
         # cost of this BQ is 10MB on DEV is minimal, AU$ 0.000008 per query
@@ -44,7 +44,7 @@ class BillingDailyTable(BillingBaseTable):
         # return empty list if no record found
         return []
 
-    async def get_invoice_months(self):
+    async def get_invoice_months(self) -> list[str]:
         """
         Get all invoice months in database
         Aggregated views contain invoice_month field
@@ -63,7 +63,7 @@ class BillingDailyTable(BillingBaseTable):
         # return empty list if no record found
         return []
 
-    async def get_cost_categories(self):
+    async def get_cost_categories(self) -> list[str]:
         """Get all service description in database"""
 
         # cost of this BQ is 10MB on DEV is minimal, AU$ 0.000008 per query
@@ -95,7 +95,7 @@ class BillingDailyTable(BillingBaseTable):
         self,
         limit: int | None = None,
         offset: int | None = None,
-    ):
+    ) -> list[str]:
         """Get all SKUs in database"""
 
         # cost of this BQ is 10MB on DEV is minimal, AU$ 0.000008 per query
