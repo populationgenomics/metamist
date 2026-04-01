@@ -222,7 +222,7 @@ class TestUpsert:
             sample_eid: participant_eid
             for participant in all_participants
             for participant_eid in participant.external_ids.values()
-            for sample in participant.samples
+            for sample in participant.samples or []
             for sample_eid in sample.external_ids.values()
         }
 

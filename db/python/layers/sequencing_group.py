@@ -148,7 +148,7 @@ class SequencingGroupLayer(BaseLayer):
                 type_=seqgroup.type,
                 technology=seqgroup.technology,
                 platform=seqgroup.platform,
-                meta={**seqgroup.meta, **meta},
+                meta={**seqgroup.meta, **meta} if seqgroup.meta else meta,
                 assay_ids=assays,
             )
 
@@ -253,7 +253,7 @@ class SequencingGroupLayer(BaseLayer):
         for sg in to_replace:
             await self.recreate_sequencing_group_with_new_assays(
                 sequencing_group_id=int(sg.id),
-                assays=[s.id for s in sg.assays],
+                assays=[s.id for s in sg.assays] if sg.assays else [],
                 meta=sg.meta,
             )
 
