@@ -128,7 +128,7 @@ class BillingGcpDailyTable(BillingBaseTable):
         )
         return (query_params, daily_cost_field, daily_cost_join)
 
-    async def get_gcp_projects(self):
+    async def get_gcp_projects(self) -> list[str]:
         """Get all GCP projects in database"""
 
         # cost of this BQ is 10MB on DEV is minimal, AU$ 0.000008 per query

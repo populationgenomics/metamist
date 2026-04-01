@@ -337,8 +337,8 @@ class BillingBaseTable(BqDbBase):
         return result
 
     async def append_sample_cost(
-        self, connection: Connection | None = None, results: list[dict] | None = None
-    ) -> list[dict] | None:
+        self, connection: Connection | None, results: list[dict]
+    ) -> list[dict]:
         """
         For each topic in results, calculate number of samples per metamist project
         and divide the cost by number of samples to get average sample storage cost
@@ -436,7 +436,7 @@ class BillingBaseTable(BqDbBase):
     async def get_total_cost(
         self,
         query: BillingTotalCostQueryModel,
-    ) -> list[dict] | None:
+    ) -> list[dict]:
         """
         Get Total cost of selected fields for requested time interval from BQ views
         """

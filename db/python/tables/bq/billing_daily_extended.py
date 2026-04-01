@@ -19,7 +19,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
         """Get table name"""
         return self.table_name
 
-    async def get_extended_values(self, field: str):
+    async def get_extended_values(self, field: str) -> list[str]:
         """
         Get all extended values in database, for specified field.
         Field is one of extended columns.
