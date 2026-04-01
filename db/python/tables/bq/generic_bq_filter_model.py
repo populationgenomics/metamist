@@ -69,7 +69,7 @@ class GenericBQFilterModel(GenericFilterModel):
             else:
                 setattr(self, field.name, GenericBQFilter(eq=value))
 
-    def to_sql(
+    def to_sql(  # pyright: ignore [reportIncompatibleMethodOverride]
         self,
         field_overrides: dict[str, str] | None = None,
         only: list[str] | None = None,  # noqa: ARG002

@@ -72,7 +72,7 @@ class MockBqClient(bq.Client):
         self.executed_queries = []
         self._query_responses: list[list[dict]] = []
 
-    def query(self, query: str, *_args, **_kwargs) -> MockQueryJob:
+    def query(self, query: str, *_args, **_kwargs) -> MockQueryJob:  # pyright: ignore [reportIncompatibleMethodOverride]
         self.executed_queries.append(query)
         # Check if this is a dry run (used for cost calculation)
         # Dry runs don't need actual results, so don't consume from queue
