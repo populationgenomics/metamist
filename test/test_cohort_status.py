@@ -64,6 +64,7 @@ class TestStatusInCohortDBLayer:
         self.sample_a = await self.sample_layer.upsert_sample(
             get_sample_model('A', 'saliva', 'exome', 'ONT')
         )
+        assert self.sample_a.sequencing_groups is not None
         self.sgA_raw = [sg.id for sg in self.sample_a.sequencing_groups]
 
         self.cohort_name = 'Sample cohort 1'
@@ -166,6 +167,7 @@ class TestStatusInCohortDBLayer:
         """Test cohort status when at least one sample is inactive"""
 
         sample_b = await self.sample_layer.upsert_sample(get_sample_model('B'))
+        assert sample_b.sequencing_groups is not None
         sg_b_raw = [sg.id for sg in sample_b.sequencing_groups]
 
         new_cohort = self.cohort = await self.cohort_layer.create_cohort_from_criteria(

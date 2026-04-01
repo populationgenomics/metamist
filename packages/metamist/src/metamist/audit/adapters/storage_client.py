@@ -94,9 +94,7 @@ class StorageClient:
         bucket = self.get_bucket(bucket_name)
 
         files = []
-        if not prefixes:
-            prefixes = {None}
-        for prefix in prefixes:
+        for prefix in prefixes or {None}:
             for item in self.client.list_blobs(bucket, prefix=prefix):
                 blob = cast(storage.Blob, item)
                 # Skip if file doesn't match extensions

@@ -415,6 +415,7 @@ class TestAssay:
         )
 
         sg_id = sample.sequencing_groups[0].id
+        assert sample.sequencing_groups[0].assays is not None
         assay_ids_sg1 = {a.id for a in sample.sequencing_groups[0].assays}
 
         assays = await assay_layer.get_assays_for_sequencing_group_ids([sg_id])
