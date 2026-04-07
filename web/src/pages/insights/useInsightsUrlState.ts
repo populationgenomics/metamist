@@ -78,9 +78,7 @@ export function useInsightsUrlState(
             }
 
             const paramString = searchParams.toString()
-            const newUrl = paramString
-                ? `${location.pathname}?${paramString}`
-                : location.pathname
+            const newUrl = paramString ? `${location.pathname}?${paramString}` : location.pathname
             navigate(newUrl, { replace: true })
         },
         [location.pathname, navigate]
