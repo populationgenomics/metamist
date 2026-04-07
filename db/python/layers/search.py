@@ -44,7 +44,6 @@ class SearchLayer(BaseLayer):
         Try to get internal CPG SG Identifier from string,
         otherwise return None (helper to catch exception)"""
         try:
-            print(sequencing_group_id_transform_to_raw(query, strict=False))
             return sequencing_group_id_transform_to_raw(query, strict=False)
         except ValueError:
             return None
