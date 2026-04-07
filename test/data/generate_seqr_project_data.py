@@ -527,9 +527,9 @@ async def generate_qc_analyses(
             analyses_to_insert.append(
                 Analysis(
                     cohort_ids=[cohort_id],
-                    type='qc',
+                    type='web',
                     status=AnalysisStatus('completed'),
-                    output=f'FAKE::{project}-{seq_type}-qc-{datetime.date.today()}.json',
+                    output=f'FAKE::{project}-{seq_type}-web/somalierpedigree-{datetime.date.today()}.html',
                     meta={'stage': 'SomalierPedigree', 'sequencing_type': seq_type},
                 )
             )
