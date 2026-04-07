@@ -186,7 +186,7 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                     options={exportOptions}
                     text="Export"
                     selectOnBlur={false}
-                    value={null}
+                    value={undefined}
                     onChange={(_, data) => exportToFile(data.value as 'csv' | 'tsv')}
                 />
             </div>

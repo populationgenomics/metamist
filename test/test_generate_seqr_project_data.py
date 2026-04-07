@@ -17,6 +17,7 @@ from test.data.generate_seqr_project_data import (
     SEQ_PLATFORMS,
     SEQ_TECHS,
     SEQ_TYPES,
+    PedigreeRow,
     generate_cohorts,
     generate_cram_analyses,
     generate_pedigree_rows,
@@ -31,7 +32,6 @@ from test.data.generate_seqr_project_data import (
     generate_sequencing_type,
     generate_web_report_analyses,
     main,
-    ped_row,
 )
 
 
@@ -46,11 +46,11 @@ class ValidateSeqrGenerateDataQueries(unittest.TestCase):
 
 
 class TestPedRow(unittest.TestCase):
-    """Phase 1a: Tests for the ped_row class."""
+    """Phase 1a: Tests for the PedigreeRow class."""
 
     def test_construction_from_list(self):
         values = ['FAM1', 'IND1', 'PAT1', 'MAT1', 1, 2]
-        row = ped_row(values)
+        row = PedigreeRow(values)
         self.assertEqual(row.family_id, 'FAM1')
         self.assertEqual(row.individual_id, 'IND1')
         self.assertEqual(row.paternal_id, 'PAT1')
@@ -60,12 +60,12 @@ class TestPedRow(unittest.TestCase):
 
     def test_iter_yields_correct_order(self):
         values = ['FAM1', 'IND1', 'PAT1', 'MAT1', 1, 2]
-        row = ped_row(values)
+        row = PedigreeRow(values)
         self.assertEqual(list(row), values)
 
     def test_field_access(self):
         values = ['FAM_X', 'IND_Y', '', '', 0, 1]
-        row = ped_row(values)
+        row = PedigreeRow(values)
         self.assertEqual(row.family_id, 'FAM_X')
         self.assertEqual(row.individual_id, 'IND_Y')
         self.assertEqual(row.paternal_id, '')
@@ -112,11 +112,11 @@ class TestGeneratePedigreeRows(unittest.TestCase):
         result = generate_pedigree_rows(num_families=1)
         self.assertGreaterEqual(len(result), 1)
 
-    def test_all_rows_are_ped_row_instances(self):
+    def test_all_rows_are_pedigree_row_instances(self):
         random.seed(42)
         result = generate_pedigree_rows(num_families=5)
         for row in result:
-            self.assertIsInstance(row, ped_row)
+            self.assertIsInstance(row, PedigreeRow)
 
     def test_all_individual_ids_unique(self):
         random.seed(42)
@@ -128,7 +128,9 @@ class TestGeneratePedigreeRows(unittest.TestCase):
         """Force a singleton family (1 individual) and check properties."""
         with patch(
             'test.data.generate_seqr_project_data.random.randint',
-            side_effect=lambda a, b: 1 if (a, b) == (1, 5) else random.Random(42).randint(a, b),
+            side_effect=lambda a, b: (
+                1 if (a, b) == (1, 5) else random.Random(42).randint(a, b)
+            ),
         ):
             result = generate_pedigree_rows(num_families=1)
             self.assertEqual(len(result), 1)
@@ -140,15 +142,21 @@ class TestGeneratePedigreeRows(unittest.TestCase):
     def test_duo_family(self):
         """Force a duo family (2 individuals) and check parent-child relationship."""
         rng = random.Random(42)
-        with patch(
-            'test.data.generate_seqr_project_data.random.randint',
-            side_effect=lambda a, b: 2 if (a, b) == (1, 5) else rng.randint(a, b),
-        ), patch(
-            'test.data.generate_seqr_project_data.random.choice',
-            side_effect=rng.choice,
-        ), patch(
-            'test.data.generate_seqr_project_data.random.choices',
-            side_effect=lambda pop, weights=None, k=1: rng.choices(pop, weights=weights, k=k),
+        with (
+            patch(
+                'test.data.generate_seqr_project_data.random.randint',
+                side_effect=lambda a, b: 2 if (a, b) == (1, 5) else rng.randint(a, b),
+            ),
+            patch(
+                'test.data.generate_seqr_project_data.random.choice',
+                side_effect=rng.choice,
+            ),
+            patch(
+                'test.data.generate_seqr_project_data.random.choices',
+                side_effect=lambda pop, weights=None, k=1: rng.choices(
+                    pop, weights=weights, k=k
+                ),
+            ),
         ):
             result = generate_pedigree_rows(num_families=1)
             self.assertEqual(len(result), 2)
@@ -169,15 +177,21 @@ class TestGeneratePedigreeRows(unittest.TestCase):
     def test_trio_plus_family(self):
         """Force a trio+ family (3-5 individuals) and check founders."""
         rng = random.Random(42)
-        with patch(
-            'test.data.generate_seqr_project_data.random.randint',
-            side_effect=lambda a, b: 4 if (a, b) == (1, 5) else rng.randint(a, b),
-        ), patch(
-            'test.data.generate_seqr_project_data.random.choice',
-            side_effect=rng.choice,
-        ), patch(
-            'test.data.generate_seqr_project_data.random.choices',
-            side_effect=lambda pop, weights=None, k=1: rng.choices(pop, weights=weights, k=k),
+        with (
+            patch(
+                'test.data.generate_seqr_project_data.random.randint',
+                side_effect=lambda a, b: 4 if (a, b) == (1, 5) else rng.randint(a, b),
+            ),
+            patch(
+                'test.data.generate_seqr_project_data.random.choice',
+                side_effect=rng.choice,
+            ),
+            patch(
+                'test.data.generate_seqr_project_data.random.choices',
+                side_effect=lambda pop, weights=None, k=1: rng.choices(
+                    pop, weights=weights, k=k
+                ),
+            ),
         ):
             result = generate_pedigree_rows(num_families=1)
             self.assertEqual(len(result), 4)
@@ -193,13 +207,9 @@ class TestGeneratePedigreeRows(unittest.TestCase):
             # Children reference founders
             for child in result[2:]:
                 if child.paternal_id:
-                    self.assertEqual(
-                        child.paternal_id, founder1.individual_id
-                    )
+                    self.assertEqual(child.paternal_id, founder1.individual_id)
                 if child.maternal_id:
-                    self.assertEqual(
-                        child.maternal_id, founder2.individual_id
-                    )
+                    self.assertEqual(child.maternal_id, founder2.individual_id)
 
 
 class TestSequencingGenerators(unittest.TestCase):
@@ -267,9 +277,7 @@ class TestSequencingGenerators(unittest.TestCase):
     def test_respects_weighting(self):
         random.seed(42)
         dist = {10: 0.99, 20: 0.01}
-        results = [
-            generate_random_number_within_distribution(dist) for _ in range(100)
-        ]
+        results = [generate_random_number_within_distribution(dist) for _ in range(100)]
         # With 99% weight, 10 should appear far more often
         self.assertGreater(results.count(10), results.count(20))
 
@@ -303,9 +311,7 @@ class TestGenerateCramAnalyses(unittest.TestCase):
         ):
             # Force all SGs to be selected as aligned
             random.seed(42)
-            result = asyncio.run(
-                generate_cram_analyses('TESTPROJ', 1, analyses)
-            )
+            result = asyncio.run(generate_cram_analyses('TESTPROJ', 1, analyses))
 
         # All SGs returned as aligned (random.sample with k >= len/2)
         self.assertGreater(len(result), 0)
@@ -326,18 +332,19 @@ class TestGenerateCramAnalyses(unittest.TestCase):
         mock_response = {'project': {'sequencingGroups': sgs}}
         analyses: list[Analysis] = []
 
-        with patch(
-            'test.data.generate_seqr_project_data.query_async',
-            new_callable=AsyncMock,
-            return_value=mock_response,
-        ), patch(
-            'test.data.generate_seqr_project_data.random.sample',
-            side_effect=lambda population, k: population,  # noqa: ARG005
+        with (
+            patch(
+                'test.data.generate_seqr_project_data.query_async',
+                new_callable=AsyncMock,
+                return_value=mock_response,
+            ),
+            patch(
+                'test.data.generate_seqr_project_data.random.sample',
+                side_effect=lambda population, k: population,  # noqa: ARG005
+            ),
         ):
             random.seed(42)
-            result = asyncio.run(
-                generate_cram_analyses('PROJ', 1, analyses)
-            )
+            result = asyncio.run(generate_cram_analyses('PROJ', 1, analyses))
         return analyses, result
 
     def test_cram_path_short_read_genome(self):
@@ -350,9 +357,7 @@ class TestGenerateCramAnalyses(unittest.TestCase):
         sgs = [self._make_sg('SG001', 'exome', 'short-read')]
         analyses, _ = self._run_cram_with_all_aligned(sgs)
         self.assertEqual(len(analyses), 1)
-        self.assertEqual(
-            analyses[0].output, 'FAKE://PROJ/exome/cram/SG001.cram'
-        )
+        self.assertEqual(analyses[0].output, 'FAKE://PROJ/exome/cram/SG001.cram')
 
     def test_cram_path_short_read_transcriptome(self):
         sgs = [self._make_sg('SG001', 'transcriptome', 'short-read')]
@@ -366,17 +371,13 @@ class TestGenerateCramAnalyses(unittest.TestCase):
         sgs = [self._make_sg('SG001', 'genome', 'long-read', 'pacbio')]
         analyses, _ = self._run_cram_with_all_aligned(sgs)
         self.assertEqual(len(analyses), 1)
-        self.assertEqual(
-            analyses[0].output, 'FAKE://PROJ/long_read/SG001.cram'
-        )
+        self.assertEqual(analyses[0].output, 'FAKE://PROJ/long_read/SG001.cram')
 
     def test_cram_path_unknown_technology_fallback(self):
         sgs = [self._make_sg('SG001', 'genome', 'unknown-tech')]
         analyses, _ = self._run_cram_with_all_aligned(sgs)
         self.assertEqual(len(analyses), 1)
-        self.assertEqual(
-            analyses[0].output, 'FAKE://PROJ/crams/SG001.cram'
-        )
+        self.assertEqual(analyses[0].output, 'FAKE://PROJ/crams/SG001.cram')
 
     def test_cram_meta_fields(self):
         sgs = [self._make_sg('SG001', 'genome', 'short-read', 'illumina')]
@@ -388,10 +389,7 @@ class TestGenerateCramAnalyses(unittest.TestCase):
         self.assertIn('size', meta)
 
     def test_returns_subset_of_sgs(self):
-        sgs = [
-            self._make_sg(f'SG{i:03}', 'genome', 'short-read')
-            for i in range(10)
-        ]
+        sgs = [self._make_sg(f'SG{i:03}', 'genome', 'short-read') for i in range(10)]
         mock_response = {'project': {'sequencingGroups': sgs}}
         analyses: list[Analysis] = []
 
@@ -401,9 +399,7 @@ class TestGenerateCramAnalyses(unittest.TestCase):
             return_value=mock_response,
         ):
             random.seed(42)
-            result = asyncio.run(
-                generate_cram_analyses('PROJ', 1, analyses)
-            )
+            result = asyncio.run(generate_cram_analyses('PROJ', 1, analyses))
 
         # Returns between len/2 and len SGs
         self.assertGreaterEqual(len(result), len(sgs) // 2)
@@ -422,9 +418,7 @@ class TestGenerateQcAnalyses(unittest.TestCase):
             ('genome', 'long-read'): 'COH001',
         }
         analyses: list[Analysis] = []
-        asyncio.run(
-            generate_qc_analyses('PROJ', cohort_ids, analyses)
-        )
+        asyncio.run(generate_qc_analyses('PROJ', cohort_ids, analyses))
         self.assertEqual(len(analyses), 0)
 
     def test_exome_produces_qc_and_web(self):
@@ -432,9 +426,7 @@ class TestGenerateQcAnalyses(unittest.TestCase):
             ('exome', 'short-read'): 'COH001',
         }
         analyses: list[Analysis] = []
-        asyncio.run(
-            generate_qc_analyses('PROJ', cohort_ids, analyses)
-        )
+        asyncio.run(generate_qc_analyses('PROJ', cohort_ids, analyses))
         self.assertEqual(len(analyses), 2)
         types = [(a.type, a.meta.get('stage')) for a in analyses]
         self.assertIn(('qc', 'CramMultiQC'), types)
@@ -445,9 +437,7 @@ class TestGenerateQcAnalyses(unittest.TestCase):
             ('genome', 'short-read'): 'COH001',
         }
         analyses: list[Analysis] = []
-        asyncio.run(
-            generate_qc_analyses('PROJ', cohort_ids, analyses)
-        )
+        asyncio.run(generate_qc_analyses('PROJ', cohort_ids, analyses))
         self.assertEqual(len(analyses), 2)
         types = [(a.type, a.meta.get('stage')) for a in analyses]
         self.assertIn(('qc', 'CramMultiQC'), types)
@@ -458,9 +448,7 @@ class TestGenerateQcAnalyses(unittest.TestCase):
             ('transcriptome', 'short-read'): 'COH001',
         }
         analyses: list[Analysis] = []
-        asyncio.run(
-            generate_qc_analyses('PROJ', cohort_ids, analyses)
-        )
+        asyncio.run(generate_qc_analyses('PROJ', cohort_ids, analyses))
         self.assertEqual(len(analyses), 0)
 
     def test_mixed_cohorts(self):
@@ -471,9 +459,7 @@ class TestGenerateQcAnalyses(unittest.TestCase):
             ('transcriptome', 'short-read'): 'COH004',
         }
         analyses: list[Analysis] = []
-        asyncio.run(
-            generate_qc_analyses('PROJ', cohort_ids, analyses)
-        )
+        asyncio.run(generate_qc_analyses('PROJ', cohort_ids, analyses))
         # genome short-read: 2, exome short-read: 2, long-read: 0, transcriptome: 0
         self.assertEqual(len(analyses), 4)
 
@@ -486,9 +472,7 @@ class TestGenerateSeqrLoaderAnalyses(unittest.TestCase):
             ('genome', 'long-read'): 'COH001',
         }
         analyses: list[Analysis] = []
-        asyncio.run(
-            generate_seqr_loader_analyses('PROJ', cohort_ids, analyses)
-        )
+        asyncio.run(generate_seqr_loader_analyses('PROJ', cohort_ids, analyses))
         self.assertEqual(len(analyses), 0)
 
     def test_genome_produces_matrixtable_and_es_index_and_sv(self):
@@ -496,9 +480,7 @@ class TestGenerateSeqrLoaderAnalyses(unittest.TestCase):
             ('genome', 'short-read'): 'COH001',
         }
         analyses: list[Analysis] = []
-        asyncio.run(
-            generate_seqr_loader_analyses('PROJ', cohort_ids, analyses)
-        )
+        asyncio.run(generate_seqr_loader_analyses('PROJ', cohort_ids, analyses))
         # matrixtable (AnnotateDataset) + es-index (MtToEs) + es-index (MtToEsSv)
         self.assertEqual(len(analyses), 3)
         types_stages = [(a.type, a.meta.get('stage')) for a in analyses]
@@ -511,9 +493,7 @@ class TestGenerateSeqrLoaderAnalyses(unittest.TestCase):
             ('exome', 'short-read'): 'COH001',
         }
         analyses: list[Analysis] = []
-        asyncio.run(
-            generate_seqr_loader_analyses('PROJ', cohort_ids, analyses)
-        )
+        asyncio.run(generate_seqr_loader_analyses('PROJ', cohort_ids, analyses))
         # matrixtable (AnnotateDataset) + es-index (MtToEs) + es-index (MtToEsCNV)
         self.assertEqual(len(analyses), 3)
         types_stages = [(a.type, a.meta.get('stage')) for a in analyses]
@@ -526,16 +506,16 @@ class TestGenerateSeqrLoaderAnalyses(unittest.TestCase):
             ('transcriptome', 'short-read'): 'COH001',
         }
         analyses: list[Analysis] = []
-        asyncio.run(
-            generate_seqr_loader_analyses('PROJ', cohort_ids, analyses)
-        )
+        asyncio.run(generate_seqr_loader_analyses('PROJ', cohort_ids, analyses))
         self.assertEqual(len(analyses), 0)
 
 
 class TestGenerateWebReportAnalyses(unittest.TestCase):
     """Phase 3d: Tests for generate_web_report_analyses."""
 
-    def _make_sg(self, sg_id, sg_type='genome', technology='short-read', platform='illumina'):
+    def _make_sg(
+        self, sg_id, sg_type='genome', technology='short-read', platform='illumina'
+    ):
         return {
             'id': sg_id,
             'type': sg_type,
@@ -547,19 +527,13 @@ class TestGenerateWebReportAnalyses(unittest.TestCase):
         random.seed(42)
         sgs = [self._make_sg('SG001'), self._make_sg('SG002')]
         analyses: list[Analysis] = []
-        asyncio.run(
-            generate_web_report_analyses('PROJ', 1, sgs, analyses)
-        )
+        asyncio.run(generate_web_report_analyses('PROJ', 1, sgs, analyses))
         # 2 SGs * 2 analyses each + 1 STRipy index = 5
         self.assertEqual(len(analyses), 5)
 
         # Check per-SG analyses
         for sg in sgs:
-            sg_analyses = [
-                a
-                for a in analyses
-                if a.sequencing_group_ids == [sg['id']]
-            ]
+            sg_analyses = [a for a in analyses if a.sequencing_group_ids == [sg['id']]]
             stages = [a.meta.get('stage') for a in sg_analyses]
             self.assertIn('Stripy', stages)
             self.assertIn('MitoReport', stages)
@@ -568,9 +542,7 @@ class TestGenerateWebReportAnalyses(unittest.TestCase):
         random.seed(42)
         sgs = [self._make_sg('SG001'), self._make_sg('SG002'), self._make_sg('SG003')]
         analyses: list[Analysis] = []
-        asyncio.run(
-            generate_web_report_analyses('PROJ', 1, sgs, analyses)
-        )
+        asyncio.run(generate_web_report_analyses('PROJ', 1, sgs, analyses))
         # Last analysis is the STRipy index
         index_analysis = analyses[-1]
         self.assertEqual(index_analysis.meta.get('stage'), 'MakeIndexPage')
@@ -581,12 +553,8 @@ class TestGenerateWebReportAnalyses(unittest.TestCase):
         random.seed(42)
         sgs = [self._make_sg('SG001')]
         analyses: list[Analysis] = []
-        asyncio.run(
-            generate_web_report_analyses('PROJ', 1, sgs, analyses)
-        )
-        stripy_analyses = [
-            a for a in analyses if a.meta.get('stage') == 'Stripy'
-        ]
+        asyncio.run(generate_web_report_analyses('PROJ', 1, sgs, analyses))
+        stripy_analyses = [a for a in analyses if a.meta.get('stage') == 'Stripy']
         self.assertGreater(len(stripy_analyses), 0)
         for a in stripy_analyses:
             self.assertIn('outliers_detected', a.meta)
@@ -596,9 +564,7 @@ class TestGenerateWebReportAnalyses(unittest.TestCase):
         random.seed(42)
         sgs = [self._make_sg('SG001')]
         analyses: list[Analysis] = []
-        asyncio.run(
-            generate_web_report_analyses('PROJ', 1, sgs, analyses)
-        )
+        asyncio.run(generate_web_report_analyses('PROJ', 1, sgs, analyses))
         for a in analyses:
             self.assertEqual(a.type, 'web')
             self.assertEqual(str(a.status), 'completed')
@@ -609,7 +575,9 @@ class TestGenerateProjectPedigree(unittest.TestCase):
 
     @patch('test.data.generate_seqr_project_data.ParticipantApi')
     @patch('test.data.generate_seqr_project_data.FamilyApi')
-    def test_returns_id_map_from_participant_api(self, mock_family_cls, mock_participant_cls):
+    def test_returns_id_map_from_participant_api(
+        self, mock_family_cls, mock_participant_cls
+    ):
         random.seed(42)
         expected_map = {'SOLAR_0042': 1, 'LUNAR_0099': 2}
 
@@ -617,8 +585,8 @@ class TestGenerateProjectPedigree(unittest.TestCase):
         mock_family_instance.import_pedigree_async = AsyncMock()
 
         mock_participant_instance = mock_participant_cls.return_value
-        mock_participant_instance.get_participant_id_map_by_external_ids_async = AsyncMock(
-            return_value=expected_map
+        mock_participant_instance.get_participant_id_map_by_external_ids_async = (
+            AsyncMock(return_value=expected_map)
         )
 
         result = asyncio.run(generate_project_pedigree('test-project'))
@@ -626,15 +594,17 @@ class TestGenerateProjectPedigree(unittest.TestCase):
 
     @patch('test.data.generate_seqr_project_data.ParticipantApi')
     @patch('test.data.generate_seqr_project_data.FamilyApi')
-    def test_import_pedigree_called_with_correct_args(self, mock_family_cls, mock_participant_cls):
+    def test_import_pedigree_called_with_correct_args(
+        self, mock_family_cls, mock_participant_cls
+    ):
         random.seed(42)
 
         mock_family_instance = mock_family_cls.return_value
         mock_family_instance.import_pedigree_async = AsyncMock()
 
         mock_participant_instance = mock_participant_cls.return_value
-        mock_participant_instance.get_participant_id_map_by_external_ids_async = AsyncMock(
-            return_value={}
+        mock_participant_instance.get_participant_id_map_by_external_ids_async = (
+            AsyncMock(return_value={})
         )
 
         asyncio.run(generate_project_pedigree('test-project'))
@@ -647,15 +617,17 @@ class TestGenerateProjectPedigree(unittest.TestCase):
 
     @patch('test.data.generate_seqr_project_data.ParticipantApi')
     @patch('test.data.generate_seqr_project_data.FamilyApi')
-    def test_participant_eids_passed_to_get_id_map(self, mock_family_cls, mock_participant_cls):
+    def test_participant_eids_passed_to_get_id_map(
+        self, mock_family_cls, mock_participant_cls
+    ):
         random.seed(42)
 
         mock_family_instance = mock_family_cls.return_value
         mock_family_instance.import_pedigree_async = AsyncMock()
 
         mock_participant_instance = mock_participant_cls.return_value
-        mock_participant_instance.get_participant_id_map_by_external_ids_async = AsyncMock(
-            return_value={}
+        mock_participant_instance.get_participant_id_map_by_external_ids_async = (
+            AsyncMock(return_value={})
         )
 
         asyncio.run(generate_project_pedigree('test-project'))
@@ -680,7 +652,9 @@ class TestGenerateSampleEntries(unittest.TestCase):
         mock_sapi = AsyncMock()
 
         asyncio.run(
-            generate_sample_entries('test-proj', participant_id_map, fake_enums, mock_sapi)
+            generate_sample_entries(
+                'test-proj', participant_id_map, fake_enums, mock_sapi
+            )
         )
 
         mock_sapi.upsert_samples_async.assert_called_once()
@@ -697,7 +671,9 @@ class TestGenerateSampleEntries(unittest.TestCase):
         mock_sapi = AsyncMock()
 
         asyncio.run(
-            generate_sample_entries('test-proj', participant_id_map, fake_enums, mock_sapi)
+            generate_sample_entries(
+                'test-proj', participant_id_map, fake_enums, mock_sapi
+            )
         )
 
         samples = mock_sapi.upsert_samples_async.call_args[0][1]
@@ -795,12 +771,29 @@ class TestMain(unittest.TestCase):
     @patch('test.data.generate_seqr_project_data.ProjectApi')
     @patch('test.data.generate_seqr_project_data.AnalysisApi')
     @patch('test.data.generate_seqr_project_data.query_async', new_callable=AsyncMock)
-    @patch('test.data.generate_seqr_project_data.generate_project_pedigree', new_callable=AsyncMock)
-    @patch('test.data.generate_seqr_project_data.generate_sample_entries', new_callable=AsyncMock)
-    @patch('test.data.generate_seqr_project_data.generate_cram_analyses', new_callable=AsyncMock)
-    @patch('test.data.generate_seqr_project_data.generate_cohorts', new_callable=AsyncMock)
-    @patch('test.data.generate_seqr_project_data.generate_web_report_analyses', new_callable=AsyncMock)
-    @patch('test.data.generate_seqr_project_data.generate_seqr_loader_analyses', new_callable=AsyncMock)
+    @patch(
+        'test.data.generate_seqr_project_data.generate_project_pedigree',
+        new_callable=AsyncMock,
+    )
+    @patch(
+        'test.data.generate_seqr_project_data.generate_sample_entries',
+        new_callable=AsyncMock,
+    )
+    @patch(
+        'test.data.generate_seqr_project_data.generate_cram_analyses',
+        new_callable=AsyncMock,
+    )
+    @patch(
+        'test.data.generate_seqr_project_data.generate_cohorts', new_callable=AsyncMock
+    )
+    @patch(
+        'test.data.generate_seqr_project_data.generate_web_report_analyses',
+        new_callable=AsyncMock,
+    )
+    @patch(
+        'test.data.generate_seqr_project_data.generate_seqr_loader_analyses',
+        new_callable=AsyncMock,
+    )
     def test_exit_when_no_default_user(
         self,
         _mock_seqr_loader,
@@ -826,8 +819,10 @@ class TestMain(unittest.TestCase):
 
         mock_query.return_value = {'enum': {'sampleType': ['blood']}}
 
-        with patch.dict('os.environ', {}, clear=True), \
-             self.assertRaises(SystemExit) as cm:
+        with (
+            patch.dict('os.environ', {}, clear=True),
+            self.assertRaises(SystemExit) as cm,
+        ):
             asyncio.run(main())
 
         self.assertEqual(cm.exception.code, 1)
@@ -838,12 +833,29 @@ class TestMain(unittest.TestCase):
     @patch('test.data.generate_seqr_project_data.ProjectApi')
     @patch('test.data.generate_seqr_project_data.AnalysisApi')
     @patch('test.data.generate_seqr_project_data.query_async', new_callable=AsyncMock)
-    @patch('test.data.generate_seqr_project_data.generate_project_pedigree', new_callable=AsyncMock)
-    @patch('test.data.generate_seqr_project_data.generate_sample_entries', new_callable=AsyncMock)
-    @patch('test.data.generate_seqr_project_data.generate_cram_analyses', new_callable=AsyncMock)
-    @patch('test.data.generate_seqr_project_data.generate_cohorts', new_callable=AsyncMock)
-    @patch('test.data.generate_seqr_project_data.generate_web_report_analyses', new_callable=AsyncMock)
-    @patch('test.data.generate_seqr_project_data.generate_seqr_loader_analyses', new_callable=AsyncMock)
+    @patch(
+        'test.data.generate_seqr_project_data.generate_project_pedigree',
+        new_callable=AsyncMock,
+    )
+    @patch(
+        'test.data.generate_seqr_project_data.generate_sample_entries',
+        new_callable=AsyncMock,
+    )
+    @patch(
+        'test.data.generate_seqr_project_data.generate_cram_analyses',
+        new_callable=AsyncMock,
+    )
+    @patch(
+        'test.data.generate_seqr_project_data.generate_cohorts', new_callable=AsyncMock
+    )
+    @patch(
+        'test.data.generate_seqr_project_data.generate_web_report_analyses',
+        new_callable=AsyncMock,
+    )
+    @patch(
+        'test.data.generate_seqr_project_data.generate_seqr_loader_analyses',
+        new_callable=AsyncMock,
+    )
     def test_creates_project_when_not_in_existing(
         self,
         _mock_seqr_loader,
@@ -869,7 +881,10 @@ class TestMain(unittest.TestCase):
         mock_enums_instance = mock_enums_cls.return_value
         mock_enums_instance.post_analysis_types_async = AsyncMock()
 
-        mock_query.return_value = {'enum': {'sampleType': ['blood']}, 'project': {'id': 1}}
+        mock_query.return_value = {
+            'enum': {'sampleType': ['blood']},
+            'project': {'id': 1},
+        }
         mock_pedigree.return_value = {}
         mock_cram.return_value = []
         mock_cohorts.return_value = {}
@@ -877,13 +892,13 @@ class TestMain(unittest.TestCase):
         mock_aapi = mock_analysis_cls.return_value
         mock_aapi.create_analysis_async = AsyncMock()
 
-        with patch.dict('os.environ', {'SM_LOCALONLY_DEFAULTUSER': 'testuser@example.com'}):
+        with patch.dict(
+            'os.environ', {'SM_LOCALONLY_DEFAULTUSER': 'testuser@example.com'}
+        ):
             asyncio.run(main())
 
         # create_project_async should have been called for each project in PROJECTS
-        self.assertEqual(
-            mock_papi.create_project_async.call_count, len(PROJECTS)
-        )
+        self.assertEqual(mock_papi.create_project_async.call_count, len(PROJECTS))
 
 
 class TestEdgeCases(unittest.TestCase):
@@ -900,7 +915,7 @@ class TestEdgeCases(unittest.TestCase):
         self.assertEqual(len(individual_ids), len(set(individual_ids)))
 
         # Check that we see different family sizes (singleton, duo, trio+)
-        family_ids = {}
+        family_ids: dict[str, list[PedigreeRow]] = {}
         for row in result:
             family_ids.setdefault(row.family_id, []).append(row)
         family_sizes = {len(members) for members in family_ids.values()}
@@ -910,9 +925,7 @@ class TestEdgeCases(unittest.TestCase):
     def test_generate_seq_technology_fallback_for_unknown_type(self):
         """When type doesn't match genome/exome/transcriptome, falls back to rna tech."""
         random.seed(42)
-        result = generate_seq_technology(
-            ['rna-seq', 'short-read'], 'something_else'
-        )
+        result = generate_seq_technology(['rna-seq', 'short-read'], 'something_else')
         self.assertIn('rna', result)
 
     def test_generate_web_report_analyses_empty_sgs(self):
@@ -925,9 +938,7 @@ class TestEdgeCases(unittest.TestCase):
         """
         random.seed(42)
         analyses: list[Analysis] = []
-        asyncio.run(
-            generate_web_report_analyses('PROJ', 1, [], analyses)
-        )
+        asyncio.run(generate_web_report_analyses('PROJ', 1, [], analyses))
         # Only the STRipy index entry is created
         self.assertEqual(len(analyses), 1)
         self.assertEqual(analyses[0].meta.get('stage'), 'MakeIndexPage')

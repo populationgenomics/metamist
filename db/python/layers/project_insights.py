@@ -668,7 +668,7 @@ INNER JOIN (
     FROM analysis
     WHERE
         status = 'COMPLETED'
-        AND type = 'CUSTOM'
+        AND type in ('CUSTOM', 'matrixtable')
         AND JSON_EXTRACT(meta, '$.stage') = 'AnnotateDataset'
         AND JSON_UNQUOTE(JSON_EXTRACT(meta, '$.sequencing_type')) IN :sequencing_types
     GROUP BY project, JSON_EXTRACT(meta, '$.sequencing_type')
@@ -676,7 +676,7 @@ INNER JOIN (
 AND a.timestamp_completed = max_timestamps.max_timestamp
 AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) = max_timestamps.sequencing_type
 WHERE
-    a.type = 'CUSTOM'
+    a.type in ('CUSTOM', 'matrixtable')
     AND a.status = 'COMPLETED'
     AND a.project IN :projects
     AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) IN :sequencing_types

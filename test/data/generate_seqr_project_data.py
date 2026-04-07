@@ -127,7 +127,7 @@ QUERY_ENUMS = gql(
 )
 
 
-class ped_row:  # noqa: N801
+class PedigreeRow:
     """The pedigree row class"""
 
     def __init__(self, values):
@@ -168,10 +168,10 @@ def generate_pedigree_rows(num_families=1):  # noqa: D417
 
     Returns
     -------
-    A list of ped_row objects representing a project's pedigree.
+    A list of PedigreeRow objects representing a project's pedigree.
     """
     used_ids: set[str] = set()
-    rows: list[ped_row] = []
+    rows: list[PedigreeRow] = []
     for _ in range(num_families):
         num_individuals_in_family = random.randint(1, 5)
         family_id = generate_random_id(used_ids)
@@ -180,7 +180,9 @@ def generate_pedigree_rows(num_families=1):  # noqa: D417
         if num_individuals_in_family == 1:  # Singleton
             individual_id = generate_random_id(used_ids)
             rows.append(
-                ped_row([family_id, individual_id, '', '', random.choice([0, 1]), 2])
+                PedigreeRow(
+                    [family_id, individual_id, '', '', random.choice([0, 1]), 2]
+                )
             )
             continue
 
@@ -191,13 +193,13 @@ def generate_pedigree_rows(num_families=1):  # noqa: D417
                 0
             ]
             rows.append(
-                ped_row([family_id, parent_id, '', '', parent_sex, parent_affected])
+                PedigreeRow([family_id, parent_id, '', '', parent_sex, parent_affected])
             )
 
             individual_id = generate_random_id(used_ids)
             if parent_sex == 1:
                 rows.append(
-                    ped_row(
+                    PedigreeRow(
                         [
                             family_id,
                             individual_id,
@@ -210,7 +212,7 @@ def generate_pedigree_rows(num_families=1):  # noqa: D417
                 )
             else:
                 rows.append(
-                    ped_row(
+                    PedigreeRow(
                         [
                             family_id,
                             individual_id,
@@ -227,7 +229,9 @@ def generate_pedigree_rows(num_families=1):  # noqa: D417
                 founder_id = generate_random_id(used_ids)
                 sex = i + 1
                 affected = random.choices([0, 1, 2], weights=[0.05, 0.8, 0.15], k=1)[0]
-                founders.append(ped_row([family_id, founder_id, '', '', sex, affected]))
+                founders.append(
+                    PedigreeRow([family_id, founder_id, '', '', sex, affected])
+                )
 
             rows.extend(founders)
             # Generate remaining individuals in the family
@@ -246,7 +250,7 @@ def generate_pedigree_rows(num_families=1):  # noqa: D417
                     0
                 ]  # Randomly assign affected status
                 rows.append(
-                    ped_row(
+                    PedigreeRow(
                         [
                             family_id,
                             individual_id,
