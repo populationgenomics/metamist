@@ -8,7 +8,6 @@ from models.models import (
     PRIMARY_EXTERNAL_ORG,
     AssayUpsertInternal,
     ParticipantUpsertInternal,
-    ProjectInsightsSummaryInternal,
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
@@ -93,24 +92,23 @@ class TestProjectInsights(DbIsolatedTest):
             project_names=[self.project_name], sequencing_types=['genome', 'exome']
         )
 
-        expected = [
-            ProjectInsightsSummaryInternal(
-                project=self.project_id,
-                dataset=self.project_name,  # for ProjectInsights, dataset is project.name
-                sequencing_type='genome',
-                sequencing_technology='short-read',
-                total_families=0,
-                total_participants=1,
-                total_samples=1,
-                total_sequencing_groups=1,
-                total_crams=0,
-                latest_annotate_dataset=None,
-                latest_snv_es_index=None,
-                latest_sv_es_index=None,
-            ),
-        ]
-
-        self.assertEqual(result, expected)
+        self.assertEqual(len(result), 1)
+        row = result[0]
+        self.assertEqual(row.project, self.project_id)
+        self.assertEqual(row.dataset, self.project_name)
+        self.assertEqual(row.sequencing_type, 'genome')
+        self.assertEqual(row.sequencing_technology, 'short-read')
+        self.assertEqual(row.total_families, 0)
+        self.assertEqual(row.total_participants, 1)
+        self.assertEqual(row.total_samples, 1)
+        self.assertEqual(row.total_sequencing_groups, 1)
+        self.assertEqual(row.total_crams, 0)
+        self.assertIsNone(row.latest_annotate_dataset)
+        self.assertIsNone(row.latest_snv_es_index)
+        self.assertIsNone(row.latest_sv_es_index)
+        self.assertEqual(row.family_ids, [])
+        self.assertEqual(len(row.participant_ids), 1)
+        self.assertEqual(len(row.sample_ids), 1)
 
     @run_as_sync
     async def test_project_insights_details(self):

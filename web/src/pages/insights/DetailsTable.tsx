@@ -23,10 +23,20 @@ const getRowClassName = (sequencingType: string) => {
     }
 }
 
+const getReportLabel = (key: 'stripy' | 'mito', participantExtId: string): string => {
+    if (key === 'stripy') return `Stripy ${participantExtId}`
+    return `MitoReport ${participantExtId}`
+}
+
 const getCellValue = (details: ProjectInsightsDetails, key: ColumnKey): React.ReactNode => {
     if (key === 'stripy' || key === 'mito') {
         const report = details.web_reports?.[key]
-        return report ? <a href={(report as { url: string }).url}>Link</a> : 'N/A'
+        if (!report) return 'N/A'
+        return (
+            <a href={(report as { url: string }).url} target="_blank" rel="noopener noreferrer">
+                {getReportLabel(key, details.participant_ext_id)}
+            </a>
+        )
     }
     if (key === 'cram') {
         // Return the cram timestamp_completed string if it exists, otherwise return 'N/A'
@@ -150,12 +160,13 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
         const url = URL.createObjectURL(blob)
         const link = document.createElement('a')
         link.href = url
-        const currentDate = new Date().toISOString().slice(0, 19)
+        const currentDate = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
         const fileName = `project_insights_details_${currentDate}.${format}`
         link.setAttribute('download', fileName)
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
+        URL.revokeObjectURL(url)
     }
 
     const exportOptions = [
@@ -174,6 +185,8 @@ const DetailsTable: React.FC<DetailsTableProps> = ({
                     icon="download"
                     options={exportOptions}
                     text="Export"
+                    selectOnBlur={false}
+                    value={null}
                     onChange={(_, data) => exportToFile(data.value as 'csv' | 'tsv')}
                 />
             </div>

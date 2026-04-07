@@ -29,6 +29,13 @@ function useFilterData<T extends ProjectInsightsSummary | ProjectInsightsDetails
                     const report = webReports?.[key]
                     return values.has(report ? 'Yes' : 'No')
                 }
+                if (key === 'cram') {
+                    const projectInsightsItem = item as ProjectInsightsDetails
+                    const cram = projectInsightsItem.cram as {
+                        timestamp_completed?: string
+                    }
+                    return values.has(cram?.timestamp_completed || 'N/A')
+                }
                 if (typeof itemValue === 'boolean') {
                     return values.has(itemValue ? 'Yes' : 'No')
                 }
