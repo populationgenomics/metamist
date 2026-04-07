@@ -304,7 +304,7 @@ class TestCohortData:
             ),
         )
         assert isinstance(result.cohort_id, int)
-        assert len(result.sequencing_group_ids) == 2
+        assert result.sequencing_group_ids and len(result.sequencing_group_ids) == 2
         assert self.sgB_raw in result.sequencing_group_ids
         assert self.sgC_raw in result.sequencing_group_ids
 
@@ -322,7 +322,7 @@ class TestCohortData:
             ),
         )
         assert isinstance(result.cohort_id, int)
-        assert len(result.sequencing_group_ids) == 2
+        assert result.sequencing_group_ids and len(result.sequencing_group_ids) == 2
         assert self.sgA_raw in result.sequencing_group_ids
         assert self.sgB_raw in result.sequencing_group_ids
 
@@ -356,7 +356,7 @@ class TestCohortData:
             ),
         )
         assert isinstance(result.cohort_id, int)
-        assert len(result.sequencing_group_ids) == 2
+        assert result.sequencing_group_ids and len(result.sequencing_group_ids) == 2
         assert self.sgA_raw in result.sequencing_group_ids
         assert self.sgB_raw in result.sequencing_group_ids
 
@@ -393,7 +393,7 @@ class TestCohortData:
                 sample_type=['blood'],
             ),
         )
-        assert len(result.sequencing_group_ids) == 1
+        assert result.sequencing_group_ids and len(result.sequencing_group_ids) == 1
         assert self.sgB_raw in result.sequencing_group_ids
 
     @pytest.mark.asyncio
@@ -484,7 +484,7 @@ class TestCohortData:
             dry_run=False,
             template_id=template,
         )
-        assert len(coh1.sequencing_group_ids) == 2
+        assert coh1.sequencing_group_ids and len(coh1.sequencing_group_ids) == 2
 
         sD = await self.samplel.upsert_sample(get_sample_model('D'))  # noqa: N806
         sgD_raw = sD.sequencing_groups[0].id  # noqa: N806
@@ -496,7 +496,7 @@ class TestCohortData:
             dry_run=False,
             template_id=template,
         )
-        assert len(coh2.sequencing_group_ids) == 3
+        assert coh2.sequencing_group_ids and len(coh2.sequencing_group_ids) == 3
         assert sgD_raw not in coh1.sequencing_group_ids
         assert sgD_raw in coh2.sequencing_group_ids
 
