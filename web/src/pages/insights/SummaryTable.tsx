@@ -289,7 +289,7 @@ const SummaryTable: React.FC<SummaryTableProps> = ({
                     {sortedData.map((summary: ProjectInsightsSummary) => (
                         <SummaryTableRow
                             summary={summary}
-                            key={`${summary.project}_${summary.dataset}`}
+                            key={`${summary.project}_${summary.sequencing_type}_${summary.sequencing_technology}`}
                         />
                     ))}
                 </SUITable.Body>
