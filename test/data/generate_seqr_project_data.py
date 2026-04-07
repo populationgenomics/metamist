@@ -8,12 +8,23 @@ import random
 import sys
 import tempfile
 
-from metamist.apis import AnalysisApi, FamilyApi, ParticipantApi, ProjectApi, SampleApi
+from metamist.apis import (
+    AnalysisApi,
+    CohortApi,
+    EnumsApi,
+    FamilyApi,
+    ParticipantApi,
+    ProjectApi,
+    SampleApi,
+)
 from metamist.graphql import gql, query_async
 from metamist.model.analysis import Analysis
 from metamist.models import (
     AnalysisStatus,
     AssayUpsert,
+    BodyCreateCohortFromCriteria,
+    CohortBody,
+    CohortCriteria,
     SampleUpsert,
     SequencingGroupUpsert,
 )
@@ -65,6 +76,10 @@ PROJECTS = [
     'OMEGA',
 ]
 
+SEQ_TYPES = ['genome', 'exome', 'transcriptome']
+SEQ_TECHS = ['short-read', 'long-read']
+SEQ_PLATFORMS = ['illumina', 'oxford-nanopore', 'pacbio']
+
 LOCI = [
     'ABCD',
     'EFGH',
@@ -88,6 +103,8 @@ QUERY_PROJECT_SGS = gql(
             sequencingGroups {
                 id
                 type
+                technology
+                platform
             }
         }
     }
@@ -266,7 +283,7 @@ def generate_seq_technology(sequencing_technologies: list[str], sequencing_type:
     """Return a random sequencing technology, biased towards illumina for short-reads"""
     if sequencing_type == 'genome':
         return random.choices(['short-read', 'long-read'], weights=[0.95, 0.05], k=1)[0]
-    if sequencing_type == 'exome':
+    if sequencing_type in ['exome', 'transcriptome']:
         return 'short-read'
     return random.choice([t for t in sequencing_technologies if 'rna' in t])
 
@@ -318,14 +335,6 @@ async def generate_sample_entries(
     """
 
     sample_types = metamist_enums['enum']['sampleType']
-    sequencing_technologies = [
-        'short-read',
-        'long-read',
-        'bulk-rna-seq',
-        'single-cell-rna-seq',
-    ]
-    sequencing_platforms = ['illumina', 'oxford-nanopore', 'pacbio']
-    sequencing_types = ['genome', 'exome', 'transcriptome']
 
     # Arbitrary distribution for number of samples, sequencing groups, assays
     default_count_probabilities = {1: 0.78, 2: 0.16, 3: 0.05, 4: 0.01}
@@ -351,8 +360,8 @@ async def generate_sample_entries(
             )
             samples.append(sample)
 
-            for stype in generate_sequencing_type(
-                default_count_probabilities, sequencing_types
+            for seq_type in generate_sequencing_type(
+                default_count_probabilities, SEQ_TYPES
             ):
                 facility = random.choice(
                     [
@@ -361,12 +370,12 @@ async def generate_sample_entries(
                         'Dept of Seq.',
                     ]
                 )
-                stechnology = generate_seq_technology(sequencing_technologies, stype)
-                splatform = generate_seq_platform(sequencing_platforms, stechnology)
+                seq_tech = generate_seq_technology(SEQ_TECHS, seq_type)
+                seq_platform = generate_seq_platform(SEQ_PLATFORMS, seq_tech)
                 sg = SequencingGroupUpsert(
-                    type=stype,
-                    technology=stechnology,
-                    platform=splatform,
+                    type=seq_type,
+                    technology=seq_tech,
+                    platform=seq_platform,
                     meta={
                         'facility': facility,
                     },
@@ -385,9 +394,9 @@ async def generate_sample_entries(
                                 'facility': facility,
                                 'reads': [],
                                 'coverage': f'{random.choice([30, 90, 300, 9000, "?"])}x',
-                                'sequencing_type': stype,
-                                'sequencing_technology': stechnology,
-                                'sequencing_platform': splatform,
+                                'sequencing_type': seq_type,
+                                'sequencing_technology': seq_tech,
+                                'sequencing_platform': seq_platform,
                             },
                         )
                     )
@@ -413,29 +422,178 @@ async def generate_cram_analyses(
         k=random.randint(int(len(sequencing_groups) / 2), len(sequencing_groups)),
     )
 
-    # Insert completed CRAM analyses for the aligned sequencing groups
-    analyses_to_insert.extend(
-        [
+    # Insert completed CRAM analyses for the aligned sequencing groups, depending on their sequencing type, technology, and platform
+    for sg in aligned_sgs:
+        if sg['technology'] == 'short-read':
+            if sg['type'] == 'genome':
+                crampath = f'FAKE://{project}/cram/{sg["id"]}.cram'
+            elif sg['type'] == 'exome':
+                crampath = f'FAKE://{project}/exome/cram/{sg["id"]}.cram'
+            elif sg['type'] == 'transcriptome':
+                crampath = f'FAKE://{project}/transcriptome/cram/{sg["id"]}.cram'
+            else:
+                crampath = f'FAKE://{project}/crams/{sg["id"]}.cram'
+        elif sg['technology'] == 'long-read':
+            crampath = f'FAKE://{project}/long_read/{sg["id"]}.cram'
+        else:
+            crampath = f'FAKE://{project}/crams/{sg["id"]}.cram'
+        analyses_to_insert.append(
             Analysis(
                 sequencing_group_ids=[sg['id']],
                 type='cram',
                 status=AnalysisStatus('completed'),
                 project=project_id,
-                output=f'FAKE://{project}/crams/{sg["id"]}.cram',
+                output=crampath,
                 timestamp_completed=(
                     datetime.datetime.now()
                     - datetime.timedelta(days=random.randint(1, 15))
                 ).isoformat(),
                 meta={
+                    'sequencing_type': sg['type'],
+                    'sequencing_technology': sg['technology'],
+                    'sequencing_platform': sg['platform'],
                     # random size between 5, 25 GB
                     'size': random.randint(5 * 1024, 25 * 1024) * 1024 * 1024,
                 },
             )
-            for sg in aligned_sgs
-        ]
-    )
+        )
 
     return aligned_sgs
+
+
+async def generate_cohorts(
+    project: str,
+    aligned_sequencing_groups: list[dict],
+    cohort_api: CohortApi,
+) -> dict[tuple[str, str], str]:
+    """
+    Generates "Custom cohorts" for the input project and its aligned sequencing groups, with generated names.
+    Uses these cohort IDs when creating multi-SG analyses, like the QC and es-index analyses.
+
+    Returns a dict mapping sequencing type and technology combinations to cohort IDs (platform is ignored here).
+    """
+    # First lists of sequencing groups by type and technology
+    sgs_by_type_tech: dict[tuple[str, str], list[str]] = {}
+    for sg in aligned_sequencing_groups:
+        key = (sg['type'], sg['technology'])
+        if key not in sgs_by_type_tech:
+            sgs_by_type_tech[key] = []
+        sgs_by_type_tech[key].append(sg['id'])
+
+    # Next, create cohorts for each combination of sequencing type and technology
+    cohort_ids_by_type_tech: dict[tuple[str, str], str] = {}
+    for (seq_type, seq_tech), sg_ids in sgs_by_type_tech.items():
+        cohort_criteria = CohortCriteria(
+            sg_ids_internal=sg_ids,
+        )
+        cohort_body = CohortBody(
+            name=f'{project} {seq_type} {seq_tech} {datetime.date.today().isoformat()}',
+            description=f'{seq_type} and {seq_tech} only',
+        )
+        cohort = cohort_api.create_cohort_from_criteria(
+            project=project,
+            body_create_cohort_from_criteria=BodyCreateCohortFromCriteria(
+                cohort_spec=cohort_body,
+                cohort_criteria=cohort_criteria,
+            ),
+        )
+        cohort_ids_by_type_tech[(seq_type, seq_tech)] = cohort['cohort_id']
+
+    return cohort_ids_by_type_tech
+
+
+async def generate_qc_analyses(
+    project: str,
+    cohort_ids_by_type_tech: dict[tuple[str, str], str],
+    analyses_to_insert: list[Analysis],
+):
+    """
+    Generates multi-SG analyses of type QC for the input project and cohorts, with random QC metrics in the meta field.
+    Created QC analyses include all SGs in the given cohorts, with results from stages `CramMultiQC` and `SomalierPedigree`.
+    """
+    for (seq_type, seq_tech), cohort_id in cohort_ids_by_type_tech.items():
+        if seq_tech == 'long-read':
+            continue
+        if seq_type in ['exome', 'genome']:
+            analyses_to_insert.append(
+                Analysis(
+                    cohort_ids=[cohort_id],
+                    type='qc',
+                    status=AnalysisStatus('completed'),
+                    output=f'FAKE::{project}-{seq_type}-qc-{datetime.date.today()}.json',
+                    meta={'stage': 'CramMultiQC', 'sequencing_type': seq_type},
+                )
+            )
+            analyses_to_insert.append(
+                Analysis(
+                    cohort_ids=[cohort_id],
+                    type='qc',
+                    status=AnalysisStatus('completed'),
+                    output=f'FAKE::{project}-{seq_type}-qc-{datetime.date.today()}.json',
+                    meta={'stage': 'SomalierPedigree', 'sequencing_type': seq_type},
+                )
+            )
+
+
+async def generate_seqr_loader_analyses(
+    project: str,
+    cohort_ids_by_type_tech: dict[tuple[str, str], str],
+    analyses_to_insert: list[Analysis],
+):
+    """
+    Generates matrixtable analyses from the AnnotateDataset stage, and ES-index analyses
+    from the MtToEs stage, using the generated cohorts for the input project.
+
+    Extends the `analyses_to_insert` list with the new analyses, which will be inserted
+    in bulk at the end of the main function.
+    """
+    for (seq_type, seq_tech), cohort_id in cohort_ids_by_type_tech.items():
+        if seq_tech == 'long-read':
+            continue
+        if seq_type in ['exome', 'genome']:
+            analyses_to_insert.extend(
+                [
+                    Analysis(
+                        cohort_ids=[cohort_id],
+                        type='matrixtable',
+                        status=AnalysisStatus('completed'),
+                        output=f'FAKE::{project}-{seq_type}-{datetime.date.today()}.mt',
+                        meta={'stage': 'AnnotateDataset', 'sequencing_type': seq_type},
+                    ),
+                    Analysis(
+                        cohort_ids=[cohort_id],
+                        type='es-index',
+                        status=AnalysisStatus('completed'),
+                        output=f'FAKE::{project}-{seq_type}-es-{datetime.date.today()}.done',
+                        meta={'stage': 'MtToEs', 'sequencing_type': seq_type},
+                    ),
+                ]
+            )
+            # Insert an SV es-index for genomes, and a GCNV es-index for exomes
+            if seq_type == 'genome':
+                analyses_to_insert.extend(
+                    [
+                        Analysis(
+                            cohort_ids=[cohort_id],
+                            type='es-index',
+                            status=AnalysisStatus('completed'),
+                            output=f'FAKE::{project}-{seq_type}-sv-{datetime.date.today()}.done',
+                            meta={'stage': 'MtToEsSv', 'sequencing_type': seq_type},
+                        ),
+                    ]
+                )
+            elif seq_type == 'exome':
+                analyses_to_insert.extend(
+                    [
+                        Analysis(
+                            cohort_ids=[cohort_id],
+                            type='es-index',
+                            status=AnalysisStatus('completed'),
+                            output=f'FAKE::{project}-{seq_type}-gcnv-{datetime.date.today()}.done',
+                            meta={'stage': 'MtToEsCNV', 'sequencing_type': seq_type},
+                        ),
+                    ]
+                )
 
 
 async def generate_web_report_analyses(
@@ -463,7 +621,7 @@ async def generate_web_report_analyses(
 
         return {'outliers_detected': outliers_detected, 'outlier_loci': outlier_loci}
 
-    # Insert completed web analyses for the aligned sequencing groups
+    # Insert a completed web analysis for MitoReport and STRipy reports for each of the aligned sequencing groups
     for sg in aligned_sequencing_groups:
         stripy_outliers = get_stripy_outliers()
         analyses_to_insert.extend(
@@ -481,8 +639,8 @@ async def generate_web_report_analyses(
                     meta={
                         'stage': 'Stripy',
                         'sequencing_type': sg['type'],
-                        # random size between 5, 50 MB
-                        'size': random.randint(5 * 1024, 25 * 1024) * 1024,
+                        # random size between 0.5, 2.5 MB
+                        'size': random.randint(512, 2560) * 1024,
                         'outliers_detected': stripy_outliers['outliers_detected'],
                         'outlier_loci': stripy_outliers['outlier_loci'],
                     },
@@ -500,76 +658,29 @@ async def generate_web_report_analyses(
                     meta={
                         'stage': 'MitoReport',
                         'sequencing_type': sg['type'],
-                        # random size between 5, 50 MB
-                        'size': random.randint(5 * 1024, 25 * 1024) * 1024,
+                        # random size between 0.5, 2.5 MB
+                        'size': random.randint(512, 2560) * 1024,
                     },
                 ),
             ]
         )
-
-
-async def generate_joint_called_analyses(
-    project: str, aligned_sgs: list[dict], analyses_to_insert: list[Analysis]
-):
-    """
-    Selects a subset of the aligned sequencing groups for the input project and
-    generates joint-called AnnotateDataset and ES-index analysis entries for them.
-    """
-    seq_type_to_sg_list = {
-        'genome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'genome'],
-        'exome': [sg['id'] for sg in aligned_sgs if sg['type'] == 'exome'],
-        'transcriptome': [
-            sg['id'] for sg in aligned_sgs if sg['type'] == 'transcriptome'
-        ],
-    }
-    for seq_type, sg_list in seq_type_to_sg_list.items():
-        if not sg_list:
-            continue
-        joint_called_sgs = random.sample(sg_list, k=random.randint(1, len(sg_list)))
-
-        analyses_to_insert.extend(
-            [
-                Analysis(
-                    sequencing_group_ids=joint_called_sgs,
-                    type='custom',
-                    status=AnalysisStatus('completed'),
-                    output=f'FAKE::{project}-{seq_type}-{datetime.date.today()}.mt',
-                    meta={'stage': 'AnnotateDataset', 'sequencing_type': seq_type},
-                ),
-                Analysis(
-                    sequencing_group_ids=joint_called_sgs,
-                    type='es-index',
-                    status=AnalysisStatus('completed'),
-                    output=f'FAKE::{project}-{seq_type}-es-{datetime.date.today()}',
-                    meta={'stage': 'MtToEs', 'sequencing_type': seq_type},
-                ),
-            ]
+    # Also insert a web report for the STRipy index for the whole project
+    analyses_to_insert.append(
+        Analysis(
+            sequencing_group_ids=[sg['id'] for sg in aligned_sequencing_groups],
+            project=project_id,
+            type='web',
+            status=AnalysisStatus('completed'),
+            output=f'FAKE://{project}/stripy/index.html',
+            timestamp_completed=datetime.datetime.now().isoformat(),
+            meta={
+                'stage': 'MakeIndexPage',
+                'sequencing_type': 'genome',
+                # random size between 5, 50 MB
+                'size': random.randint(5 * 1024, 50 * 1024) * 1024,
+            },
         )
-
-        if seq_type == 'genome':
-            analyses_to_insert.extend(
-                [
-                    Analysis(
-                        sequencing_group_ids=joint_called_sgs,
-                        type='es-index',
-                        status=AnalysisStatus('completed'),
-                        output=f'FAKE::{project}-{seq_type}-sv-{datetime.date.today()}',
-                        meta={'stage': 'MtToEsSv', 'sequencing_type': seq_type},
-                    ),
-                ]
-            )
-        elif seq_type == 'exome':
-            analyses_to_insert.extend(
-                [
-                    Analysis(
-                        sequencing_group_ids=joint_called_sgs,
-                        type='es-index',
-                        status=AnalysisStatus('completed'),
-                        output=f'FAKE::{project}-{seq_type}-gcnv-{datetime.date.today()}',
-                        meta={'stage': 'MtToEsCNV', 'sequencing_type': seq_type},
-                    ),
-                ]
-            )
+    )
 
 
 async def main():
@@ -583,7 +694,10 @@ async def main():
     aapi = AnalysisApi()
     papi = ProjectApi()
     sapi = SampleApi()
+    logging.getLogger().setLevel(logging.WARN)
     metamist_enums: dict[str, dict[str, list[str]]] = await query_async(QUERY_ENUMS)
+    logging.getLogger().setLevel(logging.INFO)
+    await EnumsApi().post_analysis_types_async('matrixtable')
 
     existing_projects = await papi.get_my_projects_async()
     for project in PROJECTS:
@@ -640,12 +754,17 @@ async def main():
         aligned_sgs = await generate_cram_analyses(
             project, project_id, analyses_to_insert
         )
+        cohort_ids_by_type_tech = await generate_cohorts(
+            project, aligned_sgs, CohortApi()
+        )
 
         await generate_web_report_analyses(
             project, project_id, aligned_sgs, analyses_to_insert
         )
 
-        await generate_joint_called_analyses(project, aligned_sgs, analyses_to_insert)
+        await generate_seqr_loader_analyses(
+            project, cohort_ids_by_type_tech, analyses_to_insert
+        )
 
         for analyses in chunk(analyses_to_insert, 50):
             logging.info(f'Inserting {len(analyses)} analysis entries into {project}')
