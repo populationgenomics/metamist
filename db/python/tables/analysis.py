@@ -313,13 +313,14 @@ class AnalysisTable(DbBase):
                     analysis_files[row['analysis_id']]['output'] = ''
 
                 # if analysis_files[row['analysis_id']]['outputs'] is a str, we set it to a list and append the str to it:
-                if isinstance(analysis_files[row['analysis_id']]['outputs'], str):
-                    analysis_files[row['analysis_id']]['outputs'] = [
-                        analysis_files[row['analysis_id']]['outputs']  # type: ignore [list-item]
-                    ]
-                analysis_files[row['analysis_id']]['outputs'].append(  # type: ignore [union-attr]
-                    (file_internal, row['json_structure'])
-                )
+                outputs = analysis_files[row['analysis_id']]['outputs']
+                new_output = (file_internal, row['json_structure'])
+                if isinstance(outputs, str):
+                    outputs = [outputs, new_output]
+                else:
+                    outputs.append(new_output)
+
+                analysis_files[row['analysis_id']]['outputs'] = outputs
             else:
                 # If no file_id, just set to the output.
                 analysis_files[row['analysis_id']]['output'] = row['output']
