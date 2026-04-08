@@ -79,11 +79,13 @@ class TestProjectInsights:
 
     @pytest.fixture(autouse=True)
     async def set_up(self, connection_with_project: Connection) -> None:
+        assert connection_with_project.project is not None
         self.partl = ParticipantLayer(connection_with_project)
         self.pil = ProjectInsightsLayer(connection_with_project)
         self.sampl = SampleLayer(connection_with_project)
         self.seql = AssayLayer(connection_with_project)
         self.project_name = connection_with_project.project.name
+        assert connection_with_project.project_id is not None
         self.project_id = connection_with_project.project_id
 
     @pytest.mark.project_roles(['writer'])

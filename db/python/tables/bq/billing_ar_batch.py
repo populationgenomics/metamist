@@ -572,7 +572,7 @@ class BillingArBatchTable(BillingBaseTable):
             seq_id_map,
             sample_id_map,
             sample_to_seq_grp,
-        ) = await self.get_sequencing_groups(connection, query.search_ids)
+        ) = await self.get_sequencing_groups(connection, query.search_ids or [])
 
         # Get all batch_id with min/max day for each of the seq group
         batch_ids = self.get_batch_ids_by_seq_groups(sequencing_groups)

@@ -96,6 +96,7 @@ class BillingBaseTable(BqDbBase):
         # creates a new connection instance
         # and queries per requests are run in sequencial order,
         # waiting for the previous one to finish
+        assert query_job.total_bytes_processed is not None
         self._connection.cost += (
             query_job.total_bytes_processed / 1024**4
         ) * BQ_COST_PER_TB

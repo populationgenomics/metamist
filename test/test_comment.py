@@ -962,6 +962,7 @@ class TestComment:
 
         assert sequencing_group.assays is not None
         assay = sequencing_group.assays[0]
+        assert assay.id is not None
 
         project_id = self.project['id']
         project_name = self.project['name']

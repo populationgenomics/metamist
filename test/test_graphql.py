@@ -102,6 +102,7 @@ class TestGraphQL:
     async def set_up(self, connection_with_project: Connection) -> None:
         """Setup the tests"""
         self.player = ParticipantLayer(connection_with_project)
+        assert connection_with_project.project is not None
         self.project_name = connection_with_project.project.name
         self.flayer = FamilyLayer(connection_with_project)
         self.alayer = AnalysisLayer(connection_with_project)
@@ -157,6 +158,9 @@ class TestGraphQL:
         p = (await self.player.upsert_participants([_get_single_participant_upsert()]))[
             0
         ]
+        assert p.samples is not None
+        assert p.samples[0].sequencing_groups is not None
+        assert p.samples[0].sequencing_groups[0].assays is not None
 
         query = """
 query MyQuery($project: String!) {
@@ -243,6 +247,9 @@ query MyQuery($project: String!) {
     async def test_sg_analyses_query(self, graphql_query: GraphQLQueryFunction):
         """Example graphql query of analyses from sequencing-group"""
         p = await self.player.upsert_participant(_get_single_participant_upsert())
+        assert p.samples is not None
+        assert p.samples[0].sequencing_groups is not None
+        assert p.samples[0].sequencing_groups[0].id is not None
         sg_id = p.samples[0].sequencing_groups[0].id
 
         await self.alayer.create_analysis(
@@ -337,6 +344,7 @@ query MyQuery($project: String!) {{
                 external_ids={PRIMARY_EXTERNAL_ORG: 'Demeter'}, meta={}, samples=[]
             )
         )
+        assert p.id is not None
 
         phenotypes = {'phenotype1': 'value1', 'phenotype2': {'number': 123}}
         # insert participant_phenotypes
@@ -517,6 +525,9 @@ query MyQuery($project: String!) {
     ):
         """Test getting project name from analysis"""
         p = await self.player.upsert_participant(_get_single_participant_upsert())
+        assert p.samples is not None
+        assert p.samples[0].sequencing_groups is not None
+        assert p.samples[0].sequencing_groups[0].id is not None
         sg_id = p.samples[0].sequencing_groups[0].id
 
         await self.alayer.create_analysis(

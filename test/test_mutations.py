@@ -534,6 +534,8 @@ class TestMutations:
             maternal_id=self.mat_id,
             affected=2,
         )
+        assert connection_with_project.project
+        assert connection_with_project.project_id
         self.project_id = connection_with_project.project_id
         self.project_name = connection_with_project.project.name
         self.connection = connection_with_project
@@ -1317,8 +1319,13 @@ class TestCohortMutations:
         self.cl = CohortLayer(connection_with_project)
         self.sgl = SequencingGroupLayer(connection_with_project)
         self.sample = await self.sl.upsert_sample(get_test_sample())
+        assert connection_with_project.project
+        assert connection_with_project.project_id
         self.project_id = connection_with_project.project_id
         self.project_name = connection_with_project.project.name
+        assert self.sample.sequencing_groups
+        assert self.sample.sequencing_groups[0].id
+        assert self.sample.sequencing_groups[1].id
         self.genome_sequencing_group_id_1 = self.sample.sequencing_groups[0].id
         self.genome_sequencing_group_id_external_1 = (
             self.sample.sequencing_groups[0].to_external().id
@@ -1375,6 +1382,7 @@ class TestCohortMutations:
         """Test mutation and API to create a cohort from sequencing group criteria with archived sgs and exclude archived sgs set to true"""
         await self.sgl.archive_sequencing_group(self.genome_sequencing_group_id_1)
 
+        assert self.sample.sequencing_groups is not None
         graphql_response = (
             await graphql_query(
                 CREATE_COHORT_FROM_CRITERIA_MUTATION_WITH_EXCLUDE,
@@ -1562,6 +1570,7 @@ class TestCohortMutations:
         api_result = (
             await self.cl.query(CohortFilter(id=GenericFilter(eq=api_cohort.cohort_id)))
         )[0]
+        assert api_cohort.sequencing_group_ids is not None
         assert len(api_cohort.sequencing_group_ids) == 1
         assert api_result.template_id != template_id
 

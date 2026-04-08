@@ -93,6 +93,7 @@ async def fake_sequencing_group(connection_with_project: Connection) -> int:
     )
 
     assert sample.sequencing_groups
+    assert sample.sequencing_groups[0].id
     return sample.sequencing_groups[0].id
 
 
@@ -430,6 +431,7 @@ class TestOutputFiles:
         assert (await row_count('output_file')) == 3
 
         proj_permission_table = ProjectPermissionsTable(connection_with_project)
+        assert connection_with_project.project is not None
         project = connection_with_project.project
         assert await proj_permission_table.delete_project_data(project)
 

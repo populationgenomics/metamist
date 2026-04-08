@@ -130,7 +130,7 @@ async def append_sample_cost_record(
     Returns:
         list[dict]: The updated list of result records.
     """
-    if row.get('cost_category').startswith('Average Sample'):
+    if row.get('cost_category', '').startswith('Average Sample'):
         # skip sample average cost rows to avoid double counting
         return results
 

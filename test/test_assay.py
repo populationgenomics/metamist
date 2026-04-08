@@ -41,6 +41,7 @@ async def sample_id(
             meta={'Testing': 'test_assay'},
         )
     )
+    assert sample.id is not None
     return sample.id
 
 
@@ -85,6 +86,7 @@ class TestAssay:
                 external_ids=external_ids,
             )
         )
+        assert upserted_assay.id is not None
 
         assay = await assay_layer.get_assay_by_id(assay_id=upserted_assay.id)
 
@@ -258,6 +260,7 @@ class TestAssay:
                 meta={'collection-year': '2022'},
             )
         )
+        assert sample.id is not None
         sample_id_for_test = sample.id
 
         seqs = await assay_layer.upsert_assays(
@@ -414,7 +417,9 @@ class TestAssay:
             )
         )
 
+        assert sample.sequencing_groups is not None
         sg_id = sample.sequencing_groups[0].id
+        assert sg_id is not None
         assert sample.sequencing_groups[0].assays is not None
         assay_ids_sg1 = {a.id for a in sample.sequencing_groups[0].assays}
 
@@ -431,6 +436,7 @@ class TestAssay:
         )
         assert len(assays_batch_1a) == 1
         batch_1a_assay = next(iter(assays_batch_1a.values()))[0]
+        assert batch_1a_assay.meta is not None
         assert batch_1a_assay.meta['batch'] == 'batch-1a'
 
     @pytest.mark.project_roles(['reader', 'writer'])
@@ -454,6 +460,7 @@ class TestAssay:
                 },
             )
         )
+        assert assay.id is not None
 
         await assay_layer.upsert_assay(
             AssayUpsertInternal(
@@ -522,6 +529,8 @@ class TestAssay:
         connection_with_project: Connection,
     ) -> None:
         """Test batch statistics."""
+        assert connection_with_project.project_id is not None
+
         samples_to_insert = [
             SampleUpsertInternal(
                 external_ids={PRIMARY_EXTERNAL_ORG: 'SAMPLE_1'},
@@ -669,6 +678,7 @@ class TestAssay:
         )
         for r in rows:
             # sequencing_group_ids has format [(sg_id, assay_count), ...]
+            assert r.batch is not None
             assays_in_batch[r.batch] += sum(sg[1] for sg in r.sequencing_group_ids)
             sgs_in_seq_type_batch[r.batch][r.sequencing_type] += len(
                 r.sequencing_group_ids

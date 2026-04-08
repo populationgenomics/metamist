@@ -140,6 +140,7 @@ class PostgresContainer(DockerContainer):
         for statement in statements:
             exit_code, output = self.exec(f'psql "{database_url}" -c "{statement}"')
             if exit_code != 0:
+                assert isinstance(output, bytes)
                 raise RuntimeError(
                     f'Failed to execute SQL with exit code {exit_code}: {output.decode()}'
                 )
@@ -151,6 +152,7 @@ class PostgresContainer(DockerContainer):
             f'dbmate --url "{database_url}?sslmode=disable&search_path=public,main,history" --migrations-dir /db/migrations --no-dump-schema migrate'
         )
         if exit_code != 0:
+            assert isinstance(output, bytes)
             raise RuntimeError(
                 f'dbmate migration failed with exit code {exit_code}: {output.decode()}'
             )

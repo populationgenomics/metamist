@@ -43,6 +43,7 @@ async def test_sample(connection_with_project: Connection) -> int:
 
     await SampleLayer(connection_with_project).upsert_sample(sample, project=project_id)
 
+    assert sample.id is not None
     return sample.id
 
 
@@ -115,13 +116,16 @@ class TestSequencingGroup:
         sg_layer = SequencingGroupLayer(connection_with_project)
 
         sg_upsert = await sg_layer.upsert_sequencing_groups([sequencing_group_model])
+        assert sg_upsert[0].id is not None
         sg_id = sg_upsert[0].id
         sg = await sg_layer.get_sequencing_group_by_id(sg_id)
+        assert sg.platform is not None
 
         inserted_sg = sg_upsert[0]
         assert inserted_sg.id == sg_id
         assert inserted_sg.type == sg.type
         assert inserted_sg.technology == sg.technology
+        assert inserted_sg.platform is not None
         assert inserted_sg.platform.lower() == sg.platform.lower()
         assert inserted_sg.meta == sg.meta
 
@@ -136,6 +140,7 @@ class TestSequencingGroup:
         sg_layer = SequencingGroupLayer(connection_with_project)
         # Create the initial SG
         initial_sg = await sg_layer.upsert_sequencing_groups([sequencing_group_model])
+        assert initial_sg[0].id
 
         # Create an updated model for upsert
         upsert_sg_model = SequencingGroupUpsertInternal(
@@ -164,6 +169,8 @@ class TestSequencingGroup:
         sg_layer = SequencingGroupLayer(connection_with_project)
         # Create the initial SG
         initial_sg = await sg_layer.upsert_sequencing_groups([sequencing_group_model])
+        assert initial_sg[0].id is not None
+        assert initial_sg[0].assays is not None
 
         new_upsert = SequencingGroupUpsertInternal(
             sample_id=initial_sg[0].sample_id,
@@ -279,6 +286,8 @@ class TestSequencingGroup:
         connection_with_project: Connection,
         sequencing_group_model: SequencingGroupUpsertInternal,
     ):
+        assert sequencing_group_model.assays is not None
+
         sample_layer = SampleLayer(connection_with_project)
         sg_layer = SequencingGroupLayer(connection_with_project)
 
@@ -313,6 +322,7 @@ class TestSequencingGroup:
                 )
             ],
         )
+        assert new_sg.assays is not None
 
         # Add both the fixture sg model and the new model to the db
         await sg_layer.upsert_sequencing_groups([sequencing_group_model, new_sg])
@@ -564,7 +574,9 @@ class TestSequencingGroup:
         sg1 = sgs[0].to_external().id
         sg2 = sgs[1].to_external().id
 
-        assert sg1, sg2
+        assert sgs[0].id is not None
+        assert sgs[1].id is not None
+        assert sg1 and sg2
 
         # Check that the sequencing groups aren't initially archived
         sgs_from_db = await sg_layer.get_sequencing_groups_by_ids(
@@ -681,6 +693,7 @@ class TestSequencingGroup:
         async with conn.transaction(), conn.cursor() as cur:
             await cur.executemany(test_data_query, test_data)
 
+        assert connection_with_project.project_id is not None
         sg_table = SequencingGroupTable(connection_with_project)
         result = await sg_table.get_sequencing_group_counts_by_month(
             [connection_with_project.project_id, project_2]
@@ -765,6 +778,7 @@ class TestSequencingGroup:
         async with conn.transaction(), conn.cursor() as cur:
             await cur.executemany(test_data_query, test_data)
 
+        assert connection_with_project.project_id is not None
         sg_table = SequencingGroupTable(connection_with_project)
         result = await sg_table.get_sequencing_group_counts_by_month(
             [connection_with_project.project_id]

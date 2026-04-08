@@ -32,6 +32,7 @@ class TestCohortBuilderBasic:
     @pytest.mark.asyncio
     async def test_build_empty_cohort(self, connection_with_project: Connection):
         """Test creating a cohort with no matching sequencing groups"""
+        assert connection_with_project.project is not None
         with pytest.raises(
             ValueError, match='criteria resulted in no sequencing groups'
         ):
@@ -69,6 +70,7 @@ class TestCohortBuilderData:
     @pytest.fixture(autouse=True)
     async def set_up(self, connection_with_project: Connection):
         self.connection = connection_with_project
+        assert connection_with_project.project is not None
         self.project_name = connection_with_project.project.name
         self.samplel = SampleLayer(self.connection)
 
@@ -82,6 +84,9 @@ class TestCohortBuilderData:
             get_sample_model('C', 'blood', 'genome', 'short-read', 'illumina')
         )
 
+        assert self.sA.sequencing_groups is not None
+        assert self.sB.sequencing_groups is not None
+        assert self.sC.sequencing_groups is not None
         self.sgA = sequencing_group_id_format(self.sA.sequencing_groups[0].id)
         self.sgB = sequencing_group_id_format(self.sB.sequencing_groups[0].id)
         self.sgC = sequencing_group_id_format(self.sC.sequencing_groups[0].id)

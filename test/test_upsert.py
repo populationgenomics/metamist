@@ -221,9 +221,9 @@ class TestUpsert:
         expected_sample_eid_to_participant_eid = {
             sample_eid: participant_eid
             for participant in all_participants
-            for participant_eid in participant.external_ids.values()
+            for participant_eid in (participant.external_ids or {}).values()
             for sample in participant.samples or []
-            for sample_eid in sample.external_ids.values()
+            for sample_eid in (sample.external_ids or {}).values()
         }
 
         db_participants = await (
@@ -297,7 +297,7 @@ class TestUpsert:
             )
         ).fetchone()
 
-        assert db_participant_no_assays['cnt'] == 0
+        assert db_participant_no_assays and db_participant_no_assays['cnt'] == 0
 
         db_participant_has_assays = await (
             await connection_with_project.pg_connection.execute(
@@ -312,4 +312,4 @@ class TestUpsert:
             )
         ).fetchone()
 
-        assert db_participant_has_assays['cnt'] == 2
+        assert db_participant_has_assays and db_participant_has_assays['cnt'] == 2

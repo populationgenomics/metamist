@@ -21,6 +21,7 @@ class TestParticipant:
     @pytest.fixture(autouse=True)
     async def set_up(self, connection_with_project: Connection):
         self.player = ParticipantLayer(connection_with_project)
+        assert connection_with_project.project_id is not None
         self.project_id = connection_with_project.project_id
         self.connection = connection_with_project
 
@@ -33,6 +34,7 @@ class TestParticipant:
                 },
             )
         )
+        assert self.p1.external_ids is not None
         self.p1_external_ids = {k.lower(): v for k, v in self.p1.external_ids.items()}
 
         self.p2 = await self.player.upsert_participant(
@@ -99,6 +101,7 @@ class TestParticipant:
                 },
             )
         )
+        assert result.id is not None
         participants = await self.player.get_participants_by_ids([result.id])
         assert participants[0].external_ids == {
             PRIMARY_EXTERNAL_ORG: 'P10',
@@ -130,6 +133,7 @@ class TestParticipant:
                 },
             )
         )
+        assert result.id is not None
         participants = await self.player.get_participants_by_ids([result.id])
         assert participants[0].external_ids == {
             PRIMARY_EXTERNAL_ORG: 'P1B',
@@ -154,6 +158,10 @@ class TestParticipant:
             SampleUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EB', 'foo': 'FB'})
         )
 
+        assert s1.id is not None
+        assert sa.id is not None
+        assert sb.id is not None
+
         result = await self.player.fill_in_missing_participants()
         assert result == 'Updated 2 records'
 
@@ -166,6 +174,7 @@ class TestParticipant:
 
         for s in samples:
             expected_eids = self.p1_external_ids if s.id == s1.id else s.external_ids
+            assert s.participant_id is not None
             assert p_map[s.participant_id].external_ids == expected_eids
 
     @pytest.mark.asyncio
@@ -179,6 +188,7 @@ class TestParticipant:
                 external_ids={PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'}
             ),
         )
+        assert child.id is not None
 
         await self.player.add_participant_to_family(
             family_id=fid,
@@ -208,6 +218,7 @@ class TestParticipant:
                 external_ids={PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'}
             ),
         )
+        assert child.id is not None
 
         await self.player.add_participant_to_family(
             family_id=fid,
@@ -286,6 +297,7 @@ class TestSample:
     @pytest.fixture(autouse=True)
     async def set_up(self, connection_with_project: Connection):
         self.slayer = SampleLayer(connection_with_project)
+        assert connection_with_project.project_id is not None
         self.project_id = connection_with_project.project_id
         self.connection = connection_with_project
 
@@ -365,6 +377,7 @@ class TestSample:
                 },
             )
         )
+        assert result.id is not None
         sample = await self.slayer.get_sample_by_id(result.id)
         assert sample.external_ids == {
             PRIMARY_EXTERNAL_ORG: 'S10',
@@ -396,6 +409,7 @@ class TestSample:
                 },
             )
         )
+        assert result.id is not None
         sample = await self.slayer.get_sample_by_id(result.id)
         assert sample.external_ids == {
             PRIMARY_EXTERNAL_ORG: 'S1B',
