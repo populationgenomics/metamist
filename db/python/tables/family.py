@@ -137,7 +137,7 @@ class FamilyTable(DbBase):
 
         for row in rows:
             pid = row.pop('participant_id')
-            projects.add(row.get('project'))
+            projects.add(row['project'])
             ret_map[pid].append(FamilyInternal(**row))
 
         return projects, ret_map
@@ -281,6 +281,7 @@ class FamilyTable(DbBase):
             RETURNING id
             """)
             new_id = await cur.fetchone()
+            assert isinstance(new_id, int)
 
             await cur.executemany(
                 """

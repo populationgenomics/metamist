@@ -174,6 +174,7 @@ class CohortTable(DbBase):
 
         async with self.connection.pg_connection.cursor(row_factory=scalar_row) as cur:
             cohort_template_id = await (await cur.execute(_query)).fetchone()
+            assert isinstance(cohort_template_id, int)
 
         return cohort_template_id
 
@@ -293,7 +294,9 @@ class CohortTable(DbBase):
 
         row = await (await self.connection.pg_connection.execute(_query)).fetchone()
         if row:
-            return parse_sql_bool(row['is_invalid'])
+            is_invalid = parse_sql_bool(row['is_invalid'])
+            assert is_invalid is not None
+            return is_invalid
         return False
 
 

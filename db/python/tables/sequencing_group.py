@@ -320,7 +320,7 @@ class SequencingGroupTable(DbBase):
                 sg_map[sid] = SequencingGroupInternal(**row)
 
         analysis_map: dict[int, list[SequencingGroupInternal]] = {
-            analysis_id: [sg_map.get(sgid) for sgid in sgids]
+            analysis_id: [sg_map[sgid] for sgid in sgids]
             for analysis_id, sgids in mapped_analysis_to_sequencing_group_id.items()
         }
 

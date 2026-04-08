@@ -77,7 +77,7 @@ class PubSubConnection:
     ):
         self.client: pubsub_v1.PublisherClient = pubsub_v1.PublisherClient()
         self.author: str = author
-        self.topic: str = os.getenv('METAMIST_GCP_PROJECT') + topic
+        self.topic: str = os.getenv('METAMIST_GCP_PROJECT', '') + topic
 
     @staticmethod
     async def get_connection_no_project(author: str, topic: str):

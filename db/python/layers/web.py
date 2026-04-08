@@ -126,13 +126,13 @@ class WebDb(DbBase):
 
         project_db = self.project
 
-        if not project_db:
+        if not project_db or not self.project_id:
             raise ValueError('Project not provided')
 
         project = WebProject(
             id=project_db.id,
             name=project_db.name,
-            meta=project_db.meta,
+            meta=project_db.meta or {},
             dataset=project_db.dataset,
         )
         seqr_links = self.get_seqr_links_from_project(project)
@@ -315,10 +315,14 @@ class WebDb(DbBase):
             for sample in samples_by_participant_id.get(participant.id, []):
                 nested_sgs = []
                 for sg in sequencing_groups_by_sample_id.get(sample.id, []):
+                    assert sg.id is not None
+                    assert sg.type is not None
+                    assert sg.technology is not None
+                    assert sg.platform is not None
                     nested_sgs.append(
                         NestedSequencingGroupInternal(
                             id=sg.id,
-                            meta=sg.meta,
+                            meta=sg.meta or {},
                             type=sg.type,
                             technology=sg.technology,
                             platform=sg.platform,

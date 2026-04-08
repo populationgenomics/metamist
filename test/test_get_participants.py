@@ -34,6 +34,8 @@ class TestParticipant:
     @pytest.mark.asyncio
     async def test_get_all_participants(self, connection_with_project: Connection):
         """Test getting all participants"""
+        assert connection_with_project.project_id is not None
+
         pl = ParticipantLayer(connection_with_project)
         ps = await pl.get_participants(project=connection_with_project.project_id)
 
@@ -48,6 +50,8 @@ class TestParticipant:
     @pytest.mark.asyncio
     async def test_get_participant_by_eid(self, connection_with_project: Connection):
         """Test to see what's in the database"""
+        assert connection_with_project.project_id is not None
+
         pl = ParticipantLayer(connection_with_project)
         ps = await pl.get_participants(
             project=connection_with_project.project_id,

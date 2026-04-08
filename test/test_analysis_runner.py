@@ -15,6 +15,7 @@ class TestAnalysisRunner:
     @pytest.fixture(autouse=True)
     async def set_up(self, connection_with_project: Connection) -> None:
         self.al = AnalysisRunnerLayer(connection_with_project)
+        assert connection_with_project.project_id is not None
         self.project_id = connection_with_project.project_id
 
     def get_test_analysis(self, ar_guid_param: str) -> AnalysisRunnerInternal:

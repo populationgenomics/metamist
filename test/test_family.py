@@ -218,6 +218,7 @@ class TestFamilyImportEndpoint:
         assert created_family.external_ids[PRIMARY_EXTERNAL_ORG] == 'test-family'
         assert created_family.description == 'Test family'
         assert created_family.coded_phenotype == 'test-phenotype'
+        assert created_family.meta is not None
         assert created_family.meta['key1'] == 'value1'
         assert created_family.meta['nested']['key2'] == 'value2'
 
@@ -246,6 +247,7 @@ class TestFamilyImportEndpoint:
         # Query and verify the updated meta
         updated_family = await family_layer.get_family_by_internal_id(family_id)
 
+        assert updated_family.meta is not None
         assert updated_family.meta['initial_key'] == 'updated_value'
         assert updated_family.meta['new_key'] == 'new_value'
 

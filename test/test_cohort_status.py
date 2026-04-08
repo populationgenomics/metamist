@@ -57,6 +57,7 @@ class TestStatusInCohortDBLayer:
     async def set_up(self, connection_with_project: Connection):
         self.cohort_layer = CohortLayer(connection_with_project)
         self.sample_layer = SampleLayer(connection_with_project)
+        assert connection_with_project.project_id is not None
         self.project_id = connection_with_project.project_id
         self.sg_layer = SequencingGroupLayer(connection_with_project)
         self.connection = connection_with_project
@@ -79,6 +80,8 @@ class TestStatusInCohortDBLayer:
                 sample_type=['saliva'],
             ),
         )
+        assert self.cohort.cohort_id is not None
+        self.cohort_id = self.cohort.cohort_id
 
     @pytest.mark.asyncio
     async def test_create_custom_cohort_and_verify_status(self):
@@ -88,13 +91,13 @@ class TestStatusInCohortDBLayer:
         """
 
         created_cohort_in_list = await self.cohort_layer.query(
-            CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
+            CohortFilter(id=GenericFilter(eq=self.cohort_id))
         )
         assert created_cohort_in_list
         assert len(created_cohort_in_list) == 1
 
         created_cohort = created_cohort_in_list[0]
-        assert created_cohort.id == self.cohort.cohort_id
+        assert created_cohort.id == self.cohort_id
         assert created_cohort.description == self.cohort_description
         assert created_cohort.name == self.cohort_name
         assert created_cohort.status == CohortStatus.active
@@ -109,7 +112,7 @@ class TestStatusInCohortDBLayer:
         )
         cohort = (
             await self.cohort_layer.query(
-                CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
+                CohortFilter(id=GenericFilter(eq=self.cohort_id))
             )
         )[0]
         assert cohort.status == CohortStatus.invalid
@@ -124,7 +127,7 @@ class TestStatusInCohortDBLayer:
         )
         cohort = (
             await self.cohort_layer.query(
-                CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
+                CohortFilter(id=GenericFilter(eq=self.cohort_id))
             )
         )[0]
         assert cohort.status == CohortStatus.invalid
@@ -135,6 +138,7 @@ class TestStatusInCohortDBLayer:
         Test computed cohort status when sample/s active,
         sg/s not archived and cohort status is active in the DB"""
 
+        assert self.sample_a.id is not None
         queried_sample = await self.sample_layer.get_by_id(sample_id=self.sample_a.id)
         assert queried_sample.active
 
@@ -149,14 +153,14 @@ class TestStatusInCohortDBLayer:
         # query directly from the cohort table as the returned status is computed runtime based on sample, sg and cohort
         cohort_raw_entry = await (
             await connection_with_project.pg_connection.execute(
-                t'SELECT status FROM cohort where id = {self.cohort.cohort_id}'
+                t'SELECT status FROM cohort where id = {self.cohort_id}'
             )
         ).fetchone()
         assert cohort_raw_entry['status'] == CohortStatus.active.value
 
         cohort = (
             await self.cohort_layer.query(
-                CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
+                CohortFilter(id=GenericFilter(eq=self.cohort_id))
             )
         )[0]
         assert cohort.status == CohortStatus.active
@@ -196,12 +200,12 @@ class TestStatusInCohortDBLayer:
 
         # directly update without using the cohort_db_layer
         await self.connection.pg_connection.execute(
-            t'UPDATE cohort SET status = {CohortUpdateStatus.archived.value} WHERE id = {self.cohort.cohort_id}',
+            t'UPDATE cohort SET status = {CohortUpdateStatus.archived.value} WHERE id = {self.cohort_id}',
         )
 
         cohort = (
             await self.cohort_layer.query(
-                CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
+                CohortFilter(id=GenericFilter(eq=self.cohort_id))
             )
         )[0]
         assert cohort.status == CohortStatus.archived
@@ -209,9 +213,7 @@ class TestStatusInCohortDBLayer:
     @pytest.mark.asyncio
     async def test_query_cohort_in_get_template_by_cohort_id(self):
         """Test template query for retrieved based on cohort id"""
-        template = await self.cohort_layer.get_template_by_cohort_id(
-            self.cohort.cohort_id
-        )
+        template = await self.cohort_layer.get_template_by_cohort_id(self.cohort_id)
         assert template
 
 
@@ -248,6 +250,8 @@ class TestCohortStatusGraphQL:
         )
         self.cohort_name = 'Sample cohort'
         self.cohort_description = 'Sample cohort description'
+        assert connection_with_project.project is not None
+        assert connection_with_project.project_id is not None
         self.project_id = connection_with_project.project_id
         self.project_name = connection_with_project.project.name
 
@@ -261,7 +265,9 @@ class TestCohortStatusGraphQL:
                 sample_type=['saliva'],
             ),
         )
-        self.cohort_id_formatted = cohort_id_format(self.cohort.cohort_id)
+        assert self.cohort.cohort_id is not None
+        self.cohort_id = self.cohort.cohort_id
+        self.cohort_id_formatted = cohort_id_format(self.cohort_id)
 
     @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
@@ -365,7 +371,7 @@ class TestCohortStatusGraphQL:
 
         # update cohort status and retrieve
         await self.cohort_layer.update_cohort(
-            CohortUpdateBody(status=CohortUpdateStatus.archived), self.cohort.cohort_id
+            CohortUpdateBody(status=CohortUpdateStatus.archived), self.cohort_id
         )
         query_cohort_status_eq = (
             await graphql_query(
@@ -420,7 +426,7 @@ class TestCohortStatusGraphQL:
 
         # update cohort status and retrieve
         await self.cohort_layer.update_cohort(
-            CohortUpdateBody(status=CohortUpdateStatus.archived), self.cohort.cohort_id
+            CohortUpdateBody(status=CohortUpdateStatus.archived), self.cohort_id
         )
 
         query_cohort_status_in = (
@@ -486,11 +492,7 @@ class TestCohortStatusGraphQL:
                 }
             }
         """,
-                {
-                    'cohort_id': cohort_id_format(
-                        self.cohort.cohort_id + randint(1, 100)
-                    )
-                },
+                {'cohort_id': cohort_id_format(self.cohort_id + randint(1, 100))},
             )
         )['data']
         assert not query_cohorts['cohorts']
@@ -648,7 +650,7 @@ class TestCohortStatusGraphQL:
                     }
             """,
             {
-                'id': cohort_id_format(self.cohort.cohort_id + randint(1, 100)),
+                'id': cohort_id_format(self.cohort_id + randint(1, 100)),
                 'cohort': {'name': 'Test name change'},
             },
         )
@@ -667,7 +669,7 @@ class TestCohortStatusGraphQL:
         )
         cohort = (
             await self.cohort_layer.query(
-                CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
+                CohortFilter(id=GenericFilter(eq=self.cohort_id))
             )
         )[0]
         assert cohort.status == CohortStatus.invalid
@@ -685,7 +687,7 @@ class TestCohortStatusGraphQL:
                     }
             """,
                 {
-                    'id': cohort_id_format(self.cohort.cohort_id),
+                    'id': self.cohort_id_formatted,
                     'cohort': {'status': ACTIVE},
                 },
             )
@@ -702,14 +704,14 @@ class TestCohortStatusGraphQL:
 
         # directly update cohort DB status
         await self.connection.pg_connection.execute(
-            t'UPDATE cohort SET status = {CohortUpdateStatus.archived.value} WHERE id = {self.cohort.cohort_id}'
+            t'UPDATE cohort SET status = {CohortUpdateStatus.archived.value} WHERE id = {self.cohort_id}'
         )
         await self.sample_layer.upsert_sample(
             SampleUpsertInternal(id=self.sample_a.id, active=False)
         )
         cohort = (
             await self.cohort_layer.query(
-                CohortFilter(id=GenericFilter(eq=self.cohort.cohort_id))
+                CohortFilter(id=GenericFilter(eq=self.cohort_id))
             )
         )[0]
         assert cohort.status == CohortStatus.archived
@@ -726,7 +728,7 @@ class TestCohortStatusGraphQL:
                     }
             """,
             {
-                'id': cohort_id_format(self.cohort.cohort_id),
+                'id': self.cohort_id_formatted,
                 'cohort': {'status': ACTIVE},
             },
         )
@@ -743,7 +745,7 @@ class TestCohortStatusGraphQL:
 
         # directly update cohort DB status
         await self.connection.pg_connection.execute(
-            t'UPDATE cohort SET status = {CohortUpdateStatus.archived} WHERE id = {self.cohort.cohort_id}'
+            t'UPDATE cohort SET status = {CohortUpdateStatus.archived} WHERE id = {self.cohort_id}'
         )
 
         updated_cohort = (
@@ -759,7 +761,7 @@ class TestCohortStatusGraphQL:
                     }
             """,
                 {
-                    'id': cohort_id_format(self.cohort.cohort_id),
+                    'id': self.cohort_id_formatted,
                     'cohort': {'status': ACTIVE},
                 },
             )

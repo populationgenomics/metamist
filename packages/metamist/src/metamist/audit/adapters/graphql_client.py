@@ -153,6 +153,7 @@ class GraphQLClient:
         if self._enums_cache is None:
             result = await query_async(self.QUERY_ENUMS)
             self._enums_cache = result['enum']
+            assert self._enums_cache is not None
         return self._enums_cache
 
     async def get_enum_values(self, enum_type: str) -> list[str]:

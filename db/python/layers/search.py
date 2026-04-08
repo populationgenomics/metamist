@@ -108,6 +108,8 @@ class SearchLayer(BaseLayer):
         except NotFoundError:
             return None
         result = rows[0]
+        assert result.id is not None
+        assert result.project is not None
 
         sample_id = result.sample_id
         sg_id = result.id

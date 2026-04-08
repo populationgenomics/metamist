@@ -349,6 +349,8 @@ async def generate_sample_entries(
                 participant_id=participant_id,
                 sequencing_groups=[],
             )
+            assert sample is not None
+            assert sample.sequencing_groups is not None
             samples.append(sample)
 
             for stype in generate_sequencing_type(
@@ -372,6 +374,8 @@ async def generate_sample_entries(
                     },
                     assays=[],
                 )
+                assert sg is not None
+                assert sg.assays is not None
                 sample.sequencing_groups.append(sg)
                 for _ in range(
                     generate_random_number_within_distribution(

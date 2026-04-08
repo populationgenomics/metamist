@@ -124,6 +124,7 @@ class TestParticipant:
         self, connection_with_project: Connection, graphql_query: GraphQLQueryFunction
     ):
         """Test query by id using graphql"""
+        assert connection_with_project.project is not None
         player = ParticipantLayer(connection_with_project)
 
         p = await player.upsert_participant(get_participant_to_insert())
@@ -354,6 +355,7 @@ class TestParticipant:
         self, connection_with_project: Connection, graphql_query: GraphQLQueryFunction
     ):
         """Test upserting and then updating participant with phenotypes, via graphql"""
+        assert connection_with_project.project is not None
         project_name = str(connection_with_project.project.name)
 
         phenotypes1: dict[str, Any] = {

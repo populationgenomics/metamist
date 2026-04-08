@@ -88,6 +88,7 @@ class TestApiBilling:
         response = await billing.get_cost_by_ar_guid(
             ar_guid, author=TEST_API_BILLING_USER
         )
+        assert isinstance(response.body, bytes)
         resp_json = json.loads(response.body.decode('utf-8'))
         assert len(resp_json) == 1
 
@@ -140,6 +141,7 @@ class TestApiBilling:
         response = await billing.get_cost_by_batch_id(
             batch_id, author=TEST_API_BILLING_USER
         )
+        assert isinstance(response.body, bytes)
         resp_json = json.loads(response.body.decode('utf-8'))
 
         assert len(resp_json) == 1
