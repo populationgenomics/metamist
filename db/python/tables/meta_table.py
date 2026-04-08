@@ -90,7 +90,7 @@ class MetaTable(DbBase):
             duck.register(
                 'meta_table',
                 duck.read_json(
-                    meta_rows_str,
+                    meta_rows_str,  # type: ignore (work around duckdb/duckdb-python#419)
                     map_inference_threshold=-1,
                     format='newline_delimited',
                 ).fetch_arrow_table(),
@@ -108,7 +108,7 @@ class MetaTable(DbBase):
             duck.register(
                 'external_id_table',
                 duck.read_json(
-                    external_id_rows_str,
+                    external_id_rows_str,  # type: ignore (work around duckdb/duckdb-python#419)
                     format='newline_delimited',
                 ).fetch_arrow_table(),
             )
