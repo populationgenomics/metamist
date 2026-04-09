@@ -74,7 +74,7 @@ class TestBillingBaseTable(BqTest):
 
     @pytest.fixture(autouse=True)
     def set_up(self):
-        super().set_up()
+        self.base_set_up()
 
         # setup table object
         # base is abstract, so we need to use a child class

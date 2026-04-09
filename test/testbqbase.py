@@ -115,7 +115,7 @@ class BqTest:
     author: str = 'Author'
     gcp_project: str = 'GCP_PROJECT'
 
-    def set_up(self):
+    def base_set_up(self):
 
         # mock BigQuery client
         self.bq_client = MockBqClient()
