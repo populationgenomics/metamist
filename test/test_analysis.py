@@ -1,5 +1,5 @@
-# pylint: disable=invalid-overridden-method
 import time
+from datetime import datetime
 
 from api.routes.analysis import AnalysisUpdateModel, update_analysis
 from db.python.filters import GenericFilter
@@ -24,8 +24,6 @@ from test.testbase import DbIsolatedTest, run_as_sync
 
 class TestAnalysis(DbIsolatedTest):
     """Test sample class"""
-
-    # pylint: disable=too-many-instance-attributes
 
     @run_as_sync
     async def setUp(self) -> None:
@@ -345,6 +343,26 @@ class TestAnalysis(DbIsolatedTest):
         self.assertEqual(sgs[1].id, exome_id)
 
     @run_as_sync
+    async def test_create_analysis_with_timestamp(self):
+        """Tests that analyses can be backdated by suppling timestamp_completed"""
+        # Test creation with a manually-set timestamp
+        test_timestamp = datetime(year=2013, month=2, day=22)
+        a_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='analysis-runner',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[],
+                timestamp_completed=test_timestamp,
+                meta={},
+            ),
+        )
+
+        # get the timestamp_completed of the analysis from the db
+        init_analysis = await self.al.query(AnalysisFilter(id=GenericFilter(eq=a_id)))
+
+        self.assertEqual(init_analysis[0].timestamp_completed, test_timestamp)
+
+    @run_as_sync
     async def test_update_analysis(self):
         """
         Test Analysis update
@@ -374,11 +392,19 @@ class TestAnalysis(DbIsolatedTest):
         # be sure the now is different than before
         time.sleep(2)
 
+        # test that updating with an incorrect output string raises an exception.
+        with self.assertRaises(ValueError):
+            await self.al.update_analysis(
+                a_id,
+                meta={'sequencing_type': 'genome', 'size': 1024},
+                output='test_output',
+            )
+
         # update the analysis with some new data
         await self.al.update_analysis(
             a_id,
             meta={'sequencing_type': 'genome', 'size': 1024},
-            output='test_output',
+            output='test://test_output',
         )
 
         # check the analysis after update
@@ -396,8 +422,8 @@ class TestAnalysis(DbIsolatedTest):
                 status=AnalysisStatus.COMPLETED,
                 sequencing_group_ids=[],
                 cohort_ids=[],
-                output='test_output',
-                outputs='test_output',
+                output='test://test_output',
+                outputs='test://test_output',
                 timestamp_completed=init_timestamp_completed,
                 project=1,
                 meta={'sequencing_type': 'genome', 'size': 1024},

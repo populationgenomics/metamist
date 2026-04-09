@@ -1,15 +1,14 @@
-# pylint: disable=redefined-builtin, import-outside-toplevel
-
 from typing import TYPE_CHECKING, Annotated
 
 import strawberry
-from strawberry.types import Info
 from strawberry.scalars import JSON
+from strawberry.types import Info
 
 from api.graphql.loaders import GraphQLContext
 from db.python.layers.comment import CommentLayer
 from db.python.layers.family import FamilyLayer
 from models.models.comment import CommentEntityType
+
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment, GraphQLFamily
@@ -23,6 +22,7 @@ class FamilyUpdateInput:
     external_ids: JSON | None = None
     description: str | None = None
     coded_phenotype: str | None = None
+    meta: JSON | None = None
 
 
 @strawberry.type
@@ -38,7 +38,7 @@ class FamilyMutations:
     ) -> Annotated['GraphQLComment', strawberry.lazy('api.graphql.schema')]:
         """Add a comment to a family"""
         # Import needed here to avoid circular import
-        from api.graphql.schema import GraphQLComment
+        from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
         connection = info.context['connection']
         cl = CommentLayer(connection)
@@ -54,7 +54,7 @@ class FamilyMutations:
         info: Info,
     ) -> Annotated['GraphQLFamily', strawberry.lazy('api.graphql.schema')]:
         """Update information for a single family"""
-        from api.graphql.schema import GraphQLFamily
+        from api.graphql.schema import GraphQLFamily  # noqa: PLC0415
 
         connection = info.context['connection']
         flayer = FamilyLayer(connection)
@@ -63,6 +63,7 @@ class FamilyMutations:
             external_ids=family.external_ids,  # type: ignore [arg-type]
             description=family.description,  # type: ignore [arg-type]
             coded_phenotype=family.coded_phenotype,  # type: ignore [arg-type]
+            meta=family.meta,  # type: ignore [arg-type]
         )
         updated_family = await flayer.get_family_by_internal_id(family.id)  # type: ignore [arg-type]
 

@@ -1,8 +1,16 @@
 from fastapi import APIRouter
 
-from api.utils.db import Connection, get_project_db_connection
+from api.utils.db import (
+    Connection,
+    get_project_db_connection,
+)
 from db.python.layers.cohort import CohortLayer
-from models.models.cohort import CohortBody, CohortCriteria, CohortTemplate, NewCohort
+from models.models.cohort import (
+    CohortBody,
+    CohortCriteria,
+    CohortTemplate,
+    NewCohort,
+)
 from models.models.project import (
     FullWriteAccessRoles,
     ProjectId,
@@ -14,10 +22,15 @@ from models.utils.cohort_template_id_format import (
     cohort_template_id_transform_to_raw,
 )
 
+
 router = APIRouter(prefix='/cohort', tags=['cohort'])
 
 
-@router.post('/{project}/cohort', operation_id='createCohortFromCriteria')
+@router.post(
+    '/{project}/cohort',
+    operation_id='createCohortFromCriteria',
+    response_model_exclude_none=True,  # used to conditionally return excluded_ineligible_sg_ids_internal attribute
+)
 async def create_cohort_from_criteria(
     cohort_spec: CohortBody,
     cohort_criteria: CohortCriteria | None = None,
@@ -25,6 +38,7 @@ async def create_cohort_from_criteria(
         {ProjectMemberRole.writer, ProjectMemberRole.contributor}
     ),
     dry_run: bool = False,
+    exclude_ineligible_sg_ids_internal: bool = False,
 ) -> NewCohort:
     """
     Create a cohort with the given name and sample/sequencing group IDs.
@@ -65,6 +79,7 @@ async def create_cohort_from_criteria(
             else None
         ),
         template_id=template_id_raw,
+        exclude_ineligible_sg_ids_internal=exclude_ineligible_sg_ids_internal,
     )
 
     return cohort_output.to_external()

@@ -9,13 +9,16 @@ from db.python.tables.sequencing_group import (
     SequencingGroupTable,
 )
 from db.python.utils import get_logger
+from models.enums.cohort import CohortStatus, CohortUpdateStatus
 from models.models.cohort import (
     CohortCriteriaInternal,
     CohortInternal,
     CohortTemplateInternal,
+    CohortUpdateBody,
     NewCohortInternal,
 )
-from models.models.project import ProjectId, ReadAccessRoles
+from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
+
 
 logger = get_logger()
 
@@ -61,8 +64,23 @@ def get_sg_filter(
     return sg_filter
 
 
+def _is_valid_cohort_criteria_combination(
+    cohort_criteria: CohortCriteriaInternal,
+) -> bool:
+    for name, value in vars(cohort_criteria).items():
+        if name != 'sg_ids_internal_raw' and (
+            value is not None and value != []
+        ):  # allows empty lists, as they represent empty criteria
+            return False
+    return True
+
+
 class CohortLayer(BaseLayer):
     """Layer for cohort logic"""
+
+    COHORT_SG_CRITERIA_ERROR_MSG = (
+        'Other criteria not supported if sequencing group ids provided as a criterion'
+    )
 
     def __init__(self, connection: Connection):
         super().__init__(connection)
@@ -132,7 +150,10 @@ class CohortLayer(BaseLayer):
         Create new cohort template
         """
 
-        assert cohort_template.criteria.projects, 'Projects must be set in criteria'
+        if not cohort_template.criteria.sg_ids_internal_raw:
+            assert cohort_template.criteria.projects, 'Projects must be set in criteria'
+        elif not _is_valid_cohort_criteria_combination(cohort_template.criteria):
+            raise ValueError(self.COHORT_SG_CRITERIA_ERROR_MSG)
         assert cohort_template.id is None, 'Cohort template ID must be None'
 
         template_id = await self.ct.create_cohort_template(
@@ -152,6 +173,7 @@ class CohortLayer(BaseLayer):
         dry_run: bool,
         cohort_criteria: CohortCriteriaInternal | None = None,
         template_id: int | None = None,
+        exclude_ineligible_sg_ids_internal: bool = False,
     ) -> NewCohortInternal:
         """
         Create a new cohort from the given parameters. Returns the newly created cohort_id.
@@ -186,11 +208,27 @@ class CohortLayer(BaseLayer):
         if not cohort_criteria:
             raise ValueError('Cohort criteria must be set')
 
+        sg_ids_internal_raw = cohort_criteria.sg_ids_internal_raw
+
+        if sg_ids_internal_raw:
+            if not _is_valid_cohort_criteria_combination(cohort_criteria):
+                if template_id:  # invoking a cohort creation from a deprecated template
+                    raise ValueError(
+                        f'Invalid template. {self.COHORT_SG_CRITERIA_ERROR_MSG}'
+                    )
+                raise ValueError(self.COHORT_SG_CRITERIA_ERROR_MSG)
+
+            projects = list(
+                await self.sglayer.get_projects_given_sg_ids(sg_ids_internal_raw)
+            )
+        else:
+            projects = cohort_criteria.projects
+
         sample_ids: list[int] = []
         if cohort_criteria.sample_type:
             # Get sample IDs with sample type
             sample_filter = SampleFilter(
-                project=GenericFilter(in_=cohort_criteria.projects),
+                project=GenericFilter(in_=projects),
                 type=(
                     GenericFilter(in_=cohort_criteria.sample_type)
                     if cohort_criteria.sample_type
@@ -202,8 +240,8 @@ class CohortLayer(BaseLayer):
             sample_ids = [s.id for s in samples]
 
         sg_filter = get_sg_filter(
-            projects=cohort_criteria.projects,
-            sg_ids_internal_raw=cohort_criteria.sg_ids_internal_raw,
+            projects=projects,
+            sg_ids_internal_raw=sg_ids_internal_raw,
             excluded_sgs_internal_raw=cohort_criteria.excluded_sgs_internal_raw,
             sg_technology=cohort_criteria.sg_technology,
             sg_platform=cohort_criteria.sg_platform,
@@ -211,15 +249,39 @@ class CohortLayer(BaseLayer):
             sample_ids=sample_ids,
         )
 
-        sgs = await self.sglayer.query(sg_filter)
+        sgs = await self.sglayer.query(sg_filter)  # retrieves active sgs
+        if not sgs:
+            raise ValueError(
+                'Cohort creation criteria resulted in no sequencing groups being selected. Please check the criteria and try again'
+            )
+
+        sg_ids = [sg.id for sg in sgs if sg.id] if sgs else []
+        excluded_ineligible_sg_ids_internal = None
+
+        if sg_ids_internal_raw:
+            sg_ids_internal_raw_set = set(sg_ids_internal_raw)
+            if len(sg_ids_internal_raw_set) != len(sg_ids):
+                # if any sgs in the criteria list not active and exclude_ineligible_sg_ids_internal not set
+                if not exclude_ineligible_sg_ids_internal:
+                    raise ValueError(
+                        'Contains sequencing groups which are not active. Please review the input sequencing groups, '
+                        'or set exclude_ineligible_sg_ids_internal to skip invalid entries and continue cohort creation'
+                    )
+
+                #  update cohort criteria with active sgs now
+                cohort_criteria.sg_ids_internal_raw = sg_ids
+                #  if create cohort given template_id, this creates a new template
+                create_cohort_template = True
+                excluded_ineligible_sg_ids_internal = list(
+                    sg_ids_internal_raw_set - set(sg_ids)
+                )
 
         if dry_run:
-            sg_ids = [sg.id for sg in sgs if sg.id] if sgs else []
-
             return NewCohortInternal(
                 dry_run=True,
                 cohort_id=None,
                 sequencing_group_ids=sg_ids,
+                excluded_ineligible_sg_ids_internal=excluded_ineligible_sg_ids_internal,
             )
         # 2. Create cohort template, if required.
         if create_cohort_template:
@@ -238,10 +300,50 @@ class CohortLayer(BaseLayer):
             raise ValueError('Template ID must be set')
 
         # 3. Create Cohort
-        return await self.ct.create_cohort(
+        new_cohort = await self.ct.create_cohort(
             project=project_to_write,
             cohort_name=cohort_name,
-            sequencing_group_ids=[sg.id for sg in sgs if sg.id],
+            sequencing_group_ids=sg_ids,
             description=description,
             template_id=template_id,
+        )
+
+        new_cohort.excluded_ineligible_sg_ids_internal = (
+            excluded_ineligible_sg_ids_internal
+        )
+        return new_cohort
+
+    async def update_cohort(self, cohort_update_body: CohortUpdateBody, cohort_id: int):
+        """update Cohort given id"""
+        cohorts, project_ids = await self.ct.query(
+            CohortFilter(id=GenericFilter(eq=cohort_id))
+        )
+
+        self.connection.check_access_to_projects_for_ids(
+            project_ids, allowed_roles=FullWriteAccessRoles
+        )
+
+        if not cohorts:
+            raise ValueError(f'Cohort ID not found')
+
+        # raise error if reactivating a cohort with archived samples or sgs
+        if cohort_update_body.status == CohortUpdateStatus.active:
+            cohort = cohorts[0]
+            current_status = cohort.status
+
+            if (
+                current_status == CohortStatus.archived
+                and await self.ct.is_cohort_sample_sg_invalid(
+                    cohort.id
+                )  # check if samples or sgs are archived
+            ):
+                raise ValueError(
+                    'Cohort contains archived samples or sequencing groups and cannot be activated'
+                )
+
+        await self.ct.update_cohort(
+            cohort_id=cohort_id,
+            name=cohort_update_body.name,
+            description=cohort_update_body.description,
+            status=cohort_update_body.status,
         )

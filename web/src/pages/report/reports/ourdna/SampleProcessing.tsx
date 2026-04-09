@@ -1,4 +1,6 @@
+import { Box, FormControl, InputLabel, MenuItem, Select, SelectChangeEvent } from '@mui/material'
 import * as Plot from '@observablehq/plot'
+import { useState } from 'react'
 import Report from '../../components/Report'
 import { ReportItemPlot, ReportItemTable } from '../../components/ReportItem'
 import ReportRow from '../../components/ReportRow'
@@ -194,6 +196,12 @@ function ProcessingTimesByAncestry(props: { project: string }) {
 }
 
 export default function ProcessingTimes({ project }: { project: string }) {
+    const [viabilityColour, setViabilityColour] = useState('biobank')
+
+    const handleColouringChange = (event: SelectChangeEvent) => {
+        setViabilityColour(event.target.value as string)
+    }
+
     return (
         <Report>
             <ReportRow>
@@ -462,6 +470,256 @@ export default function ProcessingTimes({ project }: { project: string }) {
                             }),
                         ],
                     })}
+                />
+            </ReportRow>
+            <ReportRow>
+                <Box>
+                    <FormControl sx={{ marginTop: 2, minWidth: 200 }}>
+                        <InputLabel id="viability-colour-label">Colour by</InputLabel>
+                        <Select
+                            labelId="viability-colour-label"
+                            value={viabilityColour}
+                            label="Colour by"
+                            onChange={handleColouringChange}
+                        >
+                            <MenuItem value="biobank">Biobank</MenuItem>
+                            <MenuItem value="collection_lab">Collection Lab</MenuItem>
+                            <MenuItem value="collection_event_type">Collection Event Type</MenuItem>
+                        </Select>
+                    </FormControl>
+                </Box>
+            </ReportRow>
+            <ReportRow>
+                <ReportItemPlot
+                    height={ROW_HEIGHT}
+                    flexGrow={1}
+                    title="Viability by collection day"
+                    description="Shows the percent viability of PBMC samples based on their collection date."
+                    project={project}
+                    query={[
+                        {
+                            name: 'result',
+                            query: `
+                                SELECT
+                                    try_strptime(s_parent.meta_collection_datetime, '%Y-%m-%dT%H:%M:%S') AS collection_time,
+                                    s_child.meta_percent_viability AS percent_viability,
+                                    s_parent.meta_processing_site AS biobank,
+                                    s_parent.meta_collection_lab AS collection_lab,
+                                    s_parent.meta_collection_event_type AS collection_event_type
+                                FROM
+                                    sample AS s_child
+                                JOIN
+                                    sample AS s_parent ON s_child.sample_parent_id = s_parent.sample_id
+                                WHERE
+                                    s_child.type = 'pbmc'
+                                    AND s_parent.meta_collection_datetime IS NOT NULL
+                                    AND s_child.meta_percent_viability IS NOT NULL
+                                    AND s_child.meta_percent_viability >= 0
+                                    AND s_child.meta_percent_viability <= 100
+                            `,
+                        },
+                    ]}
+                    plot={(data) => ({
+                        y: { grid: true, label: 'Percent Viability' },
+                        x: { grid: true, label: 'Collection Date' },
+                        color: { legend: true },
+                        marginBottom: 50,
+                        marks: [
+                            Plot.dot(data, {
+                                x: 'collection_time',
+                                y: 'percent_viability',
+                                fill: viabilityColour,
+                                tip: true,
+                            }),
+                        ],
+                    })}
+                />
+            </ReportRow>
+            <ReportRow>
+                <ReportItemPlot
+                    height={ROW_HEIGHT}
+                    flexGrow={1}
+                    title="PBMC Viability by Processing Combination"
+                    description="Box-and-whisker plot of PBMC sample viability, grouped by their biobank, event-type, collection-lab combination."
+                    project={project}
+                    query={[
+                        {
+                            name: 'result',
+                            query: `
+                                SELECT
+                                    s_child.meta_percent_viability AS percent_viability,
+                                    s_parent.meta_processing_site
+                                        || ' - ' ||
+                                        s_parent.meta_collection_event_type
+                                        || ' - ' ||
+                                        s_parent.meta_collection_lab AS grouping_combination
+                                FROM
+                                    sample AS s_child
+                                JOIN
+                                    sample AS s_parent ON s_child.sample_parent_id = s_parent.sample_id
+                                WHERE
+                                    s_child.type = 'pbmc'
+                                    AND s_child.meta_percent_viability IS NOT NULL
+                                    AND s_parent.meta_processing_site IS NOT NULL
+                                    AND s_parent.meta_collection_event_type IS NOT NULL
+                                    AND s_parent.meta_collection_lab IS NOT NULL
+                                    AND s_child.meta_percent_viability >= 0
+                                    AND s_child.meta_percent_viability <= 100
+                            `,
+                        },
+                    ]}
+                    plot={(data) => ({
+                        y: { grid: true, label: 'Percent Viability' },
+                        x: { label: 'Processing Combination' },
+                        color: {
+                            scheme: 'RdYlGn',
+                            legend: true,
+                            reverse: true,
+                        },
+                        marks: [
+                            Plot.boxY(data, {
+                                x: 'grouping_combination',
+                                y: 'percent_viability',
+                            }),
+                            Plot.dot(data, {
+                                x: 'grouping_combination',
+                                y: 'percent_viability',
+                                strokeOpacity: 0.4,
+                            }),
+                        ],
+                    })}
+                />
+            </ReportRow>
+            <ReportRow>
+                <ReportItemTable
+                    height={ROW_HEIGHT}
+                    flexGrow={1}
+                    flexBasis={300}
+                    title="PBMC Viability Statistics"
+                    description="Summary statistics for the box-and-whisker plot, showing the distribution of PBMC sample viability for each biobank, event-type, collection-lab combination."
+                    project={project}
+                    showToolbar={true}
+                    query={[
+                        {
+                            name: 'pbmc_data',
+                            query: `
+                                SELECT
+                                    s_child.meta_percent_viability AS percent_viability,
+                                    s_parent.meta_processing_site AS biobank,
+                                    s_parent.meta_collection_event_type AS collection_event_type,
+                                    s_parent.meta_collection_lab AS collection_lab,
+                                    s_parent.meta_processing_site
+                                        || ' - ' ||
+                                        s_parent.meta_collection_event_type
+                                        || ' - ' ||
+                                        s_parent.meta_collection_lab AS grouping_combination
+                                FROM
+                                    sample AS s_child
+                                JOIN
+                                    sample AS s_parent ON s_child.sample_parent_id = s_parent.sample_id
+                                WHERE
+                                    s_child.type = 'pbmc'
+                                    AND s_child.meta_percent_viability IS NOT NULL
+                                    AND s_parent.meta_processing_site IS NOT NULL
+                                    AND s_parent.meta_collection_event_type IS NOT NULL
+                                    AND s_parent.meta_collection_lab IS NOT NULL
+                                    AND s_child.meta_percent_viability >= 0
+                                    AND s_child.meta_percent_viability <= 100
+                            `,
+                        },
+                        {
+                            name: 'quartiles',
+                            query: `
+                                SELECT
+                                    grouping_combination,
+                                    quantile_cont(percent_viability, 0.25) AS q1,
+                                    quantile_cont(percent_viability, 0.75) AS q3,
+                                    q3 - q1 AS iqr
+                                FROM pbmc_data
+                                GROUP BY grouping_combination
+                            `,
+                        },
+                        {
+                            name: 'stats_no_outliers',
+                            query: `
+                                WITH non_outliers AS (
+                                    SELECT
+                                        p.grouping_combination,
+                                        p.percent_viability
+                                    FROM pbmc_data p
+                                    JOIN quartiles q ON p.grouping_combination = q.grouping_combination
+                                    -- Outlier criteria from
+                                    -- https://www.geeksforgeeks.org/data-visualization/what-is-box-plot-and-the-condition-of-outliers/
+                                    WHERE p.percent_viability >= q.q1 - 1.5 * q.iqr AND p.percent_viability <= q.q3 + 1.5 * q.iqr
+                                )
+                                SELECT
+                                    grouping_combination,
+                                    MIN(percent_viability) AS min_val,
+                                    MAX(percent_viability) AS max_val
+                                FROM non_outliers
+                                GROUP BY grouping_combination
+                            `,
+                        },
+                        {
+                            name: 'result',
+                            query: `
+                                SELECT
+                                    p.biobank AS "Biobank",
+                                    p.collection_event_type AS "Collection Event Type",
+                                    p.collection_lab AS "Collection Lab",
+                                    s.min_val AS "Minimum (No Outliers)",
+                                    q.q1 AS "Q1",
+                                    median(p.percent_viability) AS "Median (Q2)",
+                                    q.q3 AS "Q3",
+                                    s.max_val AS "Maximum (No Outliers)",
+                                    avg(p.percent_viability) AS "Average"
+                                FROM pbmc_data p
+                                JOIN quartiles q ON p.grouping_combination = q.grouping_combination
+                                JOIN stats_no_outliers s ON p.grouping_combination = s.grouping_combination
+                                GROUP BY
+                                    biobank,
+                                    collection_event_type,
+                                    collection_lab,
+                                    min_val,
+                                    q1,
+                                    q3,
+                                    max_val
+                                ORDER BY
+                                    biobank,
+                                    collection_event_type,
+                                    collection_lab;
+                            `,
+                        },
+                    ]}
+                />
+            </ReportRow>
+            <ReportRow>
+                <ReportItemTable
+                    height={ROW_HEIGHT}
+                    flexGrow={1}
+                    flexBasis={300}
+                    title="Outlier/invalid PBMC samples"
+                    description="Table of PBMC samples with outlier percent_viability values."
+                    project={project}
+                    showToolbar={true}
+                    query={[
+                        {
+                            name: 'result',
+                            query: `
+                                SELECT
+                                    s_child.external_id AS external_id,
+                                    s_child.meta_percent_viability AS percent_viability
+                                FROM
+                                    sample AS s_child
+                                JOIN
+                                    sample AS s_parent ON s_child.sample_parent_id = s_parent.sample_id
+                                WHERE
+                                    s_child.type = 'pbmc'
+                                    AND s_child.meta_percent_viability IS NOT NULL
+                                    AND (s_child.meta_percent_viability < 0 OR s_child.meta_percent_viability > 100)
+                            `,
+                        },
+                    ]}
                 />
             </ReportRow>
         </Report>

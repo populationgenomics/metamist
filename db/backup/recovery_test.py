@@ -1,4 +1,5 @@
-"""A script to test that tests the validity of a database backup
+"""
+A script to test that tests the validity of a database backup
 in the event of recovery.
 NOTE: DO NOT RUN THIS SCRIPT ON A PRODUCTION SERVER.
 It will drop the local mysql database after each run.
@@ -10,12 +11,12 @@ import os
 import subprocess
 import unittest
 from collections import namedtuple
-from typing import Optional, Tuple
 
 import google.cloud.secretmanager
 import mysql.connector
 from parameterized import parameterized
 from restore import pull_latest_backup, restore
+
 
 BACKUP_BUCKET = 'cpg-sm-backups'
 LOCAL_BACKUP_FOLDER = 'latest_backup'
@@ -50,9 +51,9 @@ PROD_HOST = config['p_host']
 PROD_USER = config['p_username']
 PROD_PASSWORD = config['p_password']
 
-LOCAL_USER = os.environ.get('local_username', 'root')
-LOCAL_HOST = os.environ.get('local_host', 'localhost')
-LOCAL_PASSWORD = os.environ.get('local_password', '')
+LOCAL_USER = os.environ.get('local_username', 'root')  # noqa: SIM112
+LOCAL_HOST = os.environ.get('local_host', 'localhost')  # noqa: SIM112
+LOCAL_PASSWORD = os.environ.get('local_password', '')  # noqa: SIM112
 
 
 class TestDatabaseBackup(unittest.TestCase):
@@ -83,7 +84,8 @@ class TestDatabaseBackup(unittest.TestCase):
         )
 
     def test_database_exists(self):
-        """Validates that the db in the production
+        """
+        Validates that the db in the production
         database matches those produced by the restored db"""
         backup_databases = get_results(self.local_conn, 'show databases;')
         prod_databases = get_results(self.prod_conn, 'show databases;')
@@ -118,8 +120,9 @@ class TestDatabaseBackup(unittest.TestCase):
         self.assertEqual(restored_results, prod_results)
 
     @parameterized.expand(FIELDS)
-    def test_random_rows_ids(self, table, id_fields: Tuple[str]):
-        """Pulls 10 random rows for testing.
+    def test_random_rows_ids(self, table, id_fields: tuple[str]):
+        """
+        Pulls 10 random rows for testing.
         Operates on tables with a unique id field"""
 
         id_fields_str = ', '.join(id_fields) + f', {table}.*'
@@ -159,7 +162,7 @@ def get_timestamp(folder: str):
     return timestamp
 
 
-def get_results(conn, query: str, values: Optional[Tuple] = None):
+def get_results(conn, query: str, values: tuple | None = None):
     """Returns the results from a provided query at a given connection"""
     cursor = conn.cursor()
     cursor.execute(query, values)

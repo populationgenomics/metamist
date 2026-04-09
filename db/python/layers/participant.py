@@ -1,4 +1,3 @@
-# pylint: disable=invalid-name,too-many-lines,too-many-public-methods
 import re
 from collections import defaultdict
 from enum import Enum
@@ -25,6 +24,7 @@ from models.models.project import (
     ProjectId,
     ReadAccessRoles,
 )
+
 
 HPO_REGEX_MATCHER = re.compile(r'HP\:\d+$')
 
@@ -115,9 +115,7 @@ class SeqrMetadataKeys(Enum):
 
     @staticmethod
     def get_storeable_keys():
-        """
-        Get list of keys that we'll store in participant phenotype db
-        """
+        """Get list of keys that we'll store in participant phenotype db"""
         return [
             SeqrMetadataKeys.HPO_TERMS_PRESENT,
             SeqrMetadataKeys.HPO_TERMS_ABSENT,
@@ -144,9 +142,7 @@ class SeqrMetadataKeys(Enum):
 
     @staticmethod
     def get_age_of_onset_allowed_keys():
-        """
-        SEQR age of onset must be one of these values
-        """
+        """SEQR age of onset must be one of these values"""
         return {
             'Congenital onset',
             'Embryonal onset',
@@ -186,7 +182,7 @@ class SeqrMetadataKeys(Enum):
 
         raise ValueError(
             f"Didn't recognise age of set key {age_of_onset}, "
-            f"expected one of: {', '.join(keys)}"
+            f'expected one of: {", ".join(keys)}'
         )
 
     @staticmethod
@@ -211,7 +207,7 @@ class SeqrMetadataKeys(Enum):
         >>> SeqrMetadataKeys.parse_hpo_terms('Clinical,Failure')
         Traceback (most recent call last):
         ValueError: HPO terms must follow the format "HP\\:\\d+$": Clinical, Failure
-        """
+        """  # noqa: D301
         if not hpo_terms or not hpo_terms.strip():
             return []
         terms = split_generic_terms(hpo_terms)
@@ -250,9 +246,7 @@ class ParticipantLayer(BaseLayer):
         limit: int | None = None,
         skip: int | None = None,
     ) -> list[ParticipantInternal]:
-        """
-        Query participants from the database, heavy lifting done by the filter
-        """
+        """Query participants from the database, heavy lifting done by the filter"""
         projects, participants = await self.pttable.query(
             filter_, skip=skip, limit=limit
         )
@@ -316,9 +310,7 @@ class ParticipantLayer(BaseLayer):
         external_participant_ids: list[str] | None = None,
         internal_participant_ids: list[int] | None = None,
     ) -> list[ParticipantInternal]:
-        """
-        Get participants for a project
-        """
+        """Get participants for a project"""
         internal_ids = set(internal_participant_ids or [])
         if external_participant_ids:
             id_map = await self.get_id_map_by_external_ids(
@@ -392,9 +384,7 @@ class ParticipantLayer(BaseLayer):
     async def insert_participant_phenotypes(
         self, participant_phenotypes: dict[int, dict[str, Any]]
     ):
-        """
-        Insert participant phenotypes, with format: {pid: {key: value}}
-        """
+        """Insert participant phenotypes, with format: {pid: {key: value}}"""
         ppttable = ParticipantPhenotypeTable(self.connection)
         return await ppttable.add_key_value_rows(
             [
@@ -414,7 +404,6 @@ class ParticipantLayer(BaseLayer):
         Import individual level metadata,
         currently only imports seqr metadata fields.
         """
-        # pylint: disable=too-many-locals
         # currently only does the seqr metadata template
 
         # filter to non-comment rows
@@ -633,8 +622,6 @@ class ParticipantLayer(BaseLayer):
         open_transaction=True,
     ) -> ParticipantUpsertInternal:
         """Create a single participant"""
-        # pylint: disable=unused-argument
-
         with_function = (
             self.connection.connection.transaction if open_transaction else NoOpAenter
         )
@@ -691,7 +678,6 @@ class ParticipantLayer(BaseLayer):
         open_transaction=True,
     ):
         """Batch upsert a list of participants with sequences"""
-
         with_function = (
             self.connection.connection.transaction if open_transaction else NoOpAenter
         )
@@ -724,9 +710,7 @@ class ParticipantLayer(BaseLayer):
     async def get_phenotypes_for_participants(
         self, participant_ids: list[int]
     ) -> dict[int, dict[str, Any]]:
-        """
-        Get phenotypes for participants keyed by by pid
-        """
+        """Get phenotypes for participants keyed by by pid"""
         ppttable = ParticipantPhenotypeTable(self.connection)
         return await ppttable.get_key_value_rows_for_participant_ids(
             participant_ids=participant_ids
@@ -738,15 +722,12 @@ class ParticipantLayer(BaseLayer):
         *,
         internal_participant_ids: list[int] | None = None,
         external_participant_ids: list[str] | None = None,
-        # pylint: disable=invalid-name
         replace_with_participant_external_ids=True,
         replace_with_family_external_ids=True,
     ) -> dict[str, Any]:
         """Get seqr individual level metadata template as list[list[str]]"""
-
         # avoid circular imports
-        # pylint: disable=import-outside-toplevel,cyclic-import,too-many-locals
-        from db.python.layers.family import FamilyLayer
+        from db.python.layers.family import FamilyLayer  # noqa: PLC0415
 
         ppttable = ParticipantPhenotypeTable(self.connection)
         internal_to_external_pid_map = {}
@@ -793,8 +774,8 @@ class ParticipantLayer(BaseLayer):
             h.replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_')
             for h in lheaders
         ]
-        json_header_map = dict(zip(json_headers, headers))
-        lheader_to_json = dict(zip(lheaders, json_headers))
+        json_header_map = dict(zip(json_headers, headers, strict=False))
+        lheader_to_json = dict(zip(lheaders, json_headers, strict=False))
         rows: list[dict[str, str]] = []
         for pid, d in pid_to_features.items():
             d[SeqrMetadataKeys.INDIVIDUAL_ID.value] = internal_to_external_pid_map.get(
@@ -935,7 +916,6 @@ class ParticipantLayer(BaseLayer):
         rows: list[list[str]],
     ):
         # do all the matching in lowercase space, but store in regular case space
-        # pylint: disable=invalid-name
         storeable_header_col_number_tuples: list[tuple[str, int]] = [
             (k, lheaders_to_idx_map[k.lower()])
             for k in storeable_keys

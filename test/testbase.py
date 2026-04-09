@@ -1,10 +1,7 @@
-# pylint: disable=invalid-overridden-method,no-member
-
 import asyncio
 import dataclasses
 import logging
 import os
-import socket
 import subprocess
 import unittest
 from functools import wraps
@@ -27,12 +24,14 @@ from db.python.connect import (
 )
 from db.python.tables.project import ProjectPermissionsTable
 from models.models.project import Project, ProjectId, ProjectMemberUpdate
+from test.testdb_container import TestDatabaseContainer
 
-TEST_PROJECT_NAME = 'test'
+
+TEST_PROJECT_NAME = 'test-test'
 
 # use this to determine where the db directory is relatively,
 # as pycharm runs in "test/" folder, and GH runs them in git root
-am_i_in_test_environment = os.getcwd().endswith('test')
+am_i_in_test_environment = os.getcwd().endswith('test')  # noqa: PTH109
 
 # This monkey patches the asyncio event loop and allows it to be re-entrant
 # (you can call run_until_complete while run_until_complete is already on the stack)
@@ -52,15 +51,6 @@ for lname in (
 
 
 loop = asyncio.new_event_loop()
-
-
-def find_free_port():
-    """Find free port to run tests on"""
-    s = socket.socket()
-    s.bind(('', 0))  # Bind to a free port provided by the host.
-    free_port_number = s.getsockname()[1]  # Return the port number assigned.
-    s.close()  # free the port so we can immediately use
-    return free_port_number
 
 
 def run_as_sync(f):
@@ -89,33 +79,27 @@ class DbTest(unittest.TestCase):
     project_name: str
     project_id_map: dict[ProjectId, Project]
     project_name_map: dict[str, Project]
+    db_name: str
 
     @classmethod
     def setUpClass(cls) -> None:
         @run_as_sync
         async def setup():
             """
-            This starts a mariadb container, applies liquibase schema and inserts a project
-            MAYBE, the best way in the future would be to only ever create ONE connection
-            between all Test classes, and create a new database per test, new set of a connections,
-            but that certainly has a host of its own problems.
-
-            Then you can destroy the database within tearDownClass as all tests have been completed.
+            This reuses the mariadb container created before executing any tests.
+            Then for each test class it applies liquibase schema and inserts a project.
             """
             # Set environment to test
             os.environ['SM_ENVIRONMENT'] = 'test'
             logger = logging.getLogger()
             try:
                 db = cls.dbs
+                db_port = None
                 if not cls.dbs:
-                    db = MySqlContainer('mariadb:11.2.2', password='test')
-
-                    port_to_expose = find_free_port()
-
-                    # override the default port to map the container to
-                    db.with_bind_ports(db.port, port_to_expose)
                     logger.disabled = True
-                    db.start()
+                    db_container = TestDatabaseContainer()
+                    db = db_container.get_container()
+                    db_port = db_container.get_port()
                     logger.disabled = False
                     cls.dbs = db
 
@@ -132,7 +116,7 @@ class DbTest(unittest.TestCase):
                 _root_connection = SMConnections.make_connection(
                     CredentialedDatabaseConfiguration(
                         host=db.get_container_host_ip(),
-                        port=str(port_to_expose),
+                        port=str(db_port),
                         username='root',
                         password=db.password,
                         dbname=db.dbname,
@@ -150,7 +134,9 @@ class DbTest(unittest.TestCase):
 
                 # mfranklin -> future dancoates: if you work out how to copy the
                 #       database instead of running liquibase, that would be great
-                lcon_string = f'jdbc:mariadb://{db.get_container_host_ip()}:{port_to_expose}/{db_name}'
+                lcon_string = (
+                    f'jdbc:mariadb://{db.get_container_host_ip()}:{db_port}/{db_name}'
+                )
                 # apply the liquibase schema
                 command = [
                     'liquibase',
@@ -173,7 +159,7 @@ class DbTest(unittest.TestCase):
                 sm_db = SMConnections.make_connection(
                     CredentialedDatabaseConfiguration(
                         host=db.get_container_host_ip(),
-                        port=str(port_to_expose),
+                        port=str(db_port),
                         username='root',
                         password=db.password,
                         dbname=db_name,
@@ -207,7 +193,7 @@ class DbTest(unittest.TestCase):
                 cls.project_name = TEST_PROJECT_NAME
                 cls.project_id = await ppt.create_project(
                     project_name=cls.project_name,
-                    dataset_name=cls.project_name,
+                    dataset_name='test',
                     author=cls.author,
                 )
 
@@ -234,6 +220,7 @@ class DbTest(unittest.TestCase):
 
                 cls.project_id_map = project_id_map
                 cls.project_name_map = project_name_map
+                cls.db_name = db_name
 
                 # formed_connection.project = cls.project_id
 
@@ -261,10 +248,10 @@ class DbTest(unittest.TestCase):
         async def tearDown():
             connection = cls.connections.pop(cls.__name__, None)
             if connection:
+                await connection.execute(
+                    f"""DROP DATABASE IF EXISTS `{cls.db_name}`;"""
+                )
                 await connection.disconnect()
-
-            if len(cls.connections) == 0 and cls.dbs:
-                cls.dbs.stop()
 
         tearDown()
 
@@ -298,6 +285,11 @@ class DbTest(unittest.TestCase):
             client_options={'api_endpoint': 'http://localhost:4443'},
         )
 
+    async def row_count(self, table: str) -> int:
+        """Return the number of rows in the specified table (via raw SQL)"""
+        query = f'SELECT COUNT(*) FROM {table}'
+        return await self.connection.connection.fetch_val(query)
+
     @run_as_sync
     async def run_graphql_query(self, query, variables=None):
         """Run SYNC graphql query on internal database"""
@@ -320,7 +312,7 @@ class DbTest(unittest.TestCase):
             variable_values=variables,
             context_value=await get_context(
                 connection=self.connection,
-                request=None,  # pylint: disable
+                request=None,
             ),
         )
         if value.errors:
@@ -335,7 +327,7 @@ class DbTest(unittest.TestCase):
         """Get audit_log_id for the test"""
         return await self.connection.audit_log_id()
 
-    def assertDataclassEqual(self, a, b):
+    def assertDataclassEqual(self, a, b):  # noqa: N802
         """Assert two dataclasses are equal"""
 
         def to_dict(obj):

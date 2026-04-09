@@ -1,4 +1,3 @@
-# pylint: disable=R0904
 """
 Make metamist architecture available to production pulumi stack
 so it can be centrally deployed. Do this through a plugin, and submodule.
@@ -23,6 +22,7 @@ from metamist_infrastructure.slack_notification import (
     SlackNotificationType,
 )
 
+
 # this gets moved around during the pip install
 ETL_FOLDER = Path(__file__).parent / 'etl'
 # ETL_FOLDER = Path(__file__).parent.parent / 'etl'
@@ -37,7 +37,7 @@ def append_private_repositories_to_requirements(
     Append private repositories to requirements.txt
     """
 
-    with open(filename, encoding='utf-8') as file:
+    with open(filename, encoding='utf-8') as file:  # noqa: PTH123
         file_content = file.read()
         if private_repo_url and private_repos:
             file_content = (
@@ -457,7 +457,7 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
         """Setup Bigquery table"""
         assert self.config.metamist
 
-        with open(schema_file_name) as f:
+        with open(schema_file_name) as f:  # noqa: PTH123
             schema = f.read()
 
         etl_table = gcp.bigquery.Table(
@@ -850,7 +850,9 @@ class MetamistInfrastructure(CpgInfrastructurePlugin):
                 self.config.metamist.gcp.project,
                 fxn.name,
             ).apply(
-                lambda args: f"{args[0]}-docker.pkg.dev/{args[1]}/gcf-artifacts/{args[2].replace('-','--')}:latest"
+                lambda args: (
+                    f'{args[0]}-docker.pkg.dev/{args[1]}/gcf-artifacts/{args[2].replace("-", "--")}:latest'
+                )
             )
             # create external cloud run with custom domain
             self._etl_external_function(

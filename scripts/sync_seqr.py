@@ -1,4 +1,3 @@
-# pylint: disable=missing-timeout,unnecessary-lambda-assignment,import-outside-toplevel,too-many-locals
 import asyncio
 import datetime
 import json
@@ -20,6 +19,7 @@ from metamist.model.analysis_query_model import AnalysisQueryModel
 from metamist.model.analysis_status import AnalysisStatus
 from metamist.model.export_type import ExportType
 from metamist.parser.generic_parser import chunk
+
 
 loggers_to_silence = [
     'google.auth.transport.requests',
@@ -169,7 +169,7 @@ query MyQuery($project: String!, $seqType: String!) {
         )
 
 
-async def sync_pedigree(
+async def sync_pedigree(  # noqa: RET503
     session: aiohttp.ClientSession,
     dataset,
     project_guid,
@@ -197,8 +197,8 @@ async def sync_pedigree(
     )
     if not resp.ok:
         logger.warning(f'{dataset} :: Confirming pedigree failed: {await resp.text()}')
-        with open(f'{dataset}.ped', 'w+') as f:
-            import csv
+        with open(f'{dataset}.ped', 'w+') as f:  # noqa: PTH123
+            import csv  # noqa: PLC0415
 
             writer = csv.writer(f, delimiter='\t')
             headers = [
@@ -370,7 +370,7 @@ async def sync_individual_metadata(
     )
     # print(resp.text)
     resp_text = await resp.text()
-    if resp.status == 400 and 'Unable to find individuals to update' in resp_text:
+    if resp.status == 400 and 'Unable to find individuals to update' in resp_text:  # noqa: PLR2004
         print(f'{dataset} :: No individual metadata needed updating')
         return
 
@@ -407,8 +407,7 @@ async def update_es_index(
     filename = f'{dataset}_pid_sid_map_{datetime.datetime.now().isoformat()}.tsv'
     filename = re.sub(r'[/\\?%*:|\'<>\x7F\x00-\x1F]', '-', filename)
 
-    fn_path = os.path.join(MAP_LOCATION, filename)
-    # pylint: disable=no-member
+    fn_path = os.path.join(MAP_LOCATION, filename)  # noqa: PTH118
     with AnyPath(fn_path).open('w+') as f:  # type: ignore
         f.write('\n'.join(rows_to_write))
 
@@ -491,7 +490,7 @@ async def sync_cram_map(
             return False
         if sequencing_type == 'genome' and 'exome' in output_path:
             return False
-        if sequencing_type == 'exome' and 'exome' not in output_path:
+        if sequencing_type == 'exome' and 'exome' not in output_path:  # noqa: SIM103
             return False
 
         return True
@@ -568,7 +567,11 @@ async def sync_cram_map(
             return_exceptions=True,
         )
         exceptions.extend(
-            [(r, u) for u, r in zip(updates, responses) if isinstance(r, Exception)]
+            [
+                (r, u)
+                for u, r in zip(updates, responses, strict=False)
+                if isinstance(r, Exception)
+            ]
         )
         await asyncio.sleep(wait_time)
 
@@ -601,7 +604,7 @@ async def _get_pedigree_from_sm(
             return 'U'
         if value == 1:
             return 'M'
-        if value == 2:
+        if value == 2:  # noqa: PLR2004
             return 'F'
         return 'U'
 
@@ -640,12 +643,12 @@ async def _get_pedigree_from_sm(
 
 def get_token():
     """Get identity-token for seqr specific service-credentials"""
-    import google.auth.exceptions
-    import google.auth.transport.requests
+    import google.auth.exceptions  # noqa: PLC0415
+    import google.auth.transport.requests  # noqa: PLC0415
 
     credential_filename = '/Users/mfranklin/Desktop/tmp/seqr/seqr-sync-credentials.json'
-    with open(credential_filename, 'r') as f:
-        from google.oauth2 import service_account
+    with open(credential_filename) as f:  # noqa: PTH123
+        from google.oauth2 import service_account  # noqa: PLC0415
 
         info = json.load(f)
         credentials_content = (info.get('type') == 'service_account') and info or None
@@ -681,7 +684,7 @@ def sync_all_datasets(sequencing_type: str, ignore: set[str] = None):
                     project_name, seqr_guid, sequencing_type=sequencing_type
                 )
             )
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as e:  # noqa: BLE001
             print(
                 f'Failed to sync {project_name} with error: {e!r}: {traceback.format_exc()}'
             )

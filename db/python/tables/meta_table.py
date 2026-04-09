@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from io import BytesIO, StringIO
-from typing import Any, Callable
+from typing import Any
 
 # Unfortunately some of these libs have partially or completely missing
 # type annotations so mypy will have a few red underlines in this file :/
@@ -10,6 +11,7 @@ from databases.interfaces import Record
 
 from db.python.tables.base import DbBase
 from models.models import PRIMARY_EXTERNAL_ORG
+
 
 # Use this value to replace the PRIMARY_EXTERNAL_ORG value in the json object returned
 # from the query. DuckDB doesn't support column names which are an empty string.

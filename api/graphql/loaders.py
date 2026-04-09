@@ -1,9 +1,9 @@
-# pylint: disable=no-value-for-parameter,redefined-builtin
 # ^ Do this because of the loader decorator
 import copy
 import dataclasses
 import enum
 from collections import defaultdict
+from datetime import date
 from typing import Any, TypedDict
 
 from fastapi import Request
@@ -28,7 +28,10 @@ from db.python.tables.assay import AssayFilter
 from db.python.tables.family import FamilyFilter
 from db.python.tables.participant import ParticipantFilter
 from db.python.tables.sample import SampleFilter
-from db.python.tables.sequencing_group import SequencingGroupFilter
+from db.python.tables.sequencing_group import (
+    SequencingGroupFilter,
+    SequencingGroupTable,
+)
 from db.python.utils import NotFoundError
 from models.models import (
     AnalysisInternal,
@@ -56,6 +59,7 @@ class LoaderKeys(enum.Enum):
     AUDIT_LOGS_BY_IDS = 'audit_logs_by_ids'
     AUDIT_LOGS_BY_ANALYSIS_IDS = 'audit_logs_by_analysis_ids'
 
+    ANALYSES_FOR_PROJECTS = 'analyses_for_projects'
     ANALYSES_FOR_SEQUENCING_GROUPS = 'analyses_for_sequencing_groups'
 
     ASSAYS_FOR_IDS = 'assays_for_ids'
@@ -82,6 +86,7 @@ class LoaderKeys(enum.Enum):
     SEQUENCING_GROUPS_FOR_SAMPLES = 'sequencing_groups_for_samples'
     SEQUENCING_GROUPS_FOR_PROJECTS = 'sequencing_groups_for_projects'
     SEQUENCING_GROUPS_FOR_ANALYSIS = 'sequencing_groups_for_analysis'
+    SEQUENCING_GROUPS_COUNTS_FOR_PROJECT = 'sequencing_groups_counts_for_project'
 
     COMMENTS_FOR_SAMPLE_IDS = 'comments_for_sample_ids'
     COMMENTS_FOR_PARTICIPANT_IDS = 'comments_for_participant_ids'
@@ -294,6 +299,19 @@ async def load_sequencing_groups_for_samples(
     return sg_map
 
 
+@connected_data_loader(LoaderKeys.SEQUENCING_GROUPS_COUNTS_FOR_PROJECT)
+async def load_sequencing_group_counts_by_month(
+    ids: list[ProjectId], connection: Connection
+) -> list[dict[date, dict[str, int]]]:
+    """
+    DataLoader: get_sequencing_group_counts_by_month
+    """
+    sgt = SequencingGroupTable(connection)
+    counts_by_month = await sgt.get_sequencing_group_counts_by_month(ids)
+
+    return [counts_by_month[id] for id in ids]  # noqa: A001
+
+
 @connected_data_loader(LoaderKeys.SAMPLES_FOR_IDS)
 async def load_samples_for_ids(
     sample_ids: list[int], connection: Connection
@@ -441,6 +459,27 @@ async def load_participants_for_projects(
 
 
 @connected_data_loader_with_params(
+    LoaderKeys.ANALYSES_FOR_PROJECTS, default_factory=list
+)
+async def load_analyses_for_projects(
+    ids: list[int],
+    filter_: AnalysisFilter,
+    connection: Connection,
+) -> dict[int, list[AnalysisInternal]]:
+    """
+    Data loader for loading analyses from projects.
+    """
+    alayer = AnalysisLayer(connection)
+    filter_.project = GenericFilter(in_=ids)
+    analyses = await alayer.query(filter_)
+    by_project_id: dict[int, list[AnalysisInternal]] = defaultdict(list)
+    for a in analyses:
+        by_project_id[a.project].append(a)
+
+    return by_project_id
+
+
+@connected_data_loader_with_params(
     LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS, default_factory=list
 )
 async def load_analyses_for_sequencing_groups(
@@ -506,7 +545,8 @@ async def load_family_participants_for_families(
 async def load_family_participants_for_participants(
     participant_ids: list[int], connection: Connection
 ) -> list[list[PedRowInternal]]:
-    """data loader for family participants for participants
+    """
+    data loader for family participants for participants
 
     Args:
         participant_ids (list[int]): list of internal participant ids
@@ -617,7 +657,7 @@ class GraphQLContext(TypedDict):
 
 
 async def get_context(
-    request: Request,  # pylint: disable=unused-argument
+    request: Request,  # noqa: ARG001
     connection: Connection = get_projectless_db_connection,
 ) -> GraphQLContext:
     """Get loaders / cache context for strawberyy GraphQL"""

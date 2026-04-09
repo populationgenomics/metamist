@@ -1,4 +1,3 @@
-# pylint: disable=no-value-for-parameter,redefined-builtin,missing-function-docstring,unused-argument,too-many-lines,too-many-arguments
 """
 Schema for GraphQL.
 
@@ -8,10 +7,7 @@ and defaults to decide the GraphQL schema, so it might not necessarily look corr
 
 import datetime
 from inspect import isclass
-from typing import (  # pylint: disable=unused-import; Union is used, pylint just doesn't know about it
-    Annotated,
-    Union,
-)
+from typing import Annotated
 
 import strawberry
 from strawberry.extensions import QueryDepthLimiter
@@ -46,6 +42,7 @@ from db.python.tables.participant import ParticipantFilter
 from db.python.tables.sample import SampleFilter
 from db.python.tables.sequencing_group import SequencingGroupFilter
 from models.enums import AnalysisStatus
+from models.enums.cohort import CohortStatus
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
     AnalysisInternal,
@@ -83,15 +80,17 @@ from models.utils.cohort_template_id_format import (
 from models.utils.sample_id_format import sample_id_format
 from models.utils.sequencing_group_id_format import (
     sequencing_group_id_format,
+    sequencing_group_id_format_list,
     sequencing_group_id_transform_to_raw,
 )
+
 
 enum_methods = {}
 for enum in enum_tables.__dict__.values():
     if not isclass(enum):
         continue
 
-    def create_function(_enum):
+    def create_function(_enum):  # noqa: D103
         async def m(info: Info[GraphQLContext, 'Query']) -> list[str]:
             return await _enum(info.context['connection']).get()
 
@@ -107,6 +106,7 @@ for enum in enum_tables.__dict__.values():
 GraphQLEnum = strawberry.type(type('GraphQLEnum', (object,), enum_methods))
 
 GraphQLAnalysisStatus = strawberry.enum(AnalysisStatus)  # type: ignore
+GraphQLCohortStatus: type = strawberry.enum(CohortStatus)
 
 
 # Create cohort GraphQL model
@@ -118,6 +118,7 @@ class GraphQLCohort:
     name: str
     description: str
     author: str
+    status: GraphQLCohortStatus
 
     project_id: strawberry.Private[int]
 
@@ -129,6 +130,7 @@ class GraphQLCohort:
             description=internal.description,
             author=internal.author,
             project_id=internal.project,
+            status=internal.status,
         )
 
     @strawberry.field()
@@ -166,7 +168,7 @@ class GraphQLCohort:
         )
 
         sg_layer = SequencingGroupLayer(connection)
-        filter = SequencingGroupFilter(
+        filter = SequencingGroupFilter(  # noqa: A001
             id=GenericFilter(in_=sg_ids),
             active_only=active_only.to_internal_filter() if active_only else None,
         )
@@ -193,6 +195,42 @@ class GraphQLCohort:
         loader = info.context['loaders'][LoaderKeys.PROJECTS_FOR_IDS]
         project = await loader.load(root.project_id)
         return GraphQLProject.from_internal(project)
+
+
+@strawberry.type
+class CreatedGraphQLCohort:
+    """Custom Cohort GraphQL model for cohort creation"""
+
+    created_cohort: GraphQLCohort
+    excluded_ineligible_sg_ids_internal: list[str] | None = None  # returns only SG ids
+
+    @staticmethod
+    def from_internal(
+        internal: CohortInternal,
+        excluded_ineligible_sg_ids_internal: list[int] | None = None,
+    ) -> 'CreatedGraphQLCohort':
+        return CreatedGraphQLCohort(
+            created_cohort=GraphQLCohort.from_internal(internal),
+            excluded_ineligible_sg_ids_internal=(
+                sequencing_group_id_format_list(excluded_ineligible_sg_ids_internal)
+                if excluded_ineligible_sg_ids_internal
+                else None
+            ),
+        )
+
+    @staticmethod
+    def from_internal_to_dry_run(
+        graphql_cohort: GraphQLCohort,
+        excluded_ineligible_sg_ids_internal: list[int] | None = None,
+    ) -> 'CreatedGraphQLCohort':
+        return CreatedGraphQLCohort(
+            created_cohort=graphql_cohort,
+            excluded_ineligible_sg_ids_internal=(
+                sequencing_group_id_format_list(excluded_ineligible_sg_ids_internal)
+                if excluded_ineligible_sg_ids_internal
+                else None
+            ),
+        )
 
 
 # Create cohort template GraphQL model
@@ -276,7 +314,7 @@ class GraphQLComment:
     """A comment made on a entity"""
 
     id: int
-    parentId: int | None
+    parentId: int | None  # noqa: N815
     content: str
     author: str
     created_at: datetime.datetime
@@ -291,7 +329,7 @@ class GraphQLComment:
     async def entity(
         self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLComment'
     ) -> Annotated[
-        'Union[GraphQLSample , GraphQLAssay , GraphQLSequencingGroup , GraphQLProject , GraphQLParticipant , GraphQLFamily]',
+        'GraphQLSample | GraphQLAssay | GraphQLSequencingGroup | GraphQLProject | GraphQLParticipant | GraphQLFamily',
         strawberry.union('GraphQLCommentEntity'),
     ]:
         entity_type = root.comment_entity_type
@@ -426,6 +464,7 @@ class GraphQLProject:
         root: 'GraphQLProject',
         id: GraphQLFilter[int] | None = None,
         external_id: GraphQLFilter[str] | None = None,
+        meta: GraphQLMetaFilter | None = None,
     ) -> list['GraphQLFamily']:
         # don't need a data loader here as we're presuming we're not often running
         # the "families" method for many projects at once. If so, we might need to fix that
@@ -435,6 +474,7 @@ class GraphQLProject:
                 project=GenericFilter(eq=root.id),
                 id=id.to_internal_filter() if id else None,
                 external_id=external_id.to_internal_filter() if external_id else None,
+                meta=graphql_meta_filter_to_internal_filter(meta),
             )
         )
         return [GraphQLFamily.from_internal(f) for f in families]
@@ -545,34 +585,36 @@ class GraphQLProject:
         self,
         info: Info[GraphQLContext, 'Query'],
         root: 'Project',
-        type: GraphQLFilter[str] | None = None,
         status: GraphQLFilter[GraphQLAnalysisStatus] | None = None,
-        active: GraphQLFilter[bool] | None = None,
+        type: GraphQLFilter[str] | None = None,
         meta: GraphQLMetaFilter | None = None,
+        active: GraphQLFilter[bool] | None = None,
         timestamp_completed: GraphQLFilter[datetime.datetime] | None = None,
         ids: GraphQLFilter[int] | None = None,
     ) -> list['GraphQLAnalysis']:
-        connection = info.context['connection']
-        internal_analysis = await AnalysisLayer(connection).query(
-            AnalysisFilter(
-                id=ids.to_internal_filter() if ids else None,
-                type=type.to_internal_filter() if type else None,
-                status=(
-                    status.to_internal_filter()
-                    if status
-                    else GenericFilter(eq=AnalysisStatus.COMPLETED)
-                ),
-                active=active.to_internal_filter() if active else None,
-                project=GenericFilter(eq=root.id),
-                meta=meta,
-                timestamp_completed=(
-                    timestamp_completed.to_internal_filter()
+        loader = info.context['loaders'][LoaderKeys.ANALYSES_FOR_PROJECTS]
+
+        analyses = await loader.load(
+            {
+                'id': root.id,
+                'filter_': AnalysisFilter(
+                    id=ids.to_internal_filter() if ids else None,
+                    status=status.to_internal_filter() if status else None,
+                    type=type.to_internal_filter() if type else None,
+                    meta=graphql_meta_filter_to_internal_filter(meta),
+                    active=(
+                        active.to_internal_filter()
+                        if active
+                        else GenericFilter(eq=True)
+                    ),
+                    timestamp_completed=timestamp_completed.to_internal_filter()
                     if timestamp_completed
-                    else None
+                    else None,
                 ),
-            )
+            }
         )
-        return [GraphQLAnalysis.from_internal(a) for a in internal_analysis]
+
+        return [GraphQLAnalysis.from_internal(a) for a in analyses]
 
     @strawberry.field()
     async def cohorts(
@@ -584,6 +626,7 @@ class GraphQLProject:
         author: GraphQLFilter[str] | None = None,
         template_id: GraphQLFilter[str] | None = None,
         timestamp: GraphQLFilter[datetime.datetime] | None = None,
+        status: GraphQLFilter[GraphQLCohortStatus] | None = None,
     ) -> list['GraphQLCohort']:
         connection = info.context['connection']
 
@@ -600,6 +643,7 @@ class GraphQLProject:
             ),
             timestamp=timestamp.to_internal_filter() if timestamp else None,
             project=GenericFilter(eq=root.id),
+            status=status.to_internal_filter() if status else None,
         )
 
         cohorts = await CohortLayer(connection).query(c_filter)
@@ -612,6 +656,18 @@ class GraphQLProject:
         loader = info.context['loaders'][LoaderKeys.COMMENTS_FOR_PROJECT_IDS]
         discussion = await loader.load(root.id)
         return GraphQLDiscussion.from_internal(discussion)
+
+    @strawberry.field()
+    async def sequencing_group_history(
+        self, info: Info[GraphQLContext, 'Query'], root: 'GraphQLProject'
+    ) -> list['GraphQLSequencingGroupsByDate']:
+        loader = info.context['loaders'][
+            LoaderKeys.SEQUENCING_GROUPS_COUNTS_FOR_PROJECT
+        ]
+
+        counts = await loader.load(root.id)
+
+        return GraphQLSequencingGroupsByDate.from_dict(counts)
 
 
 @strawberry.type
@@ -703,6 +759,7 @@ class GraphQLFamily:
 
     description: str | None
     coded_phenotype: str | None
+    meta: strawberry.scalars.JSON
 
     # internal
     project_id: strawberry.Private[int]
@@ -715,6 +772,7 @@ class GraphQLFamily:
             external_ids=internal.external_ids or {},
             description=internal.description,
             coded_phenotype=internal.coded_phenotype,
+            meta=internal.meta or {},
             project_id=internal.project,
         )
 
@@ -1291,11 +1349,39 @@ class GraphQLViewer:
 
 
 @strawberry.type
+class GraphQLSequencingGroupsByDate:
+    """
+    GraphQL representation of the number of Sequencing Groups of a given type that exist at a given date.
+    """
+
+    date: datetime.date
+    type: str
+    technology: str
+    count: int
+
+    @staticmethod
+    def from_dict(date_type_count_map: dict[datetime.date, dict[str, int]]):
+        entries: list[GraphQLSequencingGroupsByDate] = []
+        for month, type_counts in sorted(
+            date_type_count_map.items(), key=lambda x: x[0]
+        ):
+            for key, count in type_counts.items():
+                type, tech = key.split('|||')  # noqa: A001
+                entries.append(
+                    GraphQLSequencingGroupsByDate(
+                        date=month, type=type, technology=tech, count=count
+                    )
+                )
+
+        return entries
+
+
+@strawberry.type
 class Query:  # entry point to graphql.
     """GraphQL Queries"""
 
     @strawberry.field()
-    def enum(self, info: Info[GraphQLContext, 'Query']) -> GraphQLEnum:  # type: ignore
+    def enum(self, info: Info[GraphQLContext, 'Query']) -> GraphQLEnum:  # type: ignore  # noqa: ARG002
         return GraphQLEnum()
 
     @strawberry.field()
@@ -1376,6 +1462,7 @@ class Query:  # entry point to graphql.
         name: GraphQLFilter[str] | None = None,
         author: GraphQLFilter[str] | None = None,
         template_id: GraphQLFilter[str] | None = None,
+        status: GraphQLFilter[GraphQLCohortStatus] | None = None,
     ) -> list[GraphQLCohort]:
         connection = info.context['connection']
         cohort_layer = CohortLayer(connection)
@@ -1404,6 +1491,7 @@ class Query:  # entry point to graphql.
                 if template_id
                 else None
             ),
+            status=status.to_internal_filter() if status else None,
         )
 
         cohorts = await cohort_layer.query(filter_)
@@ -1480,9 +1568,8 @@ class Query:  # entry point to graphql.
         samples = await slayer.query(filter_)
         return [GraphQLSample.from_internal(sample) for sample in samples]
 
-    # pylint: disable=too-many-arguments
     @strawberry.field
-    async def sequencing_groups(
+    async def sequencing_groups(  # noqa: PLR0913
         self,
         info: Info[GraphQLContext, 'Query'],
         id: GraphQLFilter[str] | None = None,

@@ -13,17 +13,22 @@ jobs:
     runs-on: ubuntu-latest
     name: Pip Audit
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
 
-      - uses: pypa/gh-action-pip-audit@v1.1.0
-        name: Pip Audit Dependencies
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e #v6.8.0
         with:
-          inputs: requirements.txt
-          summary: true
-      - uses: pypa/gh-action-pip-audit@v1.1.0
-        name: Pip Audit Dev Dependencies
+          activate-environment: true
+          enable-cache: false
+          version: 0.8.22 #uv version
+
+      - name: Install project dependencies
+        run: |
+          uv sync
+
+      - uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 #v1.1.0
         with:
-          inputs: requirements-dev.txt
+          virtual-environment: .venv
           summary: true

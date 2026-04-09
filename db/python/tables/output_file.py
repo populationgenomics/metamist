@@ -1,12 +1,13 @@
-# pylint: disable=too-many-nested-blocks
 import logging
 from textwrap import dedent
+from urllib.parse import urlparse
 
 from fastapi.concurrency import run_in_threadpool
 from google.cloud.storage import Blob
 
 from db.python.tables.base import DbBase
 from models.models.output_file import OutputFileInternal, RecursiveDict
+
 
 logger = logging.getLogger(__file__)
 logger.addHandler(logging.StreamHandler())
@@ -70,6 +71,9 @@ class OutputFileTable(DbBase):
         if not path:
             raise ValueError('Invalid cloud file path')
 
+        if urlparse(path).scheme == '':
+            raise ValueError('Output file path must contain a protocol prefix')
+
         file_obj = await run_in_threadpool(
             OutputFileInternal.get_file_info,
             path=path,
@@ -119,6 +123,10 @@ class OutputFileTable(DbBase):
         output: str | None = None,
     ):
         """Add file to an analysis (through the join table)"""
+
+        # The IGNORE is to avoid duplicate entries if the same file is added multiple times
+        # and we used this over ON DUPLICATE because there are reported deadlocks with that
+        # syntax in high concurrency situations?
         _query = dedent(
             """
             INSERT IGNORE INTO analysis_outputs
@@ -164,7 +172,7 @@ class OutputFileTable(DbBase):
                         output=(None if parent_file_id else primary_file['basename']),
                     )
                     secondary_files = files.get('secondary_files_grouped')
-                    if secondary_files:
+                    if secondary_files:  # noqa: SIM102
                         if primary_file['basename'] in secondary_files:
                             for secondary_file in secondary_files[
                                 primary_file['basename']
@@ -202,9 +210,10 @@ class OutputFileTable(DbBase):
                 pass
 
             _update_query = dedent(
+                # Delete analysis outputs not in the current set of file_ids or outputs
                 """
-                DELETE ao FROM analysis_outputs ao
-                WHERE ao.analysis_id = :analysis_id
+                DELETE FROM analysis_outputs
+                WHERE analysis_id = :analysis_id
                 """
             )
 
@@ -217,14 +226,12 @@ class OutputFileTable(DbBase):
 
             # Add file_id condition if file_ids is not empty
             if file_ids:
-                conditions.append(
-                    'ao.file_id IS NOT NULL AND ao.file_id NOT IN :file_ids'
-                )
+                conditions.append('file_id IS NOT NULL AND file_id NOT IN :file_ids')
                 query_params['file_ids'] = file_ids  # Add file_ids to query parameters
 
             # Add output condition if outputs is not empty
             if outputs:
-                conditions.append('ao.output IS NOT NULL AND ao.output NOT IN :outputs')
+                conditions.append('output IS NOT NULL AND output NOT IN :outputs')
                 query_params['outputs'] = outputs  # Add outputs to query parameters
 
             # Join the conditions with OR since either can be valid

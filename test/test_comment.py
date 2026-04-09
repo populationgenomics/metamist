@@ -1,4 +1,3 @@
-# pylint: disable=missing-function-docstring, too-many-public-methods, too-many-locals
 from typing import Any
 
 from db.python.layers.assay import AssayLayer
@@ -6,12 +5,14 @@ from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
+from db.python.tables.project import ProjectPermissionsTable
 from models.models import PRIMARY_EXTERNAL_ORG, SampleUpsertInternal
 from models.models.assay import AssayUpsertInternal
 from models.models.participant import ParticipantUpsertInternal
 from models.models.sequencing_group import SequencingGroupUpsertInternal
 from test.test_participant import get_participant_to_insert
 from test.testbase import DbIsolatedTest, run_as_sync
+
 
 # @TODO would be good to add permissions testing to this, but first need a better
 # way of mocking the test user and their permissions to make that possible
@@ -329,7 +330,7 @@ default_sequencing_meta = {
 }
 
 
-def comment_uniq(comment: dict[str, Any]):
+def comment_uniq(comment: dict[str, Any]):  # noqa: D103
     return (comment['id'], comment['entity']['__typename'])
 
 
@@ -982,3 +983,88 @@ class TestComment(DbIsolatedTest):
         self.assertIn(comment_uniq(family_comment), sequencing_group_related_ids)
         self.assertIn(comment_uniq(participant_comment), sequencing_group_related_ids)
         self.assertNotIn(comment_uniq(project_comment), sequencing_group_related_ids)
+
+    @run_as_sync
+    async def test_project_deletion(self):
+        """Test ProjectPermissionsTable.delete_project_data's effect on comments"""
+
+        sample = await self.slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
+                type='blood',
+                active=True,
+                meta={'meta': 'meta ;)'},
+            )
+        )
+
+        assay = await self.assaylayer.upsert_assay(
+            assay=AssayUpsertInternal(
+                sample_id=sample.id, meta=default_sequencing_meta, type='sequencing'
+            )
+        )
+        assert assay.id
+        await self.add_comment_to_assay(assay.id, 'Assay comment')
+
+        family = await self.flayer.create_family(
+            external_ids={PRIMARY_EXTERNAL_ORG: 'f_external_id'},
+        )
+        await self.add_comment_to_family(family, 'Family comment')
+
+        participant = await self.player.upsert_participant(
+            participant=ParticipantUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'p_external_id'},
+                meta={'pmeta': 'pvalue'},
+                reported_sex=2,
+                reported_gender='FEMALE',
+                karyotype='XX',
+            )
+        )
+        assert participant.id
+        await self.add_comment_to_participant(participant.id, 'Participant comment')
+
+        project = self.connection.all_projects()[0]
+        await self.add_comment_to_project(project.id, 'Project comment')
+
+        sample_external = sample.to_external()
+        await self.add_comment_to_sample(sample_external.id, 'Sample comment')
+
+        sequencing_groups = await self.sglayer.upsert_sequencing_groups(
+            sequencing_groups=[
+                SequencingGroupUpsertInternal(
+                    sample_id=sample.id,
+                    type='mtseq',
+                    technology='short-read',
+                    platform='oxford-nanopore',
+                    assays=[
+                        AssayUpsertInternal(
+                            sample_id=sample.id,
+                            meta=default_sequencing_meta,
+                            type='sequencing',
+                        )
+                    ],
+                )
+            ]
+        )
+        sequencing_group = sequencing_groups[0]
+        sequencing_group_id = sequencing_group.to_external().id
+        assert sequencing_group_id
+        await self.add_comment_to_sequencing_group(sequencing_group_id, 'SG comment')
+
+        self.assertEqual(await self.row_count('comment'), 6)
+        self.assertEqual(await self.row_count('assay_comment'), 1)
+        self.assertEqual(await self.row_count('family_comment'), 1)
+        self.assertEqual(await self.row_count('participant_comment'), 1)
+        self.assertEqual(await self.row_count('project_comment'), 1)
+        self.assertEqual(await self.row_count('sample_comment'), 1)
+        self.assertEqual(await self.row_count('sequencing_group_comment'), 1)
+
+        pttable = ProjectPermissionsTable(self.connection)
+        self.assertTrue(await pttable.delete_project_data(project))
+
+        self.assertEqual(await self.row_count('comment'), 0)
+        self.assertEqual(await self.row_count('assay_comment'), 0)
+        self.assertEqual(await self.row_count('family_comment'), 0)
+        self.assertEqual(await self.row_count('participant_comment'), 0)
+        self.assertEqual(await self.row_count('project_comment'), 0)
+        self.assertEqual(await self.row_count('sample_comment'), 0)
+        self.assertEqual(await self.row_count('sequencing_group_comment'), 0)

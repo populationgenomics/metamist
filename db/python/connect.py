@@ -1,5 +1,3 @@
-# pylint: disable=unused-import,too-many-instance-attributes
-# flake8: noqa
 """
 Code for connecting to Postgres database
 """
@@ -9,7 +7,7 @@ import asyncio
 import json
 import logging
 import os
-from typing import Iterable
+from collections.abc import Iterable
 
 import databases
 
@@ -22,6 +20,7 @@ from db.python.utils import (
     ProjectDoesNotExist,
 )
 from models.models.project import Project, ProjectId, ProjectMemberRole
+
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -45,12 +44,14 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'family_external_id',
     'family_participant',
     'participant_phenotypes',
+    'project_member',
     'group_member',
     'cohort_template',
     'cohort',
     'cohort_sequencing_group',
     'analysis_cohort',
     'analysis_runner',
+    'output_file',
     'analysis_outputs',
     'comment',
     'sample_comment',
@@ -150,7 +151,9 @@ class Connection:
         current user has no access to it. Return the matching projects
         """
         projects = [
-            self.project_id_map[id] for id in project_ids if id in self.project_id_map
+            self.project_id_map[_id]
+            for _id in project_ids
+            if _id in self.project_id_map
         ]
 
         # Check if any of the provided ids aren't valid project ids, or the user has
@@ -240,7 +243,7 @@ class Connection:
         async with self._audit_log_lock:
             if not self._audit_log_id:
                 # make this import here, otherwise we'd have a circular import
-                from db.python.tables.audit_log import (  # pylint: disable=import-outside-toplevel,R0401
+                from db.python.tables.audit_log import (  # noqa: PLC0415
                     AuditLogTable,
                 )
 

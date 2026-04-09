@@ -8,6 +8,7 @@ from models.models import (
 )
 from test.testbase import DbIsolatedTest, run_as_sync
 
+
 default_assay_meta = {
     'sequencing_type': 'genome',
     'sequencing_technology': 'short-read',

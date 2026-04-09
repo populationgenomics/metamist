@@ -4,12 +4,13 @@ import os
 import re
 from typing import TypeAlias
 
-from google.cloud.storage import Blob, Client
 from google.api_core.exceptions import NotFound
+from google.cloud.storage import Blob, Client
 from pydantic import BaseModel
 
 from api.settings import METAMIST_GCP_PROJECT
 from models.base import SMBase, parse_sql_bool
+
 
 RecursiveDict: TypeAlias = dict[str, 'str | RecursiveDict']
 
@@ -18,7 +19,7 @@ GCS_CLIENT = None
 
 def get_gcs_client():
     """Return a GCS client"""
-    global GCS_CLIENT  # pylint: disable=global-statement
+    global GCS_CLIENT  # noqa: PLW0603
     if GCS_CLIENT:
         return GCS_CLIENT
 
@@ -73,7 +74,6 @@ class OutputFileInternal(SMBase):
         """
         return OutputFile(
             id=self.id,
-            parent_id=self.parent_id,
             path=self.path,
             basename=self.basename,
             dirname=self.dirname,
@@ -125,12 +125,12 @@ class OutputFileInternal(SMBase):
         if match:
             bucket = match.group(1)
             path_after_bucket = match.group(2) or ''
-            dirname = f'gs://{bucket}{os.path.dirname(path_after_bucket)}'
-            basename = os.path.basename(path_after_bucket)
-            file_extension = os.path.splitext(basename)[1] if basename else ''
-            file_stem = os.path.splitext(basename)[0] if basename else ''
+            dirname = f'gs://{bucket}{os.path.dirname(path_after_bucket)}'  # noqa: PTH120
+            basename = os.path.basename(path_after_bucket)  # noqa: PTH119
+            file_extension = os.path.splitext(basename)[1] if basename else ''  # noqa: PTH122
+            file_stem = os.path.splitext(basename)[0] if basename else ''  # noqa: PTH122
             prefix = (
-                os.path.dirname(path_after_bucket) + '/'
+                os.path.dirname(path_after_bucket) + '/'  # noqa: PTH120
                 if path_after_bucket.count('/') > 1
                 else ''
             )
@@ -184,7 +184,7 @@ class OutputFileInternal(SMBase):
                     )
 
                 for blob in blobs:
-                    if blob.name == params['blob_name']:
+                    if blob.name == params['blob_name']:  # noqa: SIM102
                         # .mt files present as folders on gcs so calculating checksums is not avail.
                         if params['file_extension'] != '.mt':
                             file_checksum = blob.crc32c  # pylint: disable=E1101
@@ -193,26 +193,24 @@ class OutputFileInternal(SMBase):
                             break
 
             return OutputFileInternal.from_db(
-                **{
-                    'path': path,
-                    'basename': params['basename'],  # pylint: disable=E1101
-                    'dirname': params['dirname'],  # pylint: disable=E1101
-                    'nameroot': params['file_stem'],  # pylint: disable=E1101
-                    'nameext': params['file_extension'],  # pylint: disable=E1101
-                    'file_checksum': file_checksum,
-                    'size': size,  # pylint: disable=E1101
-                    # At the moment we don't have any meta data for outputs
-                    'meta': None,
-                    'valid': valid,
-                    'secondary_files': None,
-                }
+                path=path,
+                basename=params['basename'],
+                dirname=params['dirname'],
+                nameroot=params['file_stem'],
+                nameext=params['file_extension'],
+                file_checksum=file_checksum,
+                size=size,
+                meta=None,
+                valid=valid,
+                secondary_files=None,
             )
         except (FileNotFoundError, ValueError):
             return None
 
     @staticmethod
     def reconstruct_json(data: list | str) -> str | dict:
-        """Reconstruct JSON structure from provided data.
+        """
+        Reconstruct JSON structure from provided data.
 
         Args:
             data (list | str): A tuple of (OutputFileInternal, json_structure) if file_id is not None,
@@ -235,7 +233,7 @@ class OutputFileInternal(SMBase):
             # We ensure the necessary keys exist in the current dictionary before adding the content.
             for key in path[:-1]:
                 if key.isdigit():
-                    key = int(key)  # type: ignore [assignment]
+                    key = int(key)  # type: ignore [assignment]  # noqa: PLW2901
                     if key not in current:
                         current[key] = {}
                     current = current[key]
@@ -249,14 +247,13 @@ class OutputFileInternal(SMBase):
             if final_key.isdigit():
                 final_key = int(final_key)  # type: ignore [assignment]
                 current[final_key] = content
-            else:
-                if final_key in current:
-                    if isinstance(current[final_key], dict):
-                        current[final_key].update(content)
-                    else:
-                        current[final_key] = content
+            elif final_key in current:
+                if isinstance(current[final_key], dict):
+                    current[final_key].update(content)
                 else:
                     current[final_key] = content
+            else:
+                current[final_key] = content
 
         for file in data:
             # We initialize the file_root dictionary to store the file information.
@@ -298,7 +295,6 @@ class OutputFile(BaseModel):
     """File model for external use"""
 
     id: int | None = None
-    parent_id: int | None = None
     path: str
     basename: str
     dirname: str
@@ -316,7 +312,7 @@ class OutputFile(BaseModel):
         """
         return OutputFileInternal(
             id=self.id,
-            parent_id=self.parent_id,
+            parent_id=None,  # parent_id is not exposed in external model
             path=self.path,
             basename=self.basename,
             dirname=self.dirname,

@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-instance-attributes,too-many-locals,unused-argument,wrong-import-order,unused-argument
 import logging
-from typing import List
 
 import click
 
 from metamist.parser.generic_metadata_parser import DefaultSequencing, run_as_sync
 from metamist.parser.sample_file_map_parser import SampleFileMapParser
+
 
 __DOC = """
 The SampleFileMapParser is used for parsing files with format:
@@ -63,7 +62,7 @@ logger.setLevel(logging.INFO)
 @run_as_sync
 async def main(
     manifests,
-    search_path: List[str],
+    search_path: list[str],
     project,
     default_sample_type='blood',
     default_sequencing_type='wgs',
@@ -103,5 +102,4 @@ async def main(
 
 
 if __name__ == '__main__':
-    # pylint: disable=no-value-for-parameter
     main()

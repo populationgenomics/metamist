@@ -1,7 +1,8 @@
 from enum import StrEnum
-from typing import Any, Optional
+from typing import Any
 
 from models.base import SMBase, parse_sql_dict
+
 
 ProjectId = int
 
@@ -35,9 +36,14 @@ class Project(SMBase):
     id: ProjectId
     name: str
     dataset: str
-    meta: Optional[dict[str, Any]] = None
+    meta: dict[str, Any] | None = None
     roles: set[ProjectMemberRole]
     """The roles that the current user has within the project"""
+
+    @property
+    def is_test_project(self):
+        """Returns whether this is a main or a test project"""
+        return self.name.endswith('-test')
 
     @staticmethod
     def from_db(kwargs):

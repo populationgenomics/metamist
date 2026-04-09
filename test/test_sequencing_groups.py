@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import date, datetime
+from unittest import mock
 
 from db.python.filters import GenericFilter
 from db.python.layers import AnalysisLayer, SampleLayer, SequencingGroupLayer
@@ -394,3 +395,156 @@ class TestSequencingGroup(DbIsolatedTest):
         self.assertEqual(archived_sgs[0]['archived'], True)
         self.assertEqual(archived_sgs[1]['id'], sg2)
         self.assertEqual(archived_sgs[1]['archived'], True)
+
+    @run_as_sync
+    async def test_history_no_sum(self):
+        """Test the trivial case where there are no sequencing groups."""
+
+        # Set up mocking for rows returned from the table query.
+        with mock.patch(
+            'db.python.connect.databases.Database.fetch_all', return_value=[]
+        ):
+            sg_table = self.sglayer.seqgt
+            result = await sg_table.get_sequencing_group_counts_by_month([])
+
+        self.assertDictEqual(result, {})
+
+    @run_as_sync
+    @mock.patch('db.python.tables.sequencing_group.date', wraps=date)
+    async def test_history_sum_multiple_projects(self, mock_date):
+        """Test the case where type:technology combinations are summed and held for the same project."""
+        # Mock today's date.
+        mock_date.today.return_value = date(year=2025, month=12, day=31)
+
+        # Set up mocking for rows returned from the table query.
+        rows_mock = [
+            {
+                'project': 0,
+                'type': 'genome',
+                'technology': 'short-read',
+                'sg_date': date(2025, 10, 1),
+                'num_sg': 2,
+            },
+            {
+                'project': 0,
+                'type': 'genome',
+                'technology': 'short-read',
+                'sg_date': date(2025, 11, 1),
+                'num_sg': 4,
+            },
+            {
+                'project': 1,
+                'type': 'genome',
+                'technology': 'short-read',
+                'sg_date': date(2025, 10, 1),
+                'num_sg': 3,
+            },
+            {
+                'project': 1,
+                'type': 'genome',
+                'technology': 'short-read',
+                'sg_date': date(2025, 11, 1),
+                'num_sg': 5,
+            },
+        ]
+        with mock.patch(
+            'db.python.connect.databases.Database.fetch_all', return_value=rows_mock
+        ):
+            sg_table = self.sglayer.seqgt
+            result = await sg_table.get_sequencing_group_counts_by_month([0])
+
+        self.assertDictEqual(
+            result,
+            {
+                0: {
+                    date(2025, 10, 1): {
+                        'genome|||short-read': 2,
+                    },
+                    date(2025, 11, 1): {
+                        'genome|||short-read': 6,
+                    },
+                    date(2025, 12, 1): {
+                        'genome|||short-read': 6,
+                    },
+                },
+                1: {
+                    date(2025, 10, 1): {
+                        'genome|||short-read': 3,
+                    },
+                    date(2025, 11, 1): {
+                        'genome|||short-read': 8,
+                    },
+                    date(2025, 12, 1): {
+                        'genome|||short-read': 8,
+                    },
+                },
+            },
+        )
+
+    @run_as_sync
+    @mock.patch('db.python.tables.sequencing_group.date', wraps=date)
+    async def test_history_partial_sum(self, mock_date):
+        """Test the case where less types are present initially and more are added over time."""
+        # Mock today's date.
+        mock_date.today.return_value = date(year=2025, month=12, day=31)
+
+        # Set up mocking for rows returned from the table query.
+        rows_mock = [
+            {
+                'project': 0,
+                'type': 'genome',
+                'technology': 'short-read',
+                'sg_date': date(2025, 10, 1),
+                'num_sg': 2,
+            },
+            {
+                'project': 0,
+                'type': 'genome',
+                'technology': 'long-read',
+                'sg_date': date(2025, 11, 1),
+                'num_sg': 3,
+            },
+            {
+                'project': 0,
+                'type': 'chip',
+                'technology': 'short-read',
+                'sg_date': date(2025, 10, 1),
+                'num_sg': 4,
+            },
+            {
+                'project': 0,
+                'type': 'chip',
+                'technology': 'long-read',
+                'sg_date': date(2025, 11, 1),
+                'num_sg': 5,
+            },
+        ]
+        with mock.patch(
+            'db.python.connect.databases.Database.fetch_all', return_value=rows_mock
+        ):
+            sg_table = self.sglayer.seqgt
+            result = await sg_table.get_sequencing_group_counts_by_month([0])
+
+        self.assertDictEqual(
+            result,
+            {
+                0: {
+                    date(2025, 10, 1): {
+                        'genome|||short-read': 2,
+                        'chip|||short-read': 4,
+                    },
+                    date(2025, 11, 1): {
+                        'genome|||short-read': 2,
+                        'genome|||long-read': 3,
+                        'chip|||short-read': 4,
+                        'chip|||long-read': 5,
+                    },
+                    date(2025, 12, 1): {
+                        'genome|||short-read': 2,
+                        'genome|||long-read': 3,
+                        'chip|||short-read': 4,
+                        'chip|||long-read': 5,
+                    },
+                }
+            },
+        )

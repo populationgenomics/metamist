@@ -1,6 +1,5 @@
-# pylint: disable=redefined-builtin, import-outside-toplevel
-
 from typing import TYPE_CHECKING, Annotated
+
 import strawberry
 from strawberry.types import Info
 
@@ -10,6 +9,7 @@ from db.python.layers.analysis import AnalysisLayer
 from models.enums.analysis import AnalysisStatus
 from models.models.analysis import Analysis
 from models.models.project import FullWriteAccessRoles
+
 
 if TYPE_CHECKING:
     from api.graphql.schema import GraphQLAnalysis
@@ -56,7 +56,7 @@ class AnalysisMutations:
         info: Info[GraphQLContext, 'AnalysisMutations'],
     ) -> Annotated['GraphQLAnalysis', strawberry.lazy('api.graphql.schema')]:
         """Create a new analysis"""
-        from api.graphql.schema import GraphQLAnalysis
+        from api.graphql.schema import GraphQLAnalysis  # noqa: PLC0415
 
         connection: Connection = info.context['connection']
 
@@ -88,7 +88,7 @@ class AnalysisMutations:
         info: Info[GraphQLContext, 'AnalysisMutations'],
     ) -> Annotated['GraphQLAnalysis', strawberry.lazy('api.graphql.schema')]:
         """Update status of analysis"""
-        from api.graphql.schema import GraphQLAnalysis
+        from api.graphql.schema import GraphQLAnalysis  # noqa: PLC0415
 
         connection = info.context['connection']
         alayer = AnalysisLayer(connection)

@@ -1,0 +1,38 @@
+name: PR Checklist Manager Bot
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+
+jobs:
+  checklist:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Load checklist configuration
+        id: load-config
+        run: |
+          CONFIG_JSON=$(yq -o json .github/branch_checklist.yaml)
+          ESCAPED_JSON=$(echo "$CONFIG_JSON" | jq -aRs .)
+          echo "config=$ESCAPED_JSON" >> $GITHUB_OUTPUT
+        env:
+          YQ_VERSION: latest
+
+      - name: Run checklist manager
+        uses: actions/github-script@v7
+        env:
+          config: ${{ steps.load-config.outputs.config }}
+        with:
+          script: |
+            const script = require('./.github/scripts/manage-checklist.js');
+
+            const config = ${{ fromJSON(env.config) }};
+            await script({ github, context, core, config });

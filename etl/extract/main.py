@@ -11,13 +11,16 @@ from google.cloud import pubsub_v1  # type: ignore
 
 from cpg_utils.cloud import email_from_id_token
 
+
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE')
 PUBSUB_TOPIC = os.getenv('PUBSUB_TOPIC')
 
 
 @functions_framework.http
 def etl_extract(request: flask.Request):
-    """HTTP Cloud Function.
+    """
+    HTTP Cloud Function.
+
     Args:
         request (flask.Request): The request object.
         <https://flask.palletsprojects.com/en/1.1.x/api/#incoming-request-data>
@@ -25,6 +28,7 @@ def etl_extract(request: flask.Request):
         The response text, or any set of values that can be turned into a
         Response object using `make_response`
         <https://flask.palletsprojects.com/en/1.1.x/api/#flask.make_response>.
+
     Note:
         For more information on how Flask integrates with Cloud
         Functions, see the `Writing HTTP functions` page.
@@ -92,7 +96,7 @@ def etl_extract(request: flask.Request):
     # and already stored in BQ table
     try:
         pubsub_client.publish(PUBSUB_TOPIC, json.dumps(bq_obj).encode())
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except Exception as e:  # noqa: BLE001
         logging.error(f'Failed to publish to pubsub: {e}')
 
     return {'id': request_id, 'success': True}

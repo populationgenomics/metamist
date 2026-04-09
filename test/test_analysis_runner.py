@@ -1,11 +1,10 @@
-# pylint: disable=invalid-overridden-method
 import datetime
-from test.testbase import DbIsolatedTest, run_as_sync
 
 from db.python.filters import GenericFilter
 from db.python.layers.analysis_runner import AnalysisRunnerLayer
 from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from models.models.analysis_runner import AnalysisRunnerInternal
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestAnalysisRunner(DbIsolatedTest):
@@ -78,7 +77,7 @@ class TestAnalysisRunner(DbIsolatedTest):
         """
         analyses = [
             AnalysisRunnerInternal(
-                ar_guid=f'<ar-guid-{i+1}>',
+                ar_guid=f'<ar-guid-{i + 1}>',
                 project=self.project_id,
                 output_path='output_path',
                 timestamp=datetime.datetime(2024, 1, 1),

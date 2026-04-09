@@ -1,10 +1,9 @@
-from test.testbase import DbIsolatedTest, run_as_sync
-
 from pymysql.err import IntegrityError
 
 from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from models.models import PRIMARY_EXTERNAL_ORG, ParticipantUpsertInternal
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestParticipantFamily(DbIsolatedTest):

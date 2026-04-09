@@ -1,8 +1,8 @@
-# pylint: disable=global-statement
 import os
 from functools import lru_cache
 
 from cpg_utils.cloud import read_secret
+
 
 TRUTH_SET = ('1', 'y', 't', 'true')
 
@@ -50,6 +50,8 @@ BQ_AGGREG_EXT_VIEW = os.getenv('SM_GCP_BQ_AGGREG_EXT_VIEW')
 BQ_BUDGET_VIEW = os.getenv('SM_GCP_BQ_BUDGET_VIEW')
 BQ_GCP_BILLING_VIEW = os.getenv('SM_GCP_BQ_BILLING_VIEW')
 BQ_BATCHES_VIEW = os.getenv('SM_GCP_BQ_BATCHES_VIEW')
+
+BILLING_GROUP_INFO = os.getenv('SM_BILLING_GROUP_INFO', 'billing-project-groups')
 
 # BQ cost per 1 TB, used to calculate cost of BQ queries
 BQ_COST_PER_TB = 6.25

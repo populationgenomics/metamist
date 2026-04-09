@@ -1,5 +1,3 @@
-from test.testbase import DbIsolatedTest, run_as_sync
-
 from db.python.layers import (
     AssayLayer,
     ParticipantLayer,
@@ -14,6 +12,8 @@ from models.models import (
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
 )
+from test.testbase import DbIsolatedTest, run_as_sync
+
 
 default_assay_meta = {
     'sequencing_type': 'genome',
@@ -96,7 +96,7 @@ class TestProjectInsights(DbIsolatedTest):
         expected = [
             ProjectInsightsSummaryInternal(
                 project=self.project_id,
-                dataset='test',
+                dataset=self.project_name,  # for ProjectInsights, dataset is project.name
                 sequencing_type='genome',
                 sequencing_technology='short-read',
                 total_families=0,

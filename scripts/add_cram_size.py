@@ -1,4 +1,3 @@
-# pylint: disable=too-many-nested-blocks,logging-not-lazy
 """
 This script goes through all CRAMS in sample-metadata, gets the size,
 and updates the meta['size'] attribute on the analysis.
@@ -8,18 +7,19 @@ import asyncio
 import logging
 import os
 import re
-from typing import Dict, List
 
 from google.api_core.exceptions import NotFound
 from google.cloud import storage
 
-from api.utils import group_by
 from metamist.apis import AnalysisApi, ProjectApi
 from metamist.model.analysis_query_model import AnalysisQueryModel
 from metamist.model.analysis_status import AnalysisStatus
 from metamist.model.analysis_type import AnalysisType
 from metamist.model.analysis_update_model import AnalysisUpdateModel
 from metamist.parser.generic_parser import chunk
+
+from api.utils import group_by
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -34,7 +34,7 @@ def get_bucket_name_from_path(path):
     """
     >>> get_bucket_name_from_path('gs://my-bucket/path')
     'my-bucket'
-    """
+    """  # noqa: D402
 
     path = parse_cram_path_from_output(path)
 
@@ -93,15 +93,15 @@ async def process_project(project: str):
         logger.info(f'{project} :: skipping')
         return
 
-    base_paths = set(os.path.dirname(a) for a in analysis_by_file)
-    base_paths_by_bucket: Dict[str, List[str]] = group_by(
+    base_paths = set(os.path.dirname(a) for a in analysis_by_file)  # noqa: PTH120
+    base_paths_by_bucket: dict[str, list[str]] = group_by(
         base_paths, get_bucket_name_from_path
     )
 
     # the next few lines are equiv to `bucket.get_blob(path)`
     # but without requiring storage.objects.get permission
-    updaters: Dict[int, AnalysisUpdateModel] = {}
-    missing_files: List[str] = []
+    updaters: dict[int, AnalysisUpdateModel] = {}
+    missing_files: list[str] = []
     for bucket_name, bps in base_paths_by_bucket.items():
         if bucket_name is None:
             print(
@@ -120,7 +120,7 @@ async def process_project(project: str):
                     for blob in client.list_blobs(bucket, prefix=prefix):
                         if not blob.name.endswith('.cram'):
                             continue
-                        file_size_by_name[os.path.join(bucket_path, blob.name)] = (
+                        file_size_by_name[os.path.join(bucket_path, blob.name)] = (  # noqa: PTH118
                             blob.size
                         )
                 except NotFound:

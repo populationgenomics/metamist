@@ -3,6 +3,7 @@ import datetime
 from models.base import SMBase, parse_sql_dict
 from models.models.project import ProjectId
 
+
 AuditLogId = int
 
 

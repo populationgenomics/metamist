@@ -1,6 +1,5 @@
-# pylint: disable=invalid-overridden-method
 import os
-from test.testbase import DbIsolatedTest, run_as_sync
+from typing import Any
 
 from testcontainers.core.container import DockerContainer
 
@@ -8,6 +7,7 @@ from db.python.layers.analysis import AnalysisLayer
 from db.python.layers.assay import AssayLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
+from db.python.tables.project import ProjectPermissionsTable
 from models.enums import AnalysisStatus
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -16,19 +16,18 @@ from models.models import (
     SequencingGroupUpsertInternal,
 )
 from models.models.analysis import AnalysisInternal
+from test.testbase import DbIsolatedTest, run_as_sync
 
 
 class TestOutputFiles(DbIsolatedTest):
     """Test sample class"""
-
-    # pylint: disable=too-many-instance-attributes
 
     @run_as_sync
     async def setUp(self) -> None:
         # don't need to await because it's tagged @run_as_sync
         super().setUp()
 
-        absolute_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+        absolute_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')  # noqa: PTH100, PTH118, PTH120
         gcs = (
             DockerContainer('fsouza/fake-gcs-server')
             .with_bind_ports(4443, 4443)
@@ -120,7 +119,8 @@ class TestOutputFiles(DbIsolatedTest):
 
     @run_as_sync
     async def test_output_str(self):
-        """Test how the output(s) behave when you create an analysis by passing in
+        """
+        Test how the output(s) behave when you create an analysis by passing in
         just the `output` field
         """
 
@@ -145,7 +145,8 @@ class TestOutputFiles(DbIsolatedTest):
 
     @run_as_sync
     async def test_gs_output_path(self):
-        """Test how the output(s) behave when you create an analysis by passing in
+        """
+        Test how the output(s) behave when you create an analysis by passing in
         just the `output` field
         """
         output_path = 'gs://fakegcs/file1.txt'
@@ -183,7 +184,8 @@ class TestOutputFiles(DbIsolatedTest):
 
     @run_as_sync
     async def test_create_with_str_on_outputs(self):
-        """This should test creating an Analysis by passing a string to the outputs field.
+        """
+        This should test creating an Analysis by passing a string to the outputs field.
         The test should fail as we don't want to be passing string to this field.
         """
 
@@ -235,7 +237,6 @@ class TestOutputFiles(DbIsolatedTest):
 
         output_file_data = {
             'cram': {
-                'parent_id': None,
                 'path': 'gs://fakegcs/file2.cram',
                 'basename': 'file2.cram',
                 'dirname': 'gs://fakegcs/',
@@ -306,3 +307,99 @@ class TestOutputFiles(DbIsolatedTest):
             analysis.outputs['cram']['secondary_files']['ext'],
             output_file_data['cram']['secondary_files']['ext'],  # type: ignore [index]
         )
+
+    @run_as_sync
+    async def test_outputs_contains_protocol(self):
+        """Tests validation of the outputs field so that file paths contain a protocol prefix"""
+
+        outputs_valid: dict[str, Any] = {
+            'cram': {
+                'filtered': {
+                    'basename': 'gs://fakegcs/file2.cram',
+                    'secondary_files': {
+                        'meta': {'basename': 'gs://fakegcs/file2.cram.meta'},
+                        'ext': {'basename': 'gs://fakegcs/file2.cram.ext'},
+                    },
+                },
+            },
+            'vcf': {
+                'basename': 'gs://fakegcs/file3.vcf',
+                'secondary_files': {
+                    'meta': {'basename': 'gs://fakegcs/file3.vcf.meta'},
+                    'ext': {'basename': 'gs://fakegcs/file3.vcf.ext'},
+                },
+            },
+        }
+
+        analysis_id = None
+        # Check the base case of the validator passing a correctly formatted outputs field.
+        try:
+            analysis_id = await self.al.create_analysis(
+                AnalysisInternal(
+                    type='cram',
+                    status=AnalysisStatus.COMPLETED,
+                    sequencing_group_ids=[self.genome_sequencing_group_id],
+                    meta={'sequencing_type': 'genome', 'size': 1024},
+                    outputs=outputs_valid,
+                )
+            )
+        except ValueError:
+            self.fail()
+
+        # Setup the invalid outputs.
+        outputs_invalid = outputs_valid.copy()
+        outputs_invalid['cram']['filtered']['secondary_files']['ext']['basename'] = (
+            '://fakegcs/file2.cram.ext'
+        )
+
+        # Check the case of a file path being incorrectly formatted.
+        with self.assertRaises(ValueError):
+            await self.al.create_analysis(
+                AnalysisInternal(
+                    type='cram',
+                    status=AnalysisStatus.COMPLETED,
+                    sequencing_group_ids=[self.genome_sequencing_group_id],
+                    meta={'sequencing_type': 'genome', 'size': 1024},
+                    outputs=outputs_invalid,
+                )
+            )
+
+        # Check the case of updating an Analysis with a file path being incorrectly formatted.
+        with self.assertRaises(ValueError):
+            await self.al.update_analysis(
+                analysis_id=analysis_id, outputs=outputs_invalid
+            )
+
+    @run_as_sync
+    async def test_project_deletion(self):
+        """Test ProjectPermissionsTable.delete_project_data's effect on analysis outputs and files"""
+
+        outputs = {
+            'cram': {
+                'basename': 'gs://fakegcs/file3.cram',
+                'secondary_files': {
+                    'meta': {'basename': 'gs://fakegcs/file3.cram.meta'},
+                    'ext': {'basename': 'gs://fakegcs/file3.cram.ext'},
+                },
+            },
+        }
+
+        await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.genome_sequencing_group_id],
+                meta={'sequencing_type': 'genome', 'size': 1024},
+                outputs=outputs,
+            )
+        )
+
+        self.assertEqual(await self.row_count('analysis_outputs'), 3)
+        self.assertEqual(await self.row_count('output_file'), 3)
+
+        pttable = ProjectPermissionsTable(self.connection)
+        project = self.project_id_map[self.project_id]
+        self.assertTrue(await pttable.delete_project_data(project))
+
+        self.assertEqual(await self.row_count('analysis_outputs'), 0)
+        self.assertEqual(await self.row_count('output_file'), 0)

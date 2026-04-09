@@ -6,8 +6,15 @@ from async_lru import alru_cache
 from fastapi import APIRouter
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from google.cloud import secretmanager_v1
+from pydantic import TypeAdapter
 
-from api.settings import BILLING_CACHE_RESPONSE_TTL, BQ_AGGREG_VIEW
+from api.settings import (
+    BILLING_CACHE_RESPONSE_TTL,
+    BILLING_GROUP_INFO,
+    BQ_AGGREG_VIEW,
+    METAMIST_GCP_PROJECT,
+)
 from api.utils.db import (
     BqConnection,
     Connection,
@@ -23,6 +30,8 @@ from models.models import (
     BillingTotalCostQueryModel,
     BillingTotalCostRecord,
 )
+from models.models.billing import BillingTeamRecord
+
 
 router = APIRouter(prefix='/billing', tags=['billing'])
 
@@ -326,7 +335,8 @@ async def get_total_cost(
     author: str = get_author,
     connection: Connection = get_projectless_db_connection,
 ) -> list[BillingTotalCostRecord]:
-    """Get Total cost of selected fields for requested time interval
+    """
+    Get Total cost of selected fields for requested time interval
 
     Here are few examples of requests:
 
@@ -570,7 +580,8 @@ async def get_cost_by_sample(
     author: str = get_author,
     connection: Connection = get_projectless_db_connection,
 ) -> list[BillingTotalCostRecord]:
-    """Get Total cost of selected fields for requested sample or sequencing group
+    """
+    Get Total cost of selected fields for requested sample or sequencing group
 
     Here are few examples of requests:
 
@@ -586,3 +597,22 @@ async def get_cost_by_sample(
     billing_layer = _get_billing_layer_from(author)
     records = await billing_layer.get_cost_by_sample(connection, query)
     return [BillingTotalCostRecord.from_json(record) for record in records]
+
+
+@router.get('/group-info', operation_id='getBillingGroupInfo')
+@alru_cache(ttl=BILLING_CACHE_RESPONSE_TTL)
+async def get_billing_group_info() -> list[BillingTeamRecord]:
+    """
+    Get billing groups and topics related to CPG teams
+    """
+    name = (
+        f'projects/{METAMIST_GCP_PROJECT}/secrets/{BILLING_GROUP_INFO}/versions/latest'
+    )
+    response = (
+        await secretmanager_v1.SecretManagerServiceAsyncClient().access_secret_version(
+            name=name
+        )
+    )
+    return TypeAdapter(list[BillingTeamRecord]).validate_json(
+        response.payload.data.decode('UTF-8')
+    )

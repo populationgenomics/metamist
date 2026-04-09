@@ -13,6 +13,7 @@ from cpg_infra.config import CPGInfrastructureConfig
 
 from metamist_infrastructure import MetamistInfrastructure
 
+
 GCP_PROJECT = os.getenv('METAMIST_INFRA_GCP_PROJECT')
 SLACK_CHANNEL = os.getenv('METAMIST_INFRA_SLACK_CHANNEL')
 SLACK_TOKEN_SECRET_NAME = os.getenv('METAMIST_INFRA_SLACK_TOKEN_SECRET_NAME')
@@ -76,7 +77,8 @@ if __name__ == '__main__':
 
     # setup dummy infrastructure, so private repo url can be constructed
     class DummyRegistry(NamedTuple):
-        """Dummy Registry
+        """
+        Dummy Registry
         This is used to mockup the registry object
         """
 
@@ -85,7 +87,8 @@ if __name__ == '__main__':
         name: str
 
     class DummyInfra(NamedTuple):
-        """Dummy Infrastructure
+        """
+        Dummy Infrastructure
         This is used to mockup the infrastructure object
         """
 
