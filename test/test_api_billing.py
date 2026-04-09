@@ -33,7 +33,7 @@ class TestApiBilling:
     def setup_bq_test(self):
         # Initialize BqTest functionality directly
         bq_test = BqTest()
-        bq_test.set_up()
+        bq_test.base_set_up()
         self.layer = bq_test.layer
 
         # make billing enabled by default for all the calls

@@ -14,7 +14,7 @@ class TestBillingLayer:
     @pytest.fixture(autouse=True)
     def setup_bq_test(self):
         self.bq_test = BqTest()
-        self.bq_test.set_up()
+        self.bq_test.base_set_up()
         self.connection = self.bq_test.connection
         self.bq_result = self.bq_test.bq_result
         self.bq_client = self.bq_test.bq_client
