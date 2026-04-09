@@ -433,6 +433,10 @@ class ParticipantTable:
                     )
                     cur = await conn.execute(_query)
                     row = await cur.fetchone()
+                    if not row:
+                        raise NotFoundError(
+                            f"Couldn't find participant with internal ID {participant_id}"
+                        )
                     project = row['project']
 
                     to_update = [
