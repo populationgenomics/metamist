@@ -6,12 +6,12 @@
 
 import csv
 import sys
-import click
 
+import click
 import pandas as pd
 from cloudpathlib import CloudPath
 
-from redcap_parsing_utils import Facility, find_fastq_pairs, FILEMAP_HEADERS
+from .redcap_parsing_utils import FILEMAP_HEADERS, Facility, find_fastq_pairs
 
 
 @click.command()

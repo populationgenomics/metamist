@@ -1,10 +1,11 @@
 """ A simple script to import metadata files for RD projects """
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import click
 import pandas as pd
+
 from metamist.apis import FamilyApi, ImportApi
 
 

@@ -1,8 +1,10 @@
 # pylint: disable=unused-variable
 import sys
-from enum import Enum
 from collections import defaultdict
+from enum import Enum
+
 from cloudpathlib import CloudPath
+
 
 PEDFILE_HEADERS = [
     'Family ID',
