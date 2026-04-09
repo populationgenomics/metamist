@@ -48,6 +48,9 @@ ANALYSES_QUERY = gql(
                     type
                     meta
                     outputs
+                    project {
+                        name
+                    }
                 }
             }
         }
@@ -134,6 +137,10 @@ def get_analyses_to_update_and_files_to_move(
     files_to_move = []
     for sg in analysis_query_result['project']['sequencingGroups']:
         for analysis in sg['analyses']:
+            if analysis['project']['name'] != new_dataset:
+                # This skips the analyses that haven't been updated with the new project
+                continue
+
             if (
                 analysis['type'] == 'sv'
                 and analysis['meta'].get('stage') != 'GatherSampleEvidence'
