@@ -105,10 +105,8 @@ class OutputFileTable(DbBase):
             RETURNING id
             """
 
-        cur = await self.connection.pg_connection.execute(create_update_file)
-        id_of_new_file = await cur.fetchone()
-
-        return id_of_new_file['id']
+        new_file = await self.connection.execute_must_fetch_one(create_update_file)
+        return new_file['id']
 
     async def add_output_file_to_analysis(
         self,

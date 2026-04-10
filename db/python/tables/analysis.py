@@ -95,8 +95,7 @@ class AnalysisTable(DbBase):
                 RETURNING id
             """
 
-            acur = await self.connection.pg_connection.execute(_query)
-            row = await acur.fetchone()
+            row = await self.connection.execute_must_fetch_one(_query)
             id_of_new_analysis = row['id']
 
             if sequencing_group_ids:

@@ -67,7 +67,4 @@ class AuditLogTable(DbBase):
             ({author}, {on_behalf_of}, {ar_guid}, {comment}, {project}, {meta_param})
         RETURNING id
         """
-        res = await self.connection.pg_connection.execute(_query)
-        row: dict[str, int] | None = await res.fetchone()
-        assert row
-        return row['id']
+        return (await self.connection.execute_must_fetch_one(_query))['id']

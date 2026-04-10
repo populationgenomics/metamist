@@ -173,10 +173,7 @@ class ProjectPermissionsTable:
             RETURNING id
         """
 
-        cur = await self.connection.pg_connection.execute(_query)
-        row = await cur.fetchone()
-        assert row
-        project_id = row['id']
+        project_id = (await self.connection.execute_must_fetch_one(_query))['id']
 
         await self.connection.refresh_projects()
 

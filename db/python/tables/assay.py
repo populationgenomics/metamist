@@ -304,9 +304,7 @@ class AssayTable(DbBase):
                     'audit_log_id': await self.audit_log_id(),
                 },
             )
-            row = await cur.fetchone()
-            assert row
-            id_of_new_assay = row['id']
+            id_of_new_assay = (await self.connection.must_fetch_one(cur))['id']
 
             if external_ids:
                 _project = project or self.project_id

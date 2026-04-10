@@ -9,8 +9,10 @@ import os
 import urllib.parse
 from collections.abc import Iterable
 from contextlib import asynccontextmanager
+from string.templatelib import Template
+from typing import Any
 
-from psycopg import AsyncConnection
+from psycopg import AsyncConnection, AsyncCursor
 from psycopg.pq import TransactionStatus
 from psycopg.rows import DictRow, dict_row
 from psycopg.types.enum import EnumInfo, register_enum
@@ -104,6 +106,26 @@ class Connection:
         with_function = conn.transaction if not in_transaction else NoOpAenter
         async with with_function():
             yield
+
+    @staticmethod
+    async def must_fetch_one(cur: AsyncCursor[DictRow]) -> dict[str, Any]:
+        """
+        Fetch a row from the cursor and return it, ensuring that a row was
+        indeed obtained. This is a wrapper for cur.fetchone() for use when
+        it is (or should be) guaranteed that one row will be returned.
+        """
+        res = await cur.fetchone()
+        assert res is not None, f'No row selected when one expected'
+        return res
+
+    async def execute_must_fetch_one(self, query: Template) -> dict[str, Any]:
+        """
+        Execute the query and return the resulting row, ensuring that a row was
+        indeed obtained. This is a wrapper for pg_connection.execute() + cursor.fetchone()
+        for use when it is (or should be) guaranteed that one row will be returned.
+        """
+        cur = await self.pg_connection.execute(query)
+        return await self.must_fetch_one(cur)
 
     def all_projects(self):
         """Return all projects that the current user has access to"""

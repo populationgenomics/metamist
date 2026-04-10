@@ -24,10 +24,10 @@ class TestChangelog:
             )
         )
 
-        cur = await connection_with_project.pg_connection.execute(
-            t'SELECT audit_log_id FROM sample WHERE id = {sample.id}'
-        )
-        row = await cur.fetchone()
-        sample_cl_id = row['audit_log_id']
+        sample_cl_id = (
+            await connection_with_project.execute_must_fetch_one(
+                t'SELECT audit_log_id FROM sample WHERE id = {sample.id}'
+            )
+        )['audit_log_id']
 
         assert await connection_with_project.audit_log_id() == sample_cl_id
