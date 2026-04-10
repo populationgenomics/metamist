@@ -69,15 +69,13 @@ class WebDb(DbBase):
         _query = (
             t'SELECT COUNT(*) FROM sample WHERE project = {self.project_id} AND active'
         )
-        cur = await self.connection.pg_connection.execute(_query)
-        res = await cur.fetchone()
+        res = await self.connection.execute_must_fetch_one(_query)
         return res['count']
 
     async def get_total_number_of_participants(self):
         """Get total number of participants within a project"""
         _query = t'SELECT COUNT(*) FROM participant WHERE project = {self.project_id}'
-        cur = await self.connection.pg_connection.execute(_query)
-        res = await cur.fetchone()
+        res = await self.connection.execute_must_fetch_one(_query)
         return res['count']
 
     async def get_total_number_of_sequencing_groups(self):
@@ -87,8 +85,7 @@ class WebDb(DbBase):
         FROM sequencing_group sg
         INNER JOIN sample s ON s.id = sg.sample_id
         WHERE project = {self.project_id} AND NOT sg.archived"""
-        cur = await self.connection.pg_connection.execute(_query)
-        res = await cur.fetchone()
+        res = await self.connection.execute_must_fetch_one(_query)
         return res['count']
 
     async def get_total_number_of_assays(self):
@@ -98,8 +95,7 @@ class WebDb(DbBase):
         FROM assay sq
         INNER JOIN sample s ON s.id = sq.sample_id
         WHERE s.project = {self.project_id}"""
-        cur = await self.connection.pg_connection.execute(_query)
-        res = await cur.fetchone()
+        res = await self.connection.execute_must_fetch_one(_query)
         return res['count']
 
     def get_seqr_links_from_project(self, project: WebProject) -> dict[str, str]:

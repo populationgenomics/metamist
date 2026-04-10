@@ -381,9 +381,7 @@ async def seeded_db(
                 VALUES ({project_name}, 'test-dataset', '{{}}')
                 RETURNING id
             """)
-            row = await cur.fetchone()
-            assert row is not None
-            project_id: int = row['id']
+            project_id = (await Connection.must_fetch_one(cur))['id']
 
             # Add test user as project member with configured roles
             for role in roles:

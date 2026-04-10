@@ -561,9 +561,7 @@ class TestCohortData:
             },
         )
 
-        row = await acur.fetchone()
-        assert row
-        cohort_template_id = row['id']
+        cohort_template_id = (await Connection.must_fetch_one(acur))['id']
 
         with pytest.raises(ValueError):
             await self.cohortl.create_cohort_from_criteria(

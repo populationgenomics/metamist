@@ -152,9 +152,7 @@ class BillingArBatchTable(BillingBaseTable):
             INNER JOIN sequencing_group sg ON sg.sample_id = s.id
             WHERE s.project = ANY({[project_id]})
         """
-        info_record = await (await connection.pg_connection.execute(_query)).fetchone()
-        assert info_record
-        return info_record.get('cnt', 0)
+        return (await connection.execute_must_fetch_one(_query))['cnt']
 
     async def get_total_crams_info(
         self, connection: Connection, project_id: int
@@ -171,11 +169,8 @@ class BillingArBatchTable(BillingBaseTable):
             AND a.status = 'COMPLETED'
             and a.project = ANY({[project_id]})
         """
-        info_record = await (await connection.pg_connection.execute(_query)).fetchone()
-
-        assert info_record
-        total_crams_size = float(info_record.get('total_crams_size') or 0)
-        return total_crams_size
+        info_record = await connection.execute_must_fetch_one(_query)
+        return float(info_record['total_crams_size'])
 
     async def calculate_storage_cost_using_cram_files_info(
         self,
