@@ -101,6 +101,7 @@ UNRECORDED_ANALYSIS_FILES = [
     # Stripy stage files
     'gs://{bucket_name}-analysis/stripy/{sg_id}.stripy.json',
     'gs://{bucket_name}-analysis/stripy/{sg_id}.stripy.log.txt',
+    'gs://cpg-{bucket_name}-main-web/stripy/{sg_id}.stripy.html',  # latest global report
     # MitoReport stage files
     'gs://{bucket_name}-analysis/mito/{sg_id}.coverage_mean.txt',
     'gs://{bucket_name}-analysis/mito/{sg_id}.coverage_median.txt',
