@@ -31,7 +31,7 @@ class AssayInternal(SMBase):  # noqa: PLW1641
             type=self.type,
             external_ids=self.external_ids or {},
             sample_id=sample_id_format(self.sample_id),
-            meta=self.meta,
+            meta=self.meta or {},
         )
 
 
