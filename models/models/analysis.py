@@ -40,7 +40,7 @@ class AnalysisInternal(SMBase):
         analysis_type = kwargs.pop('type', None)
         status = kwargs.pop('status', None)
         timestamp_completed = kwargs.pop('timestamp_completed', None)
-        meta = parse_sql_dict(kwargs.get('meta'))
+        meta = parse_sql_dict(kwargs.get('meta') or {})
 
         if timestamp_completed and isinstance(timestamp_completed, str):
             timestamp_completed = datetime.fromisoformat(timestamp_completed)
@@ -78,8 +78,12 @@ class AnalysisInternal(SMBase):
             status=self.status,
             sequencing_group_ids=sequencing_group_id_format_list(
                 self.sequencing_group_ids
-            ),
-            cohort_ids=cohort_id_format_list(self.cohort_ids),
+            )
+            if self.sequencing_group_ids is not None
+            else None,
+            cohort_ids=cohort_id_format_list(self.cohort_ids)
+            if self.cohort_ids is not None
+            else None,
             output=self.output,
             outputs=self.outputs,
             timestamp_completed=(

@@ -27,8 +27,8 @@ class ParticipantInternal(SMBase):
     @classmethod
     def from_db(cls, data: dict):
         """Convert from db keys, mainly converting JSON-encoded fields"""
-        meta = parse_sql_dict(data.pop('meta', {}))
-        external_ids = parse_sql_dict(data.pop('external_ids', {}))
+        meta = parse_sql_dict(data.pop('meta', None) or {})
+        external_ids = parse_sql_dict(data.pop('external_ids', None) or {})
         return ParticipantInternal(**data, meta=meta, external_ids=external_ids)
 
     def to_external(self):
