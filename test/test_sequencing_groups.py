@@ -3,6 +3,7 @@ from datetime import date
 from unittest import mock
 
 import pytest
+from psycopg import sql
 
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
@@ -462,28 +463,31 @@ class TestSequencingGroup:
         ]
 
         # Firstly create two sequencing groups to attach analyses to
-        insert_sgs = f"""
+        insert_sgs = sql.SQL("""
             INSERT INTO sequencing_group (sample_id, type, technology, archived)
             VALUES ({test_sample}, %(type)s, %(technology)s, false)
-            RETURNING id"""
+            RETURNING id""").format(test_sample=test_sample)
 
         async with connection_with_project.pg_connection.cursor() as cur:
             await cur.executemany(insert_sgs, test_sg_data, returning=True)
-            sg_ids = [(await cur.fetchone())['id'] async for _ in cur.results()]
+            sg_ids = [
+                (await Connection.must_fetch_one(cur))['id']
+                async for _ in cur.results()
+            ]
 
         assert len(sg_ids) == 2
 
         # Create a cram and gvcf analysis
-        insert_analyses = f"""
+        insert_analyses = sql.SQL("""
             INSERT INTO analysis (type, project, status)
-            VALUES (%(type)s, {connection_with_project.project_id}, 'completed')
-            RETURNING id"""
+            VALUES (%(type)s, {project_id}, 'completed')
+            RETURNING id""").format(project_id=connection_with_project.project_id)
 
         async with connection_with_project.pg_connection.cursor() as cur:
             await cur.execute(insert_analyses, {'type': 'cram'})
-            cram_id = (await cur.fetchone())['id']
+            cram_id = (await Connection.must_fetch_one(cur))['id']
             await cur.execute(insert_analyses, {'type': 'gvcf'})
-            gvcf_id = (await cur.fetchone())['id']
+            gvcf_id = (await Connection.must_fetch_one(cur))['id']
 
         # Attach the cram analysis to the first sg, gvcf analysis to the second sg
         insert_analysis_sequencing_group = """
@@ -682,11 +686,13 @@ class TestSequencingGroup:
             },
         ]
 
-        test_data_query = f"""
+        test_data_query = sql.SQL("""
             INSERT INTO sequencing_group_history
                 (id, sample_id, type, technology, archived, sys_period)
             VALUES
-                (%(id)s, %(sample_id)s, %(type)s, %(technology)s, false, tstzrange(%(sg_date)s, '{today.isoformat()}'))"""
+                (%(id)s, %(sample_id)s, %(type)s, %(technology)s, false, tstzrange(%(sg_date)s, {today}))""").format(
+            today=today.isoformat()
+        )
 
         # Insert the test data to the DB
         conn = connection_with_project.pg_connection
@@ -767,11 +773,13 @@ class TestSequencingGroup:
             },
         ]
 
-        test_data_query = f"""
+        test_data_query = sql.SQL("""
             INSERT INTO sequencing_group_history
                 (id, sample_id, type, technology, archived, sys_period)
             VALUES
-                (%(id)s, %(sample_id)s, %(type)s, %(technology)s, false, tstzrange(%(sg_date)s, '{today.isoformat()}'))"""
+                (%(id)s, %(sample_id)s, %(type)s, %(technology)s, false, tstzrange(%(sg_date)s, {today}))""").format(
+            today=today.isoformat()
+        )
 
         # Insert the test data to the DB
         conn = connection_with_project.pg_connection
