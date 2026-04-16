@@ -82,6 +82,7 @@ def etl_extract(request: flask.Request):
     bq_client = bq.Client()
     pubsub_client = pubsub_v1.PublisherClient()
 
+    assert BIGQUERY_TABLE is not None
     errors = bq_client.insert_rows_json(BIGQUERY_TABLE, [bq_obj | {'body': jbody_str}])
 
     if errors:
@@ -94,6 +95,7 @@ def etl_extract(request: flask.Request):
     # publish to pubsub
     # message contains all the attributes except body which can be large
     # and already stored in BQ table
+    assert PUBSUB_TOPIC is not None
     try:
         pubsub_client.publish(PUBSUB_TOPIC, json.dumps(bq_obj).encode())
     except Exception as e:  # noqa: BLE001

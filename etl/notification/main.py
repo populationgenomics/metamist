@@ -64,6 +64,7 @@ def etl_notify(request: flask.Request):
             'message': f'Failed to format message: {e}',
         }, 500
 
+    assert SLACK_CHANNEL is not None
     success = None
     try:
         client = WebClient(token=SLACK_BOT_TOKEN)
