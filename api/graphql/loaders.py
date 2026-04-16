@@ -9,7 +9,7 @@ from typing import Any, TypedDict
 from fastapi import Request
 from strawberry.dataloader import DataLoader
 
-from api.utils import group_by
+from api.utils import ensure_nonnone, group_by
 from api.utils.db import GetConnection, get_projectless_db_connection_getter
 from db.python.filters import GenericFilter, get_hashable_value
 from db.python.layers import (
@@ -263,7 +263,7 @@ async def load_samples_for_participant_ids(
     filter.participant_id = GenericFilter(in_=ids)
     async with get_connection() as connection:
         samples = await SampleLayer(connection).query(filter)
-        samples_by_pid = group_by(samples, lambda s: s.participant_id)
+        samples_by_pid = group_by(samples, lambda s: ensure_nonnone(s.participant_id))
     return samples_by_pid
 
 
@@ -303,7 +303,7 @@ async def load_sequencing_groups_for_samples(
             _filter.sample.id = GenericFilter(in_=ids)
 
         sequencing_groups = await sglayer.query(_filter)
-        sg_map = group_by(sequencing_groups, lambda sg: sg.sample_id)
+        sg_map = group_by(sequencing_groups, lambda sg: ensure_nonnone(sg.sample_id))
         return sg_map
 
 
@@ -417,9 +417,8 @@ async def load_sequencing_groups_for_project_ids(
         sglayer = SequencingGroupLayer(connection)
         filter.project = GenericFilter(in_=ids)
         sequencing_groups = await sglayer.query(filter_=filter)
-        seq_group_map = group_by(sequencing_groups, lambda sg: sg.project)
-
-        return seq_group_map
+        sg_map = group_by(sequencing_groups, lambda sg: ensure_nonnone(sg.project))
+        return sg_map
 
 
 @connected_data_loader(LoaderKeys.PROJECTS_FOR_IDS)

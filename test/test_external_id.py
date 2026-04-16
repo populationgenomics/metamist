@@ -2,6 +2,7 @@ import pytest
 from psycopg import IntegrityError
 from psycopg.errors import UniqueViolation
 
+from api.utils import ensure_nonnone
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers import FamilyLayer, ParticipantLayer, SampleLayer
@@ -168,7 +169,7 @@ class TestParticipant:
         samples = await slayer.get_samples_by(sample_ids=[s1.id, sa.id, sb.id])
 
         participants = await self.player.get_participants_by_ids(
-            [s.participant_id for s in samples]
+            [ensure_nonnone(s.participant_id) for s in samples]
         )
         p_map = {p.id: p for p in participants}
 
@@ -287,8 +288,8 @@ class TestParticipant:
         )
         assert len(result) == 3
         for eid, sgid in result:
-            assert eid in self.p1.external_ids.values()
-            assert sgid == s2.sequencing_groups[0].id
+            assert eid in ensure_nonnone(self.p1.external_ids).values()
+            assert sgid == ensure_nonnone(s2.sequencing_groups)[0].id
 
 
 class TestSample:

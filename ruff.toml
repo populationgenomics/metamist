@@ -62,6 +62,8 @@ ignore = [
     "T201",
     # Allow assign before returning, can be useful for readability
     "RET504",
+    # Allow use of TypeVars rather than Py3.12+ type parameter syntax
+    "UP047",
 
     # Ignore overly pedantic docstring errors. These would require lots of fixing
     # on existing code to become compliant and aren't that important
