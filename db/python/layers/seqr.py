@@ -1,10 +1,10 @@
 import asyncio
+import datetime
 import os
 import re
 import traceback
 from collections import defaultdict
 from collections.abc import Iterable, Iterator
-from datetime import datetime
 from typing import TypeVar
 
 import aiohttp
@@ -53,6 +53,8 @@ ES_INDEX_STAGES = {
     SeqrDatasetType.GCNV: 'MtToEsCNV',
     SeqrDatasetType.MITO: 'MtToEsMito',
 }
+
+FAR_FUTURE = datetime.datetime(datetime.MAXYEAR, 12, 31)
 
 _url_individuals_sync = '/api/project/sa/{projectGuid}/individuals/sync'
 _url_individual_meta_sync = '/api/project/sa/{projectGuid}/individuals_metadata/sync'
@@ -370,7 +372,7 @@ class SeqrLayer(BaseLayer):
         messages = []
         if sequencing_group_ids:
             es_index_analyses = sorted(
-                es_index_analyses, key=lambda el: el.timestamp_completed
+                es_index_analyses, key=lambda el: el.timestamp_completed or FAR_FUTURE
             )
             sequencing_groups_in_new_index = set(
                 es_index_analyses[-1].sequencing_group_ids or []
@@ -446,7 +448,8 @@ class SeqrLayer(BaseLayer):
             if not any(sid in s for sid in SEQUENCING_GROUPS_TO_IGNORE)
         ]
 
-        filename = f'{project_guid}_pid_sgid_map_{datetime.now().isoformat()}.tsv'
+        now = datetime.datetime.now()
+        filename = f'{project_guid}_pid_sgid_map_{now.isoformat()}.tsv'
         # remove any non-filename compliant filenames
         filename = re.sub(r'[/\\?%*:|\'<>\x7F\x00-\x1F]', '-', filename)
 
@@ -484,7 +487,7 @@ class SeqrLayer(BaseLayer):
 
             es_indexes_filtered_by_type = sorted(
                 es_indexes_filtered_by_type,
-                key=lambda el: el.timestamp_completed,
+                key=lambda el: el.timestamp_completed or FAR_FUTURE,
             )
 
             es_index = es_indexes_filtered_by_type[-1].output
