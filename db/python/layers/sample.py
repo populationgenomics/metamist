@@ -1,7 +1,7 @@
 import datetime
 from typing import Any, NamedTuple
 
-from api.utils import group_by
+from api.utils import ensure_nonnone, group_by
 from db.python.filters import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer, Connection
@@ -66,7 +66,7 @@ class SampleLayer(BaseLayer):
             projects, allowed_roles=ReadAccessRoles
         )
 
-        grouped_samples = group_by(samples, lambda s: s.participant_id)
+        grouped_samples = group_by(samples, lambda s: ensure_nonnone(s.participant_id))
 
         return grouped_samples
 
@@ -241,7 +241,7 @@ class SampleLayer(BaseLayer):
                 s = r.sample
                 if not s.id:
                     s.id = await self.st.insert_sample(
-                        external_ids=s.external_ids,
+                        external_ids=s.external_ids or {},  # type: ignore
                         sample_type=s.type,
                         active=True,
                         meta=s.meta,

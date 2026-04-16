@@ -2,7 +2,7 @@ import datetime
 from collections import defaultdict
 from typing import Any
 
-from api.utils import group_by
+from api.utils import ensure_nonnone, group_by
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
@@ -178,7 +178,7 @@ class AnalysisLayer(BaseLayer):
         )
 
         sequencing_groups = await sglayer.query(sgfilter)
-        sg_by_id = {sg.id: sg for sg in sequencing_groups}
+        sg_by_id = {ensure_nonnone(sg.id): sg for sg in sequencing_groups}
         sg_to_project = {sg.id: sg.project for sg in sequencing_groups}
 
         cram_list = await self.at.query(
@@ -189,7 +189,9 @@ class AnalysisLayer(BaseLayer):
             )
         )
 
-        crams_by_sg = group_by(cram_list, lambda c: c.sequencing_group_ids[0])
+        crams_by_sg = group_by(
+            cram_list, lambda c: ensure_nonnone(c.sequencing_group_ids)[0]
+        )
 
         results: dict[ProportionalDateTemporalMethod, list[ProportionalDateModel]] = {}
         for method in temporal_methods:
@@ -402,8 +404,8 @@ class AnalysisLayer(BaseLayer):
         )
 
         for sg_id, analyses in crams.items():
+            project = project_name_map[ensure_nonnone(sg_by_id[sg_id].project)]
             for idx, cram in enumerate(analyses):
-                project = project_name_map.get(sg_by_id[sg_id].project)
                 delta = None
                 if idx == 0:
                     # use the sample_create_date for the first analysis
