@@ -187,7 +187,7 @@ class AnalysisLayer(BaseLayer):
 
         sequencing_groups = await sglayer.query(sgfilter)
         sg_by_id = {ensure_nonnone(sg.id): sg for sg in sequencing_groups}
-        sg_to_project = {sg.id: sg.project for sg in sequencing_groups}
+        sg_to_project = {ensure_nonnone(sg.id): sg.project for sg in sequencing_groups}
 
         cram_list = await self.at.query(
             AnalysisFilter(

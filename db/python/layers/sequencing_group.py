@@ -1,5 +1,6 @@
 from datetime import date
 
+from api.utils import ensure_nonnone
 from db.python.connect import Connection
 from db.python.filters.generic import GenericFilter
 from db.python.layers.assay import AssayLayer
@@ -140,14 +141,15 @@ class SequencingGroupLayer(BaseLayer):
             - and returns a new sequence group.
         """
         seqgroup = await self.get_sequencing_group_by_id(sequencing_group_id)
+        assert seqgroup.id is not None
         async with self.connection.transaction():
             await self.archive_sequencing_group(seqgroup.id)
 
             return await self.seqgt.create_sequencing_group(
-                sample_id=seqgroup.sample_id,
-                type_=seqgroup.type,
-                technology=seqgroup.technology,
-                platform=seqgroup.platform,
+                sample_id=ensure_nonnone(seqgroup.sample_id),
+                type_=ensure_nonnone(seqgroup.type),
+                technology=ensure_nonnone(seqgroup.technology),
+                platform=ensure_nonnone(seqgroup.platform),
                 meta={**seqgroup.meta, **meta} if seqgroup.meta else meta,
                 assay_ids=assays,
             )
@@ -224,6 +226,7 @@ class SequencingGroupLayer(BaseLayer):
                     to_replace.append(sg)
                     continue
 
+                assert sg.id is not None
                 existing_sequences = set(sequence_to_group.get(int(sg.id), []))
                 new_assay_ids = set(sq.id for sq in sg.assays)
                 if new_assay_ids == existing_sequences:
@@ -235,12 +238,12 @@ class SequencingGroupLayer(BaseLayer):
         # but we're inside a transaction, so it's not actually committing anything
         # so should be quick to "write" in serial
         for sg in to_insert:
-            assay_ids = [a.id for a in sg.assays] if sg.assays else []
+            assay_ids = [ensure_nonnone(a.id) for a in sg.assays] if sg.assays else []
             sg.id = await self.seqgt.create_sequencing_group(
-                sample_id=sg.sample_id,
-                type_=sg.type,
-                technology=sg.technology,
-                platform=sg.platform,
+                sample_id=ensure_nonnone(sg.sample_id),
+                type_=ensure_nonnone(sg.type),
+                technology=ensure_nonnone(sg.technology),
+                platform=ensure_nonnone(sg.platform),
                 meta=sg.meta,
                 assay_ids=assay_ids,
             )
@@ -252,9 +255,9 @@ class SequencingGroupLayer(BaseLayer):
 
         for sg in to_replace:
             await self.recreate_sequencing_group_with_new_assays(
-                sequencing_group_id=int(sg.id),
+                sequencing_group_id=int(ensure_nonnone(sg.id)),
                 assays=[s.id for s in sg.assays] if sg.assays else [],
-                meta=sg.meta,
+                meta=sg.meta or {},
             )
 
         return sequencing_groups
