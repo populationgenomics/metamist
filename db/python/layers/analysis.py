@@ -164,14 +164,15 @@ class AnalysisLayer(BaseLayer):
         if not start_date:
             raise ValueError('start_date must be set')
         start_date = check_or_parse_date(start_date)
+        assert start_date is not None
         end_date = check_or_parse_date(end_date)
 
-        if end_date and start_date and end_date < start_date:
+        if end_date and end_date < start_date:
             raise ValueError(
                 f'end_date ({end_date}) must be after start_date ({start_date})'
             )
 
-        if start_date and start_date < datetime.date(2020, 1, 1):
+        if start_date < datetime.date(2020, 1, 1):
             raise ValueError(f'start_date ({start_date}) must be after 2020-01-01')
 
         project_objs = self.connection.get_and_check_access_to_projects_for_ids(
@@ -298,7 +299,7 @@ class AnalysisLayer(BaseLayer):
         sg_by_id: dict[SequencingGroupInternalId, SequencingGroupInternal],
         crams: dict[SequencingGroupInternalId, list[AnalysisInternal]],
         project_name_map: dict[ProjectId, str],
-        start_date: datetime.date | None,
+        start_date: datetime.date,
         end_date: datetime.date | None,
     ) -> list[ProportionalDateModel]:
         """
@@ -491,7 +492,7 @@ class AnalysisLayer(BaseLayer):
     async def get_sgs_added_by_day_by_es_indices(
         self,
         start: datetime.date,
-        end: datetime.date,
+        end: datetime.date | None,
         projects: list[ProjectId],
     ):
         """
@@ -519,7 +520,9 @@ class AnalysisLayer(BaseLayer):
                     timestamp_completed=GenericFilter(
                         # midnight on the day
                         gt=datetime.datetime.combine(start, datetime.time()),
-                        lte=datetime.datetime.combine(end, datetime.time()),
+                        lte=datetime.datetime.combine(end, datetime.time())
+                        if end is not None
+                        else None,
                     ),
                 )
             )
@@ -536,7 +539,9 @@ class AnalysisLayer(BaseLayer):
                 timestamp_completed=GenericFilter(
                     # midnight on the day
                     gt=datetime.datetime.combine(start, datetime.time()),
-                    lte=datetime.datetime.combine(end, datetime.time()),
+                    lte=datetime.datetime.combine(end, datetime.time())
+                    if end is not None
+                    else None,
                 ),
             )
         )
