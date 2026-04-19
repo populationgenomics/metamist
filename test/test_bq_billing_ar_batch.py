@@ -86,13 +86,9 @@ class TestBillingArBatchTable(BqTest):
         self.bq_result._rows = []
 
         # test get_batches_by_ar_guid function
-        (start_day, end_day, batch_ids) = await self.table_obj.get_batches_by_ar_guid(
-            ar_guid
-        )
+        result = await self.table_obj.get_batches_by_ar_guid(ar_guid)
 
-        assert start_day is None
-        assert end_day is None
-        assert batch_ids == []
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_get_batches_by_ar_guid_one_record(self):
@@ -110,9 +106,9 @@ class TestBillingArBatchTable(BqTest):
             )
         ]
         # test get_batches_by_ar_guid function
-        (start_day, end_day, batch_ids) = await self.table_obj.get_batches_by_ar_guid(
-            ar_guid
-        )
+        result = await self.table_obj.get_batches_by_ar_guid(ar_guid)
+        assert result is not None
+        (start_day, end_day, batch_ids) = result
 
         assert given_start_day == start_day
         # end day is the last day + 1
@@ -138,9 +134,9 @@ class TestBillingArBatchTable(BqTest):
         ]
 
         # test get_batches_by_ar_guid function
-        (start_day, end_day, batch_ids) = await self.table_obj.get_batches_by_ar_guid(
-            ar_guid
-        )
+        result = await self.table_obj.get_batches_by_ar_guid(ar_guid)
+        assert result is not None
+        (start_day, end_day, batch_ids) = result
 
         assert given_start_day == start_day
         # end day is the last day + 1
@@ -157,9 +153,9 @@ class TestBillingArBatchTable(BqTest):
         self.bq_result._rows = []
 
         # test get_ar_guid_by_batch_id function
-        _, _, ar_guid = await self.table_obj.get_ar_guid_by_batch_id(batch_id)
+        result = await self.table_obj.get_ar_guid_by_batch_id(batch_id)
 
-        assert ar_guid is None
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_get_ar_guid_by_batch_id_one_rec(self):
@@ -178,6 +174,8 @@ class TestBillingArBatchTable(BqTest):
         ]
 
         # test get_ar_guid_by_batch_id function
-        _, _, ar_guid = await self.table_obj.get_ar_guid_by_batch_id(batch_id)
+        result = await self.table_obj.get_ar_guid_by_batch_id(batch_id)
+        assert result is not None
+        (_, _, ar_guid) = result
 
         assert expected_ar_guid == ar_guid

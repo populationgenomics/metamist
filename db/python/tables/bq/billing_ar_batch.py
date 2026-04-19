@@ -37,7 +37,7 @@ class BillingArBatchTable(BillingBaseTable):
 
     async def get_batches_by_ar_guid(
         self, ar_guid: str
-    ) -> tuple[datetime | None, datetime | None, list[str]]:
+    ) -> tuple[datetime, datetime, list[str]] | None:
         """
         Get batches for given ar_guid
         """
@@ -63,18 +63,18 @@ class BillingArBatchTable(BillingBaseTable):
             end_day = max(row.end_day for row in query_job_result) + timedelta(days=1)
             return start_day, end_day, [row.batch_id for row in query_job_result]
 
-        # return empty list if no record found
-        return None, None, []
+        # no records found
+        return None
 
     async def get_ar_guid_by_batch_id(
         self, batch_id: str | None
-    ) -> tuple[datetime | None, datetime | None, str | None]:
+    ) -> tuple[datetime, datetime, str] | None:
         """
         Get ar_guid for given batch_id,
         if batch_id is found, but not ar_guid, then return batch_id back
         """
         if batch_id is None:
-            return None, None, None
+            return None
 
         _query = f"""
         SELECT ar_guid,
@@ -104,7 +104,7 @@ class BillingArBatchTable(BillingBaseTable):
             return start_day, end_day, batch_id
 
         # return None if no ar_guid found
-        return None, None, None
+        return None
 
     async def get_records_first_timestamps(
         self,

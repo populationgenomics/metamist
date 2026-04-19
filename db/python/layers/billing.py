@@ -202,24 +202,18 @@ class BillingLayer(BqBaseLayer):
         billing_table = self.table_factory(query.source, [query.field], query.filters)
         return await billing_table.get_running_cost_with_filters(query)
 
-    async def get_cost_by_ar_guid(
-        self,
-        ar_guid: str | None = None,
-    ) -> list[AnalysisCostRecord]:
+    async def get_cost_by_ar_guid(self, ar_guid: str) -> list[AnalysisCostRecord]:
         """
         Get Costs by AR GUID
         """
         ar_batch_lookup_table = BillingArBatchTable(self.connection)
 
         # First get all batches and the min/max day to use for the query
-        (
-            start_day,
-            end_day,
-            batches,
-        ) = await ar_batch_lookup_table.get_batches_by_ar_guid(ar_guid)
+        batches_result = await ar_batch_lookup_table.get_batches_by_ar_guid(ar_guid)
 
-        if not batches:
+        if not batches_result:
             return []
+        (start_day, end_day, batches) = batches_result
 
         billing_table = BillingDailyExtendedTable(self.connection)
         results = await billing_table.get_batch_cost_summary(
@@ -227,36 +221,27 @@ class BillingLayer(BqBaseLayer):
         )
         return results
 
-    async def get_cost_by_batch_id(
-        self,
-        batch_id: str | None = None,
-    ) -> list[AnalysisCostRecord]:
+    async def get_cost_by_batch_id(self, batch_id: str) -> list[AnalysisCostRecord]:
         """
         Get Costs by Batch ID
         """
         ar_batch_lookup_table = BillingArBatchTable(self.connection)
 
         # First get all batches and the min/max day to use for the query
-        (
-            start_day,
-            end_day,
-            ar_guid,
-        ) = await ar_batch_lookup_table.get_ar_guid_by_batch_id(batch_id)
+        batches_result = await ar_batch_lookup_table.get_ar_guid_by_batch_id(batch_id)
 
-        if ar_guid is None:
+        if batches_result is None:
             return []
+        (start_day, end_day, ar_guid) = batches_result
 
         if ar_guid != batch_id:
             # found ar_guid for the batch_id
             # The get all batches for the ar_guid
-            (
-                start_day,
-                end_day,
-                batches,
-            ) = await ar_batch_lookup_table.get_batches_by_ar_guid(ar_guid)
+            batches_result = await ar_batch_lookup_table.get_batches_by_ar_guid(ar_guid)
 
-            if not batches:
+            if not batches_result:
                 return []
+            (start_day, end_day, batches) = batches_result
         else:
             # ar_guid is not present, so use the batch_id
             batches = [batch_id]

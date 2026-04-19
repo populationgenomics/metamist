@@ -394,12 +394,6 @@ class TestBillingLayer:
 
         layer = BillingLayer(self.connection)
 
-        # ar_guid as None, return empty results
-        records = await layer.get_cost_by_ar_guid(ar_guid=None)
-
-        # return empty record
-        assert records == []
-
         # dummy ar_guid, no mockup data, return empty results
         dummy_ar_guid = '12345678'
         records = await layer.get_cost_by_ar_guid(ar_guid=dummy_ar_guid)
@@ -444,13 +438,7 @@ class TestBillingLayer:
 
         layer = BillingLayer(self.connection)
 
-        # ar_guid as None, return empty results
-        records = await layer.get_cost_by_batch_id(batch_id=None)
-
-        # return empty record
-        assert records == []
-
-        # dummy ar_guid, no mockup data, return empty results
+        # dummy batch_id, no mockup data, return empty results
         dummy_batch_id = '12345'
         records = await layer.get_cost_by_batch_id(batch_id=dummy_batch_id)
 
