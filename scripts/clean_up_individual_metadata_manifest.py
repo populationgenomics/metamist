@@ -124,7 +124,9 @@ def extract_hpo_terms(hpo_terms_string: str) -> str:
     # Split the terms by newline and strip whitespace
     terms = [term.strip() for term in hpo_terms_string.split('\n') if term.strip()]
     # Split the terms by whitespace and strip whitespace
-    terms = [term.strip().removesuffix(':').removesuffix(';').removesuffix(',') for term in ' '.join(terms).split(' ') if term.strip()]
+    terms = [
+        term.strip().removesuffix(':').removesuffix(';').removesuffix(',').removesuffix('-')
+        for term in ' '.join(terms).split(' ') if term.strip()]
     # Remove any terms that are not in the format "HP:XXXXXXX"
     for term in terms:
         if term.startswith('HP:'):

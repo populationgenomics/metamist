@@ -663,6 +663,7 @@ class GenericParser(CloudHelper):
         if dry_run:
             logger.info('Dry run, so returning without inserting / updating metadata')
             self.prepare_detail(samples)
+            print(message)
             return summary, (participants if participants else samples)
 
         if confirm:
@@ -720,6 +721,7 @@ class GenericParser(CloudHelper):
 
             insert: int
             update: int = 0
+            updates: list[str | int] | None = None
 
         participants: ParserElementSummary
         samples: ParserElementSummary
@@ -749,10 +751,22 @@ class GenericParser(CloudHelper):
             participants=GenericParser.ParserSummary.ParserElementSummary(
                 insert=participants_to_insert,
                 update=len(participants) - participants_to_insert,
+                updates=sorted(
+                    [
+                        p.primary_external_id
+                        for p in participants
+                        if p.internal_pid and p.primary_external_id
+                    ]
+                ),
             ),
             samples=GenericParser.ParserSummary.ParserElementSummary(
                 insert=samples_to_insert,
                 update=len(all_samples) - samples_to_insert,
+                updates=sorted([
+                    s.primary_external_id
+                    for s in all_samples
+                    if s.internal_sid and s.primary_external_id
+                ])
             ),
             sequencing_groups=GenericParser.ParserSummary.ParserElementSummary(
                 insert=sgs_to_insert,
