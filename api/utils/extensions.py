@@ -1,4 +1,5 @@
 import csv
+from typing import overload
 
 
 EXTENSION_TO_DELIM_MAP = {
@@ -27,6 +28,14 @@ def guess_delimiter_by_filename(filename: str, raise_exception=True) -> str | No
     return None
 
 
+@overload
+def guess_delimiter_by_upload_file_obj(
+    file, default_delimiter: str | None = None
+) -> str: ...
+@overload
+def guess_delimiter_by_upload_file_obj(
+    file, default_delimiter: str | None, raise_exception: bool
+) -> str | None: ...
 def guess_delimiter_by_upload_file_obj(
     file, default_delimiter: str | None = None, raise_exception: bool = True
 ) -> str | None:

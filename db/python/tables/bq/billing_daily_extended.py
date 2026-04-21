@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from google.cloud import bigquery
 
@@ -64,7 +65,7 @@ class BillingDailyExtendedTable(BillingBaseTable):
         """
         Get summary of AR run
         """
-        query_parameters = [
+        query_parameters: list[Any] = [
             bigquery.ScalarQueryParameter('start_time', 'TIMESTAMP', start_time),
             bigquery.ScalarQueryParameter('end_time', 'TIMESTAMP', end_time),
         ]
