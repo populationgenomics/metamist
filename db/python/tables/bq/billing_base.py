@@ -3,7 +3,7 @@ import re
 from abc import ABCMeta, abstractmethod
 from collections import Counter, defaultdict
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal, overload
 
 from google.cloud import bigquery
 
@@ -71,11 +71,21 @@ class BillingBaseTable(BqDbBase):
         """Get table name"""
         raise NotImplementedError('Calling Abstract method directly')
 
+    @overload
+    def _execute_query(
+        self, query: str, params: list[Any] | None = None
+    ) -> list[Any]: ...
+    @overload
+    def _execute_query(
+        self, query: str, params: list[Any] | None, results_as_list: Literal[True]
+    ) -> list[Any]: ...
+    @overload
+    def _execute_query(
+        self, query: str, params: list[Any] | None, results_as_list: Literal[False]
+    ) -> bigquery.QueryJob: ...
     def _execute_query(
         self, query: str, params: list[Any] | None = None, results_as_list: bool = True
-    ) -> (
-        list[Any] | bigquery.table.RowIterator | bigquery.table._EmptyRowIterator | None
-    ):
+    ) -> list[Any] | bigquery.QueryJob:
         """Execute query, add BQ labels"""
         if params:
             job_config = bigquery.QueryJobConfig(

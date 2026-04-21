@@ -1,9 +1,14 @@
 from datetime import date, datetime, timedelta
+from typing import overload
 
 
 INVOICE_DAY_DIFF = 3
 
 
+@overload
+def parse_date_only_string(d: str) -> date: ...
+@overload
+def parse_date_only_string(d: None) -> None: ...
 def parse_date_only_string(d: str | None) -> date | None:
     """Convert date string to date, allow for None"""
     if not d:

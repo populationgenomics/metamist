@@ -3,7 +3,7 @@ import os
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from datetime import datetime
-from typing import TypeVar
+from typing import TypeVar, overload
 
 from cloudpathlib import AnyPath, GSPath
 from google.cloud import storage
@@ -60,6 +60,10 @@ class CloudHelper:
 
         raise ValueError(f'Unrecognised extension on file: {filename}')
 
+    @overload
+    def file_path(self, filename: str) -> str: ...
+    @overload
+    def file_path(self, filename: str, raise_exception: bool) -> str | None: ...
     def file_path(self, filename: str, raise_exception: bool = True) -> str | None:
         """
         If the filename is a fully qualified path, this does NOT check for file existence
@@ -133,7 +137,7 @@ class CloudHelper:
             # add a specific case for GCS as the AnyPath implementation calls
             # bucket.get_blob which triggers a read (which humans are not permitted)
             blob = await self.get_gcs_blob(path)
-            return blob.time_created
+            return blob.time_created if blob else None
 
         ctime = AnyPath(path).stat().st_ctime
         if not ctime:
