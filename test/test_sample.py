@@ -61,7 +61,10 @@ class TestSample:
         """Test querying samples by an external ID, and check it's returned"""
         slayer = SampleLayer(connection_with_project)
         meta_dict = {'meta': 'meta ;)'}
-        ex_ids = {PRIMARY_EXTERNAL_ORG: 'Test01', 'external_org': 'ex01'}
+        ex_ids: dict[str, str | None] = {
+            PRIMARY_EXTERNAL_ORG: 'Test01',
+            'external_org': 'ex01',
+        }
         s = await slayer.upsert_sample(
             SampleUpsertInternal(
                 external_ids=ex_ids,
@@ -101,7 +104,7 @@ class TestSample:
             )
         )
 
-        new_external_id_dict = {PRIMARY_EXTERNAL_ORG: 'Test02'}
+        new_external_id_dict: dict[str, str | None] = {PRIMARY_EXTERNAL_ORG: 'Test02'}
         await slayer.upsert_sample(
             SampleUpsertInternal(id=s.id, external_ids=new_external_id_dict)
         )
