@@ -19,7 +19,7 @@ class TestParticipantModels(TestCase):
         internal = external.to_internal()
 
         self.assertIsInstance(internal, ParticipantUpsertInternal)
-        self.assertDictEqual({PRIMARY_EXTERNAL_ORG: 'hey-hey'}, internal.external_ids)
+        self.assertEqual({PRIMARY_EXTERNAL_ORG: 'hey-hey'}, internal.external_ids)
 
     def test_participant_to_external_basic(self):
         """Test converting a basic participant to external model"""
@@ -30,7 +30,7 @@ class TestParticipantModels(TestCase):
 
         self.assertIsInstance(external, ParticipantUpsert)
         self.assertEqual(1, external.id)
-        self.assertDictEqual({PRIMARY_EXTERNAL_ORG: 'hey-hey'}, external.external_ids)
+        self.assertEqual({PRIMARY_EXTERNAL_ORG: 'hey-hey'}, external.external_ids)
 
 
 class TestSampleModels(TestCase):
@@ -42,7 +42,7 @@ class TestSampleModels(TestCase):
         internal = external.to_internal()
 
         self.assertIsInstance(internal, SampleUpsertInternal)
-        self.assertDictEqual({PRIMARY_EXTERNAL_ORG: 'hey-hey'}, internal.external_ids)
+        self.assertEqual({PRIMARY_EXTERNAL_ORG: 'hey-hey'}, internal.external_ids)
 
     def test_sample_to_external_basic(self):
         """Test converting a basic sample to external model"""
@@ -53,4 +53,4 @@ class TestSampleModels(TestCase):
 
         self.assertIsInstance(external, SampleUpsert)
         self.assertEqual(sample_id_format(1), external.id)
-        self.assertDictEqual({PRIMARY_EXTERNAL_ORG: 'hey-hey'}, external.external_ids)
+        self.assertEqual({PRIMARY_EXTERNAL_ORG: 'hey-hey'}, external.external_ids)
