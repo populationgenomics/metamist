@@ -350,7 +350,7 @@ class BillingArBatchTable(BillingBaseTable):
         rows = await (await connection.pg_connection.execute(_query)).fetchall()
         projects = {row['project']: row['seq_grps'] for row in rows}
         if not projects:
-            return (None, None)
+            return ({}, {})
 
         # get the project dataset (GCP project names)
         project_names: dict[int, str] = {}

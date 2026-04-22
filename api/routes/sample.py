@@ -189,7 +189,7 @@ async def get_samples_create_date(
     st = SampleLayer(connection)
 
     # Check access permissions
-    sample_ids_raw = sample_id_transform_to_raw_list(sample_ids) if sample_ids else None
+    sample_ids_raw = sample_id_transform_to_raw_list(sample_ids) if sample_ids else []
 
     # Convert to raw ids and query the start dates for all of them
     result = await st.get_samples_create_date(sample_ids_raw)
