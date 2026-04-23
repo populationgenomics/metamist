@@ -1,7 +1,6 @@
 name: Lint
 on:
-  pull_request:
-    type: [opened, synchronize]
+  pull_request
 
 permissions: {}
 
@@ -20,6 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - uses: actions/setup-python@v6
@@ -61,19 +61,6 @@ jobs:
           uv run regenerate_api.py
 
       - name: pre-commit
-        #run: uv run pre-commit run --from-ref $GITHUB_BASE_REF --to-ref $GITHUB_REF
-        #run: uv run pre-commit run --from-ref ${{ github.base_ref }} --to-ref ${{ github.head_ref }}
-        run: |
-          set -x
-          echo x1 $GITHUB_BASE_REF
-          echo x2 $GITHUB_REF
-          echo x3 ${{ github.base_ref }}
-          echo x4 ${{ github.head_ref }}
-          echo x5 ${{ github.event.pull_request.base.sha }}
-          echo x6 ${{ github.event.pull_request.head.sha }}
-          git log -1 $GITHUB_BASE_REF || true
-          git log -1 origin/$GITHUB_BASE_REF || true
-          git log -1 $GITHUB_REF || true
-          git log -1 ${{ github.event.pull_request.base.sha }} || true
-          git log -1 ${{ github.event.pull_request.head.sha }} || true
-          uv run pre-commit run --from-ref $GITHUB_BASE_REF --to-ref $GITHUB_REF
+        env:
+          PRE_COMMIT_ARGS: --from-ref ${{ github.event.pull_request.base.sha }} --to-ref ${{ github.event.pull_request.head.sha }}
+        run: uv run pre-commit run $PRE_COMMIT_ARGS
