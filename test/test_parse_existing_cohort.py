@@ -21,6 +21,11 @@ from test.conftest import GraphQLQueryFunction, make_graphql_query_mock
 class TestExistingCohortParser:
     """Test the ExistingCohortParser"""
 
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection_with_project: Connection):
+        assert connection_with_project.project is not None
+        self.project = connection_with_project.project
+
     @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
     @patch('metamist.parser.cloudhelper.CloudHelper.datetime_added')
@@ -32,7 +37,6 @@ class TestExistingCohortParser:
         mock_fileexists,
         mock_datetime_added,
         mock_graphql_query,
-        connection_with_project: Connection,
         graphql_query: GraphQLQueryFunction,
     ):
         """
@@ -54,7 +58,7 @@ class TestExistingCohortParser:
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project=connection_with_project.project.name,
+            project=self.project.name,
             allow_missing_files=False,
             sequencing_type='genome',
         )
@@ -111,7 +115,7 @@ class TestExistingCohortParser:
         assert assay.meta == expected_sequence_dict
 
     @pytest.mark.asyncio
-    async def test_no_header(self, connection_with_project: Connection):
+    async def test_no_header(self):
         """
         Test input without a header
         """
@@ -124,7 +128,7 @@ class TestExistingCohortParser:
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project=connection_with_project.project.name,
+            project=self.project.name,
             allow_missing_files=False,
             sequencing_type='genome',
         )
@@ -227,7 +231,7 @@ class TestExistingCohortParser:
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project=connection_with_project.project.name,
+            project=self.project.name,
             allow_missing_files=False,
             sequencing_type='genome',
         )
@@ -248,9 +252,7 @@ class TestExistingCohortParser:
         assert summary.assays.update == 0
 
     @pytest.mark.asyncio
-    async def test_get_read_filenames_no_reads_fail(
-        self, connection_with_project: Connection
-    ):
+    async def test_get_read_filenames_no_reads_fail(self):
         """Test ValueError is raised when allow_missing_files is False and sequencing groups have no reads"""
 
         single_row = {Columns.MANIFEST_FLUID_X: ''}
@@ -259,7 +261,7 @@ class TestExistingCohortParser:
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project=connection_with_project.project.name,
+            project=self.project.name,
             allow_missing_files=False,
             sequencing_type='genome',
         )
@@ -272,7 +274,7 @@ class TestExistingCohortParser:
 
     @pytest.mark.asyncio
     async def test_get_read_filenames_no_reads_pass(
-        self, connection_with_project: Connection, caplog: pytest.LogCaptureFixture
+        self, caplog: pytest.LogCaptureFixture
     ):
         """Test when allow_missing_files is True and records with missing fastqs, no ValueError is raised"""
 
@@ -282,7 +284,7 @@ class TestExistingCohortParser:
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project=connection_with_project.project.name,
+            project=self.project.name,
             allow_missing_files=True,
             sequencing_type='genome',
         )
@@ -299,7 +301,7 @@ class TestExistingCohortParser:
         assert len(read_filenames) == 0
 
     @pytest.mark.asyncio
-    async def test_genome_sequencing_type(self, connection_with_project: Connection):
+    async def test_genome_sequencing_type(self):
         """Test that the sequencing type is set correctly when the --sequencing-type flag is set to 'genome''"""
 
         # Test with 'genome'
@@ -307,14 +309,14 @@ class TestExistingCohortParser:
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project=connection_with_project.project.name,
+            project=self.project.name,
             allow_missing_files=True,
             sequencing_type='genome',
         )
         assert parser.default_sequencing.seq_type == 'genome'
 
     @pytest.mark.asyncio
-    async def test_exome_sequencing_type(self, connection_with_project: Connection):
+    async def test_exome_sequencing_type(self):
         """Test that the sequencing type is set correctly when the --sequencing-type flag is set to 'exome'"""
 
         # Test with 'exome'
@@ -322,7 +324,7 @@ class TestExistingCohortParser:
             include_participant_column=False,
             batch_number='M01',
             search_locations=[],
-            project=connection_with_project.project.name,
+            project=self.project.name,
             allow_missing_files=True,
             sequencing_type='exome',
         )
@@ -339,7 +341,6 @@ class TestExistingCohortParser:
         mock_fileexists,
         mock_datetime_added,
         mock_graphql_query,
-        connection_with_project: Connection,
         graphql_query: GraphQLQueryFunction,
     ):
         """Test that the sequencing type is set correctly when the --sequencing-type flag is set to 'genome' or 'exome'"""
@@ -362,7 +363,7 @@ class TestExistingCohortParser:
                 include_participant_column=False,
                 batch_number='M01',
                 search_locations=[],
-                project=connection_with_project.project.name,
+                project=self.project.name,
                 allow_missing_files=False,
                 sequencing_type=sequencing_type,
             )
