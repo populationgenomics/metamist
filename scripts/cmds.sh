@@ -1,11 +1,11 @@
 SM_ENVIRONMENT=
-PROJECT="schr-neuro"
+PROJECT="ghfm-kidgen"
 SEARCH_PATH="gs://cpg-${PROJECT}-main-upload/"
 # SEARCH_PATH="gs://cpg-${PROJECT}-upload/"
-SUBDIR="2026-04-16/extracted"  # Set this to the desired subdirectory for each run, 0 to 16
+SUBDIR="QPath/2026-04-24/"  # Set this to the desired subdirectory for each run, 0 to 16
 SEARCH_PATH+=$SUBDIR
 ROOT_PATH="/Users/edwfor/Code/metamist/ingestion_metadata/"
-DATA_DATE="2026-04-17"
+DATA_DATE="2026-04-24"
 FOLDER="${PROJECT}_${DATA_DATE}/"
 ROOT_PATH+="${FOLDER}"
 # SAMPLE_MAPPING="${ROOT_PATH}sample_file_mapping_${BATCH}.csv"
