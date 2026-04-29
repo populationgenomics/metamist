@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Any
 
 from models.base import OpenApiGenNoneType, SMBase, parse_sql_dict
@@ -74,7 +75,7 @@ class ParticipantUpsertInternal(SMBase):
     """Internal upsert model for participant"""
 
     id: int | None = None
-    external_ids: dict[str, str | None] | None = None
+    external_ids: Mapping[str, str | None] | None = None
     reported_sex: int | None = None
     reported_gender: str | None = None
     karyotype: str | None = None

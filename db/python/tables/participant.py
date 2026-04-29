@@ -1,4 +1,5 @@
 from collections import defaultdict
+from collections.abc import Mapping
 from string.templatelib import Template
 
 from psycopg import sql
@@ -392,7 +393,7 @@ class ParticipantTable:
     async def update_participant(
         self,
         participant_id: int,
-        external_ids: dict[str, str | None] | None,
+        external_ids: Mapping[str, str | None] | None,
         reported_sex: int | None,
         reported_gender: str | None,
         karyotype: str | None,

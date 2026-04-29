@@ -1,6 +1,7 @@
 import dataclasses
 import json
 from collections import defaultdict
+from collections.abc import Mapping
 from string.templatelib import Template
 from typing import Any, NamedTuple
 
@@ -342,7 +343,7 @@ class AssayTable(DbBase):
         self,
         assay_id: int,
         *,
-        external_ids: dict[str, str | None] | None = None,
+        external_ids: Mapping[str, str | None] | None = None,
         meta: dict[str, Any] | None = None,
         assay_type: str | None = None,
         sample_id: int | None = None,

@@ -1,4 +1,5 @@
 import json
+from collections.abc import Mapping
 from typing import Any
 
 from api.utils import group_by
@@ -113,7 +114,7 @@ class FamilyLayer(BaseLayer):
     async def update_family(
         self,
         id_: int,
-        external_ids: dict[str, str | None] | None = None,
+        external_ids: Mapping[str, str | None] | None = None,
         description: str | None = None,
         coded_phenotype: str | None = None,
         meta: dict[str, Any] | None = None,

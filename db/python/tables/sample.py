@@ -1,6 +1,6 @@
 import asyncio
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from datetime import date
 from string.templatelib import Template
 from typing import Any
@@ -345,7 +345,7 @@ class SampleTable(DbBase):
         id_: int,
         meta: dict | None,
         participant_id: int | None,
-        external_ids: dict[str, str | None] | None,
+        external_ids: Mapping[str, str | None] | None,
         type_: str | None,
         active: bool | None = None,
         sample_parent_id: int | None = None,

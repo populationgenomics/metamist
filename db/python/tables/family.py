@@ -1,5 +1,6 @@
 import dataclasses
 from collections import defaultdict
+from collections.abc import Mapping
 from string.templatelib import Template
 from typing import Any
 
@@ -181,7 +182,7 @@ class FamilyTable(DbBase):
     async def update_family(
         self,
         id_: int,
-        external_ids: dict[str, str | None] | None = None,
+        external_ids: Mapping[str, str | None] | None = None,
         description: str | None = None,
         coded_phenotype: str | None = None,
         meta: dict[str, Any] | None = None,
