@@ -212,11 +212,11 @@ class FamilyTable(DbBase):
                 # Set audit_log_id to this transaction before deleting the rows
                 await cur.execute(t"""
                      UPDATE family_external_id SET audit_log_id = {audit_log_id}
-                     WHERE family_id = {id_} AND name = ANY({to_delete})
+                     WHERE family_id = {id_} AND LOWER(name) = ANY({to_delete})
                 """)
 
                 await cur.execute(
-                    t'DELETE FROM family_external_id WHERE family_id = {id_} AND name = ANY({to_delete})'
+                    t'DELETE FROM family_external_id WHERE family_id = {id_} AND LOWER(name) = ANY({to_delete})'
                 )
 
             if to_update:
@@ -331,7 +331,7 @@ class FamilyTable(DbBase):
                 strict=False,
             ):
                 await cur.execute(
-                    t'SELECT family_id FROM family_external_id WHERE project = {project_param} AND external_id ={eid}'
+                    t'SELECT family_id FROM family_external_id WHERE project = {project_param} AND LOWER(external_id)={eid.lower()}'
                 )
                 existing_id = await cur.fetchone()
                 meta_param = Jsonb(mt or {})
@@ -363,10 +363,12 @@ class FamilyTable(DbBase):
         if not family_ids:
             return {}
 
+        fids_case_insensitive = [fid.lower() for fid in family_ids]
+
         project_param = project or self.project_id
         _query = t"""
         SELECT external_id, family_id AS id FROM family_external_id
-        WHERE external_id = ANY({family_ids}) AND project = {project_param}
+        WHERE LOWER(external_id) = ANY({fids_case_insensitive}) AND project = {project_param}
         """
 
         results = await (await self.connection.pg_connection.execute(_query)).fetchall()

@@ -373,13 +373,13 @@ class SampleTable(DbBase):
                 _audit_update_query = t"""
                     UPDATE sample_external_id
                     SET audit_log_id = {audit_log_id}
-                    WHERE sample_id = {id_} AND name = ANY({to_delete})
+                    WHERE sample_id = {id_} AND LOWER(name) = ANY({to_delete})
                 """
                 await self.connection.pg_connection.execute(_audit_update_query)
 
                 _delete_query = t"""
                     DELETE FROM sample_external_id
-                    WHERE sample_id = {id_} AND name = ANY({to_delete})
+                    WHERE sample_id = {id_} AND LOWER(name) = ANY({to_delete})
                 """
                 await self.connection.pg_connection.execute(_delete_query)
 
@@ -611,10 +611,12 @@ class SampleTable(DbBase):
                 'Project must be provided to get sample id map by external ids'
             )
 
+        eids_case_insensitive = [eid.lower() for eid in external_ids]
+
         _query = t"""
             SELECT sample_id AS id, external_id
             FROM sample_external_id
-            WHERE external_id = ANY({external_ids}) AND project = {project_id}
+            WHERE LOWER(external_id) = ANY({eids_case_insensitive}) AND project = {project_id}
         """
 
         cur = await self.connection.pg_connection.execute(_query)

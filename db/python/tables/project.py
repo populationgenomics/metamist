@@ -120,8 +120,8 @@ class ProjectPermissionsTable:
             SELECT gm.member, g.name
             FROM "group" g
             JOIN group_member gm ON g.id = gm.group_id
-            WHERE g.name = {group_name}
-            AND gm.member = {member}
+            WHERE LOWER(g.name) = {group_name.lower()}
+            AND LOWER(gm.member) = {member.lower()}
             LIMIT 1
         """
 
@@ -199,7 +199,7 @@ class ProjectPermissionsTable:
             )
         fields_str = sql.SQL(',').join(setters)
 
-        _query = t'UPDATE project SET {fields_str:q} WHERE name = {project_name}'
+        _query = t'UPDATE project SET {fields_str:q} WHERE LOWER(name) = {project_name.lower()}'
 
         conn = self.connection.pg_connection
         await conn.execute(_query)

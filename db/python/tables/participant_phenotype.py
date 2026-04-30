@@ -26,7 +26,7 @@ class ParticipantPhenotypeTable(DbBase):
                 VALUES (%(participant_id)s, %(description)s, %(value)s, %(audit_log_id)s, 'DESCRIPTION')
             ) AS source (participant_id, description, value, audit_log_id, hpo_term)
             ON target.participant_id = source.participant_id
-            AND target.description = source.description
+            AND LOWER(target.description) = LOWER(source.description)
             AND target.hpo_term = source.hpo_term
             WHEN MATCHED THEN
                 UPDATE SET

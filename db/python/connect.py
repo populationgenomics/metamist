@@ -336,7 +336,7 @@ async def configure_pg_connection(connection: AsyncConnection):
     async with connection:
         await connection.set_autocommit(True)
         await connection.execute(
-            f'SET search_path TO {MAIN_SCHEMA}, {HISTORY_SCHEMA}, public;'
+            f'SET search_path TO public, {MAIN_SCHEMA}, {HISTORY_SCHEMA};'
         )
 
         # register enums on the connection

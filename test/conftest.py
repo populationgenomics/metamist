@@ -148,7 +148,7 @@ class PostgresContainer(DockerContainer):
         """Run dbmate migrations inside the container."""
         database_url = self.get_superuser_database_url()
         exit_code, output = self.exec(
-            f'dbmate --url "{database_url}?sslmode=disable&search_path=public" --migrations-dir /db/migrations --no-dump-schema migrate'
+            f'dbmate --url "{database_url}?sslmode=disable&search_path=public,main,history" --migrations-dir /db/migrations --no-dump-schema migrate'
         )
         if exit_code != 0:
             raise RuntimeError(

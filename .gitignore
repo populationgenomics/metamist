@@ -28,6 +28,8 @@ packages/metamist/src/metamist/*
 !packages/metamist/src/metamist/audit/
 !packages/metamist/src/metamist/graphql/
 packages/metamist/src/metamist/graphql/*.graphql
+!packages/metamist/src/metamist/metamist_config.py
+!packages/metamist/src/metamist/cli.py
 
 # We don't want to ignore the parser sub folder
 # since we do have sample_metadata/parsers that are not generated

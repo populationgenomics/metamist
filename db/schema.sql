@@ -1,7 +1,7 @@
 \restrict dbmate
 
--- Dumped from database version 18.1 (Debian 18.1-1.pgdg13+2)
--- Dumped by pg_dump version 18.1
+-- Dumped from database version 18.3 (Debian 18.3-1.pgdg13+1)
+-- Dumped by pg_dump version 18.3 (Debian 18.3-1.pgdg13+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -16,10 +16,31 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: history; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA history;
+
+
+--
 -- Name: main; Type: SCHEMA; Schema: -; Owner: -
 --
 
 CREATE SCHEMA main;
+
+
+--
+-- Name: public; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA public;
+
+
+--
+-- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON SCHEMA public IS 'standard public schema';
 
 
 --
@@ -68,9 +89,558 @@ CREATE TYPE main.project_member_role AS ENUM (
 );
 
 
+--
+-- Name: json_merge_patch(jsonb, jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.json_merge_patch(target jsonb, patch jsonb) RETURNS jsonb
+    LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE
+    AS $$
+DECLARE
+    result JSONB;
+    key TEXT;
+    patch_value JSONB;
+    target_value JSONB;
+BEGIN
+    -- If patch is not an object, return the patch (replaces target entirely)
+    IF jsonb_typeof(patch) != 'object' THEN
+        RETURN patch;
+    END IF;
+
+    -- If patch is an object but target is not, start with empty object
+    IF jsonb_typeof(target) != 'object' THEN
+        target := '{}';
+    END IF;
+
+    -- Start with the target
+    result := target;
+
+    -- Iterate over each key in the patch
+    FOR key IN SELECT jsonb_object_keys(patch)
+    LOOP
+        patch_value := patch -> key;
+
+        -- If patch value is null, remove the key from result
+        IF patch_value IS NULL OR jsonb_typeof(patch_value) = 'null' THEN
+            result := result - key;
+        ELSE
+            -- Get the current target value for this key (may be null if key doesn't exist)
+            target_value := result -> key;
+
+            -- If target doesn't have this key, use null as the base
+            IF target_value IS NULL THEN
+                target_value := 'null'::jsonb;
+            END IF;
+
+            -- Recursively merge and set the result
+            result := jsonb_set(result, ARRAY[key], json_merge_patch(target_value, patch_value));
+        END IF;
+    END LOOP;
+
+    RETURN result;
+END;
+$$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: analysis_cohort_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.analysis_cohort_history (
+    cohort_id integer CONSTRAINT analysis_cohort_cohort_id_not_null NOT NULL,
+    analysis_id integer CONSTRAINT analysis_cohort_analysis_id_not_null NOT NULL,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT analysis_cohort_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: analysis_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.analysis_history (
+    id integer CONSTRAINT analysis_id_not_null NOT NULL,
+    type text,
+    output text,
+    status main.analysis_status,
+    timestamp_completed timestamp with time zone,
+    project integer CONSTRAINT analysis_project_not_null NOT NULL,
+    author text,
+    meta jsonb,
+    active boolean,
+    on_behalf_of text,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT analysis_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: analysis_outputs_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.analysis_outputs_history (
+    analysis_id integer CONSTRAINT analysis_outputs_analysis_id_not_null NOT NULL,
+    file_id integer,
+    output text,
+    json_structure text,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT analysis_outputs_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: analysis_runner_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.analysis_runner_history (
+    ar_guid text CONSTRAINT analysis_runner_ar_guid_not_null NOT NULL,
+    project integer CONSTRAINT analysis_runner_project_not_null NOT NULL,
+    "timestamp" timestamp with time zone,
+    access_level text CONSTRAINT analysis_runner_access_level_not_null NOT NULL,
+    repository text CONSTRAINT analysis_runner_repository_not_null NOT NULL,
+    commit text CONSTRAINT analysis_runner_commit_not_null NOT NULL,
+    output_path text CONSTRAINT analysis_runner_output_path_not_null NOT NULL,
+    script text,
+    description text CONSTRAINT analysis_runner_description_not_null NOT NULL,
+    driver_image text CONSTRAINT analysis_runner_driver_image_not_null NOT NULL,
+    config_path text,
+    cwd text,
+    environment text CONSTRAINT analysis_runner_environment_not_null NOT NULL,
+    hail_version text,
+    batch_url text CONSTRAINT analysis_runner_batch_url_not_null NOT NULL,
+    submitting_user text,
+    meta jsonb,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT analysis_runner_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: analysis_sequencing_group_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.analysis_sequencing_group_history (
+    analysis_id integer CONSTRAINT analysis_sequencing_group_analysis_id_not_null NOT NULL,
+    sequencing_group_id integer CONSTRAINT analysis_sequencing_group_sequencing_group_id_not_null NOT NULL,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT analysis_sequencing_group_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: assay_comment_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.assay_comment_history (
+    comment_id integer CONSTRAINT assay_comment_comment_id_not_null NOT NULL,
+    assay_id integer CONSTRAINT assay_comment_assay_id_not_null NOT NULL,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT assay_comment_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: assay_external_id_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.assay_external_id_history (
+    project integer CONSTRAINT assay_external_id_project_not_null NOT NULL,
+    assay_id integer CONSTRAINT assay_external_id_assay_id_not_null NOT NULL,
+    name text CONSTRAINT assay_external_id_name_not_null NOT NULL,
+    external_id text CONSTRAINT assay_external_id_external_id_not_null NOT NULL,
+    author text,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT assay_external_id_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: assay_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.assay_history (
+    id integer CONSTRAINT assay_id_not_null NOT NULL,
+    sample_id integer CONSTRAINT assay_sample_id_not_null NOT NULL,
+    type text CONSTRAINT assay_type_not_null NOT NULL,
+    meta jsonb,
+    author text,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT assay_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: cohort_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.cohort_history (
+    id integer CONSTRAINT cohort_id_not_null NOT NULL,
+    project integer CONSTRAINT cohort_project_not_null NOT NULL,
+    template_id integer,
+    name text CONSTRAINT cohort_name_not_null NOT NULL,
+    description text CONSTRAINT cohort_description_not_null NOT NULL,
+    status main.cohort_status CONSTRAINT cohort_status_not_null NOT NULL,
+    author text,
+    "timestamp" timestamp with time zone CONSTRAINT cohort_timestamp_not_null NOT NULL,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT cohort_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: cohort_sequencing_group_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.cohort_sequencing_group_history (
+    cohort_id integer CONSTRAINT cohort_sequencing_group_cohort_id_not_null NOT NULL,
+    sequencing_group_id integer CONSTRAINT cohort_sequencing_group_sequencing_group_id_not_null NOT NULL,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT cohort_sequencing_group_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: cohort_template_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.cohort_template_history (
+    id integer CONSTRAINT cohort_template_id_not_null NOT NULL,
+    name text CONSTRAINT cohort_template_name_not_null NOT NULL,
+    description text CONSTRAINT cohort_template_description_not_null NOT NULL,
+    criteria jsonb CONSTRAINT cohort_template_criteria_not_null NOT NULL,
+    project integer CONSTRAINT cohort_template_project_not_null NOT NULL,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT cohort_template_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: comment_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.comment_history (
+    id integer CONSTRAINT comment_id_not_null NOT NULL,
+    parent_id integer,
+    content text,
+    status main.comment_status CONSTRAINT comment_status_not_null NOT NULL,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT comment_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: family_comment_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.family_comment_history (
+    comment_id integer CONSTRAINT family_comment_comment_id_not_null NOT NULL,
+    family_id integer CONSTRAINT family_comment_family_id_not_null NOT NULL,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT family_comment_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: family_external_id_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.family_external_id_history (
+    project integer CONSTRAINT family_external_id_project_not_null NOT NULL,
+    family_id integer CONSTRAINT family_external_id_family_id_not_null NOT NULL,
+    name text CONSTRAINT family_external_id_name_not_null NOT NULL,
+    external_id text CONSTRAINT family_external_id_external_id_not_null NOT NULL,
+    meta jsonb,
+    audit_log_id integer CONSTRAINT family_external_id_audit_log_id_not_null NOT NULL,
+    sys_period tstzrange CONSTRAINT family_external_id_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: family_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.family_history (
+    id integer CONSTRAINT family_id_not_null NOT NULL,
+    project integer CONSTRAINT family_project_not_null NOT NULL,
+    description text,
+    coded_phenotype text,
+    author text,
+    meta jsonb,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT family_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: family_participant_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.family_participant_history (
+    family_id integer CONSTRAINT family_participant_family_id_not_null NOT NULL,
+    participant_id integer CONSTRAINT family_participant_participant_id_not_null NOT NULL,
+    paternal_participant_id integer,
+    maternal_participant_id integer,
+    affected integer,
+    notes text,
+    author text,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT family_participant_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: group_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.group_history (
+    id integer CONSTRAINT group_id_not_null NOT NULL,
+    name text CONSTRAINT group_name_not_null NOT NULL,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT group_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: group_member_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.group_member_history (
+    group_id integer CONSTRAINT group_member_group_id_not_null NOT NULL,
+    member text CONSTRAINT group_member_member_not_null NOT NULL,
+    author text,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT group_member_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: output_file_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.output_file_history (
+    id integer CONSTRAINT output_file_id_not_null NOT NULL,
+    path text CONSTRAINT output_file_path_not_null NOT NULL,
+    basename text CONSTRAINT output_file_basename_not_null NOT NULL,
+    dirname text CONSTRAINT output_file_dirname_not_null NOT NULL,
+    nameroot text CONSTRAINT output_file_nameroot_not_null NOT NULL,
+    nameext text,
+    file_checksum text,
+    size bigint CONSTRAINT output_file_size_not_null NOT NULL,
+    meta jsonb,
+    valid boolean,
+    parent_id integer,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT output_file_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: participant_comment_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.participant_comment_history (
+    comment_id integer CONSTRAINT participant_comment_comment_id_not_null NOT NULL,
+    participant_id integer CONSTRAINT participant_comment_participant_id_not_null NOT NULL,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT participant_comment_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: participant_external_id_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.participant_external_id_history (
+    project integer CONSTRAINT participant_external_id_project_not_null NOT NULL,
+    participant_id integer CONSTRAINT participant_external_id_participant_id_not_null NOT NULL,
+    name text CONSTRAINT participant_external_id_name_not_null NOT NULL,
+    external_id text CONSTRAINT participant_external_id_external_id_not_null NOT NULL,
+    meta jsonb,
+    audit_log_id integer CONSTRAINT participant_external_id_audit_log_id_not_null NOT NULL,
+    sys_period tstzrange CONSTRAINT participant_external_id_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: participant_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.participant_history (
+    id integer CONSTRAINT participant_id_not_null NOT NULL,
+    project integer CONSTRAINT participant_project_not_null NOT NULL,
+    author text,
+    reported_sex integer,
+    reported_gender text,
+    karyotype text,
+    meta jsonb,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT participant_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: participant_phenotypes_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.participant_phenotypes_history (
+    participant_id integer CONSTRAINT participant_phenotypes_participant_id_not_null NOT NULL,
+    hpo_term text,
+    description text,
+    author text,
+    value jsonb,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT participant_phenotypes_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: project_comment_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.project_comment_history (
+    comment_id integer CONSTRAINT project_comment_comment_id_not_null NOT NULL,
+    project_id integer CONSTRAINT project_comment_project_id_not_null NOT NULL,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT project_comment_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: project_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.project_history (
+    id integer CONSTRAINT project_id_not_null NOT NULL,
+    name character varying(64) CONSTRAINT project_name_not_null NOT NULL,
+    dataset text,
+    meta jsonb,
+    author text,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT project_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: project_member_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.project_member_history (
+    project_id integer CONSTRAINT project_member_project_id_not_null NOT NULL,
+    member text CONSTRAINT project_member_member_not_null NOT NULL,
+    role main.project_member_role CONSTRAINT project_member_role_not_null NOT NULL,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT project_member_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: sample_comment_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.sample_comment_history (
+    comment_id integer CONSTRAINT sample_comment_comment_id_not_null NOT NULL,
+    sample_id integer CONSTRAINT sample_comment_sample_id_not_null NOT NULL,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT sample_comment_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: sample_external_id_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.sample_external_id_history (
+    project integer CONSTRAINT sample_external_id_project_not_null NOT NULL,
+    sample_id integer CONSTRAINT sample_external_id_sample_id_not_null NOT NULL,
+    name text CONSTRAINT sample_external_id_name_not_null NOT NULL,
+    external_id text CONSTRAINT sample_external_id_external_id_not_null NOT NULL,
+    meta jsonb,
+    audit_log_id integer CONSTRAINT sample_external_id_audit_log_id_not_null NOT NULL,
+    sys_period tstzrange CONSTRAINT sample_external_id_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: sample_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.sample_history (
+    id integer CONSTRAINT sample_id_not_null NOT NULL,
+    project integer CONSTRAINT sample_project_not_null NOT NULL,
+    participant_id integer,
+    active boolean,
+    meta jsonb,
+    type text,
+    sample_root_id integer,
+    sample_parent_id integer,
+    author text,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT sample_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: sequencing_group_assay_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.sequencing_group_assay_history (
+    sequencing_group_id integer CONSTRAINT sequencing_group_assay_sequencing_group_id_not_null NOT NULL,
+    assay_id integer CONSTRAINT sequencing_group_assay_assay_id_not_null NOT NULL,
+    author text,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT sequencing_group_assay_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: sequencing_group_comment_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.sequencing_group_comment_history (
+    comment_id integer CONSTRAINT sequencing_group_comment_comment_id_not_null NOT NULL,
+    sequencing_group_id integer CONSTRAINT sequencing_group_comment_sequencing_group_id_not_null NOT NULL,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT sequencing_group_comment_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: sequencing_group_external_id_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.sequencing_group_external_id_history (
+    project integer CONSTRAINT sequencing_group_external_id_project_not_null NOT NULL,
+    sequencing_group_id integer CONSTRAINT sequencing_group_external_id_sequencing_group_id_not_null NOT NULL,
+    external_id text CONSTRAINT sequencing_group_external_id_external_id_not_null NOT NULL,
+    name text CONSTRAINT sequencing_group_external_id_name_not_null NOT NULL,
+    author text,
+    null_if_archived smallint,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT sequencing_group_external_id_sys_period_not_null NOT NULL
+);
+
+
+--
+-- Name: sequencing_group_history; Type: TABLE; Schema: history; Owner: -
+--
+
+CREATE TABLE history.sequencing_group_history (
+    id integer CONSTRAINT sequencing_group_id_not_null NOT NULL,
+    sample_id integer CONSTRAINT sequencing_group_sample_id_not_null NOT NULL,
+    type text CONSTRAINT sequencing_group_type_not_null NOT NULL,
+    technology text CONSTRAINT sequencing_group_technology_not_null NOT NULL,
+    platform text,
+    meta jsonb,
+    archived boolean,
+    author text,
+    audit_log_id integer,
+    sys_period tstzrange CONSTRAINT sequencing_group_sys_period_not_null NOT NULL
+);
+
 
 --
 -- Name: analysis; Type: TABLE; Schema: main; Owner: -
@@ -398,6 +968,7 @@ CREATE TABLE main.family (
     description text,
     coded_phenotype text,
     author text,
+    meta jsonb DEFAULT '{}'::jsonb,
     audit_log_id integer,
     sys_period tstzrange NOT NULL
 );
@@ -856,6 +1427,15 @@ CREATE TABLE main.sequencing_type (
 
 
 --
+-- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.schema_migrations (
+    version character varying NOT NULL
+);
+
+
+--
 -- Name: analysis analysis_pkey; Type: CONSTRAINT; Schema: main; Owner: -
 --
 
@@ -1160,6 +1740,14 @@ ALTER TABLE ONLY main.sequencing_type
 
 
 --
+-- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schema_migrations
+    ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+
+
+--
 -- Name: idx_analysis_audit_log_id; Type: INDEX; Schema: main; Owner: -
 --
 
@@ -1191,14 +1779,14 @@ CREATE INDEX idx_analysis_cohort_cohort_id ON main.analysis_cohort USING btree (
 -- Name: idx_analysis_outputs_analysis_file; Type: INDEX; Schema: main; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_analysis_outputs_analysis_file ON main.analysis_outputs USING btree (analysis_id, file_id, json_structure);
+CREATE UNIQUE INDEX idx_analysis_outputs_analysis_file ON main.analysis_outputs USING btree (analysis_id, file_id, COALESCE(json_structure, ''::text));
 
 
 --
 -- Name: idx_analysis_outputs_analysis_output; Type: INDEX; Schema: main; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_analysis_outputs_analysis_output ON main.analysis_outputs USING btree (analysis_id, output, json_structure);
+CREATE UNIQUE INDEX idx_analysis_outputs_analysis_output ON main.analysis_outputs USING btree (analysis_id, output, COALESCE(json_structure, ''::text));
 
 
 --
@@ -1723,231 +2311,231 @@ CREATE INDEX idx_sequencing_group_type ON main.sequencing_group USING btree (typ
 -- Name: analysis versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.analysis FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.analysis_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.analysis FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.analysis_history', 'true');
 
 
 --
 -- Name: analysis_cohort versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.analysis_cohort FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.analysis_cohort_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.analysis_cohort FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.analysis_cohort_history', 'true');
 
 
 --
 -- Name: analysis_outputs versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.analysis_outputs FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.analysis_outputs_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.analysis_outputs FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.analysis_outputs_history', 'true');
 
 
 --
 -- Name: analysis_runner versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.analysis_runner FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.analysis_runner_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.analysis_runner FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.analysis_runner_history', 'true');
 
 
 --
 -- Name: analysis_sequencing_group versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.analysis_sequencing_group FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.analysis_sequencing_group_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.analysis_sequencing_group FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.analysis_sequencing_group_history', 'true');
 
 
 --
 -- Name: assay versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.assay FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.assay_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.assay FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.assay_history', 'true');
 
 
 --
 -- Name: assay_comment versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.assay_comment FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.assay_comment_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.assay_comment FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.assay_comment_history', 'true');
 
 
 --
 -- Name: assay_external_id versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.assay_external_id FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.assay_external_id_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.assay_external_id FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.assay_external_id_history', 'true');
 
 
 --
 -- Name: cohort versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.cohort FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.cohort_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.cohort FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.cohort_history', 'true');
 
 
 --
 -- Name: cohort_sequencing_group versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.cohort_sequencing_group FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.cohort_sequencing_group_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.cohort_sequencing_group FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.cohort_sequencing_group_history', 'true');
 
 
 --
 -- Name: cohort_template versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.cohort_template FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.cohort_template_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.cohort_template FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.cohort_template_history', 'true');
 
 
 --
 -- Name: comment versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.comment FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.comment_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.comment FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.comment_history', 'true');
 
 
 --
 -- Name: family versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.family FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.family_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.family FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.family_history', 'true');
 
 
 --
 -- Name: family_comment versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.family_comment FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.family_comment_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.family_comment FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.family_comment_history', 'true');
 
 
 --
 -- Name: family_external_id versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.family_external_id FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.family_external_id_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.family_external_id FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.family_external_id_history', 'true');
 
 
 --
 -- Name: family_participant versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.family_participant FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.family_participant_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.family_participant FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.family_participant_history', 'true');
 
 
 --
 -- Name: group versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main."group" FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.group_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main."group" FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.group_history', 'true');
 
 
 --
 -- Name: group_member versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.group_member FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.group_member_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.group_member FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.group_member_history', 'true');
 
 
 --
 -- Name: output_file versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.output_file FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.output_file_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.output_file FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.output_file_history', 'true');
 
 
 --
 -- Name: participant versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.participant FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.participant_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.participant FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.participant_history', 'true');
 
 
 --
 -- Name: participant_comment versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.participant_comment FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.participant_comment_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.participant_comment FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.participant_comment_history', 'true');
 
 
 --
 -- Name: participant_external_id versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.participant_external_id FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.participant_external_id_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.participant_external_id FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.participant_external_id_history', 'true');
 
 
 --
 -- Name: participant_phenotypes versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.participant_phenotypes FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.participant_phenotypes_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.participant_phenotypes FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.participant_phenotypes_history', 'true');
 
 
 --
 -- Name: project versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.project FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.project_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.project FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.project_history', 'true');
 
 
 --
 -- Name: project_comment versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.project_comment FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.project_comment_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.project_comment FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.project_comment_history', 'true');
 
 
 --
 -- Name: project_member versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.project_member FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.project_member_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.project_member FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.project_member_history', 'true');
 
 
 --
 -- Name: sample versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.sample FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.sample_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.sample FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.sample_history', 'true');
 
 
 --
 -- Name: sample_comment versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.sample_comment FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.sample_comment_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.sample_comment FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.sample_comment_history', 'true');
 
 
 --
 -- Name: sample_external_id versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.sample_external_id FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.sample_external_id_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.sample_external_id FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.sample_external_id_history', 'true');
 
 
 --
 -- Name: sequencing_group versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.sequencing_group FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.sequencing_group_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.sequencing_group FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.sequencing_group_history', 'true');
 
 
 --
 -- Name: sequencing_group_assay versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.sequencing_group_assay FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.sequencing_group_assay_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.sequencing_group_assay FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.sequencing_group_assay_history', 'true');
 
 
 --
 -- Name: sequencing_group_comment versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.sequencing_group_comment FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.sequencing_group_comment_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.sequencing_group_comment FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.sequencing_group_comment_history', 'true');
 
 
 --
 -- Name: sequencing_group_external_id versioning_trigger; Type: TRIGGER; Schema: main; Owner: -
 --
 
-CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.sequencing_group_external_id FOR EACH ROW EXECUTE FUNCTION history.versioning('sys_period', 'history.sequencing_group_external_id_history', 'true');
+CREATE TRIGGER versioning_trigger BEFORE INSERT OR DELETE OR UPDATE ON main.sequencing_group_external_id FOR EACH ROW EXECUTE FUNCTION public.versioning('sys_period', 'history.sequencing_group_external_id_history', 'true');
 
 
 --
@@ -2753,9 +3341,13 @@ ALTER TABLE ONLY main.sequencing_type
 -- Dbmate schema migrations
 --
 
-INSERT INTO main.schema_migrations (version) VALUES
+INSERT INTO public.schema_migrations (version) VALUES
+    ('20260110061420'),
     ('20260120061420'),
     ('20260120061443'),
     ('20260120061532'),
     ('20260120061600'),
-    ('20260120061617');
+    ('20260120061616'),
+    ('20260120061617'),
+    ('20260129010059'),
+    ('20260212055045');
