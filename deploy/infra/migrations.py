@@ -76,8 +76,11 @@ def create_migration_resources(
             timeout='600s',
             scaling=gcp.cloudrunv2.ServiceTemplateScalingArgs(
                 min_instance_count=0,
-                max_instance_count=1,  # We only need one instance for migrations to avoid concurrency issues
+                # We only need one instance for migrations to avoid concurrency issues
+                max_instance_count=1,
             ),
+            # Similarily, only allow one request at a time. Don't want multiple migrations running
+            max_instance_request_concurrency=1,
             vpc_access=(
                 gcp.cloudrunv2.ServiceTemplateVpcAccessArgs(
                     network_interfaces=[
