@@ -20,6 +20,7 @@ from models.models import (
     SequencingGroupUpsertInternal,
 )
 from models.models.analysis import AnalysisInternal
+from models.models.output_file import RecursiveDict
 
 
 def custom_get_gcs_client():
@@ -448,7 +449,7 @@ class TestOutputFiles:
         analysis_layer = AnalysisLayer(connection_with_project)
         output_file_table = OutputFileTable(connection_with_project)
 
-        outputs = {
+        outputs: RecursiveDict = {
             'cram': {
                 'basename': 'gs://fakegcs/file3.cram',
                 'secondary_files': {
