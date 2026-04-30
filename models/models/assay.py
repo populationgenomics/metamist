@@ -50,7 +50,7 @@ class AssayUpsertInternal(SMBase):
         return AssayUpsert(
             id=self.id,
             type=self.type,
-            external_ids=self.external_ids,
+            external_ids=self.external_ids,  # type: ignore
             sample_id=sample_id_format(self.sample_id) if self.sample_id else None,
             meta=self.meta,
         )

@@ -314,7 +314,7 @@ class AnalysisTable(DbBase):
 
                 # if analysis_files[row['analysis_id']]['outputs'] is a str, we set it to a list and append the str to it:
                 outputs = analysis_files[row['analysis_id']]['outputs']
-                new_output = (file_internal, row['json_structure'])
+                new_output = (file_internal, row['json_structure'] or '')
                 if isinstance(outputs, str):
                     outputs = [outputs, new_output]
                 else:

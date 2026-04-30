@@ -410,7 +410,7 @@ class FamilyLayer(BaseLayer):
             return result
 
         await self.ftable.insert_or_update_multiple_families(
-            external_ids=select_columns(external_identifier_idx, display_name_idx),
+            external_ids=select_columns(external_identifier_idx, display_name_idx),  # type: ignore
             descriptions=select_columns(description_idx),
             coded_phenotypes=select_columns(phenotype_idx),
             meta=parse_meta(select_columns(meta_idx)),
