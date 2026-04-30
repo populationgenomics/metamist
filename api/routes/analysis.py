@@ -88,7 +88,11 @@ class AnalysisQueryModel(BaseModel):
                 else None
             ),
             project=(
-                GenericFilter(in_=[project_id_map.get(p) for p in self.projects])
+                GenericFilter(
+                    in_=[
+                        project_id_map[p] for p in self.projects if p in project_id_map
+                    ]
+                )
                 if self.projects
                 else None
             ),
