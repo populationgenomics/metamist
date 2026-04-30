@@ -179,11 +179,11 @@ def create_server_resources(
                         ),
                         gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name='DB_POOL_MIN_SIZE',
-                            value=config.server.sm_legacy_proxy_sa,
+                            value=config.server.db_min_pool_size,
                         ),
                         gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name='DB_POOL_MAX_SIZE',
-                            value=config.server.sm_legacy_proxy_sa,
+                            value=config.server.db_max_pool_size,
                         ),
                         gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name='SM_DBCREDS',
