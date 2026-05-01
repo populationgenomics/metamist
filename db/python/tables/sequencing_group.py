@@ -256,6 +256,33 @@ class SequencingGroupTable(DbBase):
 
         return sequencing_group_ids_by_sample_ids_by_type
 
+    async def get_participant_ids_and_sequencing_group_ids_for_sequencing_type(
+        self, sequencing_type: str
+    ) -> tuple[set[ProjectId], dict[int, list[int]]]:
+        """
+        Get participant IDs for a specific sequence type.
+        Particularly useful for seqr like cases
+        """
+        _query = """
+        SELECT s.project as project, sg.id as sid, s.participant_id as pid
+        FROM sequencing_group sg
+        INNER JOIN sample s ON sg.sample_id = s.id
+        WHERE sg.type = :seqtype AND project = :project
+        """
+
+        rows = list(
+            await self.connection.fetch_all(
+                _query, {'seqtype': sequencing_type, 'project': self.project_id}
+            )
+        )
+
+        projects = set(r['project'] for r in rows)
+        participant_id_to_sids: dict[int, list[int]] = defaultdict(list)
+        for r in rows:
+            participant_id_to_sids[r['pid']].append(r['sid'])
+
+        return projects, participant_id_to_sids
+
     async def get_samples_create_date_from_sgs(
         self, sequencing_group_ids: list[int]
     ) -> dict[SequencingGroupInternalId, date]:

@@ -122,6 +122,28 @@ class SequencingGroupLayer(BaseLayer):
         """
         return await self.seqgt.get_all_sequencing_group_ids_by_sample_ids_by_type()
 
+    async def get_participant_ids_sequencing_group_ids_for_sequencing_type(
+        self, sequencing_type: str
+    ) -> dict[int, list[int]]:
+        """
+        Get list of participant IDs for a specific sequence type,
+        useful for synchronisation seqr projects
+        """
+        (
+            projects,
+            pids,
+        ) = await self.seqgt.get_participant_ids_and_sequencing_group_ids_for_sequencing_type(
+            sequencing_type
+        )
+        if not pids:
+            return {}
+
+        self.connection.check_access_to_projects_for_ids(
+            projects, allowed_roles=ReadAccessRoles
+        )
+
+        return pids
+
     async def get_type_numbers_for_project(self, project: ProjectId) -> dict[str, int]:
         """Get sequencing type numbers (of groups) for a project"""
         return await self.seqgt.get_type_numbers_for_project(project)
