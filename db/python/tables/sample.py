@@ -754,7 +754,7 @@ class SampleTable(DbBase):
 
         _query = t"""
         WITH t AS(
-            SELECT project, sample.id, MIN(lower(s.sys_period)) as sample_first_date
+            SELECT project, sample.id, MIN(lower(sample_hist.sys_period)) as sample_first_date
             FROM sample
             INNER JOIN (
                 SELECT id, sys_period FROM sample
