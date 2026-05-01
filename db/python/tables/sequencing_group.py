@@ -263,18 +263,15 @@ class SequencingGroupTable(DbBase):
         Get participant IDs for a specific sequence type.
         Particularly useful for seqr like cases
         """
-        _query = """
+        _query = t"""
         SELECT s.project as project, sg.id as sid, s.participant_id as pid
         FROM sequencing_group sg
         INNER JOIN sample s ON sg.sample_id = s.id
-        WHERE sg.type = :seqtype AND project = :project
+        WHERE sg.type = {sequencing_type} AND project = {self.project_id}
         """
 
-        rows = list(
-            await self.connection.fetch_all(
-                _query, {'seqtype': sequencing_type, 'project': self.project_id}
-            )
-        )
+        cur = await self.connection.pg_connection.execute(_query)
+        rows = await cur.fetchall()
 
         projects = set(r['project'] for r in rows)
         participant_id_to_sids: dict[int, list[int]] = defaultdict(list)
