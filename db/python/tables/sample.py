@@ -762,7 +762,7 @@ class SampleTable(DbBase):
                 SELECT id, sys_period FROM sample_history
             ) sample_hist ON sample.id = sample_hist.id
             {where_str:q}
-            GROUP BY project,id
+            GROUP BY project, sample.id
         )
         SELECT project,
         CAST(EXTRACT(YEAR FROM sample_first_date) AS INTEGER) AS year,
