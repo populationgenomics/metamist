@@ -16,6 +16,7 @@ from cloudpathlib import AnyPath
 from cpg_utils.cloud import get_google_identity_token
 
 from api.settings import (
+    FAR_FUTURE,
     SEQR_AUDIENCE,
     SEQR_MAP_LOCATION,
     SEQR_SLACK_NOTIFICATION_CHANNEL,
@@ -53,8 +54,6 @@ ES_INDEX_STAGES = {
     SeqrDatasetType.GCNV: 'MtToEsCNV',
     SeqrDatasetType.MITO: 'MtToEsMito',
 }
-
-FAR_FUTURE = datetime.datetime(datetime.MAXYEAR, 12, 31)
 
 _url_individuals_sync = '/api/project/sa/{projectGuid}/individuals/sync'
 _url_individual_meta_sync = '/api/project/sa/{projectGuid}/individuals_metadata/sync'

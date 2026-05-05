@@ -1,3 +1,4 @@
+import datetime
 import os
 from functools import lru_cache
 
@@ -5,6 +6,7 @@ from cpg_utils.cloud import read_secret
 
 
 TRUTH_SET = ('1', 'y', 't', 'true')
+FAR_FUTURE = datetime.datetime(datetime.MAXYEAR, 12, 31)
 
 LOG_DATABASE_QUERIES = (
     os.getenv('SM_LOG_DATABASE_QUERIES', 'false').lower() in TRUTH_SET

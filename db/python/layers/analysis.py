@@ -2,6 +2,7 @@ import datetime
 from collections import defaultdict
 from typing import Any
 
+from api.settings import FAR_FUTURE
 from api.utils import ensure_nonnone, group_by
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
@@ -32,7 +33,6 @@ from models.models.sequencing_group import SequencingGroupInternalId
 
 
 ES_ANALYSIS_OBJ_INTRO_DATE = datetime.date(2022, 6, 21)
-FAR_FUTURE = datetime.datetime(datetime.MAXYEAR, 12, 31)
 
 logger = get_logger()
 
@@ -161,10 +161,9 @@ class AnalysisLayer(BaseLayer):
             NB: Can't use the align datetime.date because the data is not good enough
         """
         # sanity checks
+        start_date = check_or_parse_date(start_date)
         if not start_date:
             raise ValueError('start_date must be set')
-        start_date = check_or_parse_date(start_date)
-        assert start_date is not None
         end_date = check_or_parse_date(end_date)
 
         if end_date and end_date < start_date:

@@ -297,16 +297,17 @@ class FamilyLayer(BaseLayer):
 
             # now let's map participants back
 
+            def external_participant_ids_lookup(external_id: str | None) -> int | None:
+                if external_id is None:
+                    return None
+                return external_participant_ids_map.get(external_id)
+
             insertable_rows = [
                 PedRowInternal(
                     family_id=external_family_id_map[row.family_id],
                     individual_id=external_participant_ids_map[row.individual_id],
-                    paternal_id=external_participant_ids_map.get(row.paternal_id)
-                    if row.paternal_id
-                    else None,
-                    maternal_id=external_participant_ids_map.get(row.maternal_id)
-                    if row.maternal_id
-                    else None,
+                    paternal_id=external_participant_ids_lookup(row.paternal_id),
+                    maternal_id=external_participant_ids_lookup(row.maternal_id),
                     affected=row.affected,
                     notes=row.notes,
                     sex=row.sex,
