@@ -8,7 +8,12 @@ from typing import Any, NamedTuple
 from psycopg import sql
 from psycopg.types.json import Jsonb
 
-from db.python.filters import GenericFilter, GenericFilterModel, GenericMetaFilter
+from db.python.filters import (
+    GenericFilter,
+    GenericFilterModel,
+    GenericMetaFilter,
+    join_sql_with_AND,
+)
 from db.python.tables.base import DbBase
 from db.python.utils import NotFoundError
 from models.models.assay import AssayId, AssayInternal
@@ -218,7 +223,7 @@ class AssayTable(DbBase):
                 )
             )
 
-        wheres_q = sql.SQL(' AND ').join(wheres)
+        wheres_q = join_sql_with_AND(wheres)
 
         _query = t"""
             SELECT

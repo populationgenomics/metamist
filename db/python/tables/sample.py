@@ -10,7 +10,7 @@ from psycopg import DatabaseError, sql
 from psycopg.rows import class_row
 from psycopg.types.json import Jsonb
 
-from db.python.filters import GenericFilter, join_sql_with_AND
+from db.python.filters import GenericFilter, is_literally_TRUE, join_sql_with_AND
 from db.python.filters.sample import SampleFilter
 from db.python.tables.base import DbBase
 from db.python.tables.meta_table import MetaTable
@@ -114,7 +114,8 @@ class SampleTable(DbBase):
 
         # WHERE
         wheres_sql = join_sql_with_AND(wheres)
-        query_template += t' WHERE {wheres_sql:q}' if len(wheres) > 0 else t''
+        if not is_literally_TRUE(wheres_sql):
+            query_template += t' WHERE {wheres_sql:q}'
 
         # ORDER BY, LIMIT, OFFSET
         query_template += t' ORDER BY pp.id' if limit or skip else t''

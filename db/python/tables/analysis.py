@@ -10,6 +10,7 @@ from db.python.filters import (
     GenericFilter,
     GenericFilterModel,
     GenericMetaFilter,
+    join_sql_with_AND,
 )
 from db.python.tables.base import DbBase
 from db.python.utils import NotFoundError, to_db_json
@@ -543,7 +544,7 @@ class AnalysisTable(DbBase):
         if participant_ids:
             where_conditions.append(t'peid.participant_id = ANY({participant_ids})')
 
-        where_clause = sql.SQL(' AND ').join(where_conditions)
+        where_clause = join_sql_with_AND(where_conditions)
 
         _query = t"""
             SELECT a.id, peid.external_id as participant_id, a.output as output, sg.id as sequencing_group_id

@@ -39,13 +39,14 @@ def get_hashable_value(value):  # noqa: PLR0911
     return hash(value)
 
 
+def is_literally_TRUE(s: Template):  # noqa: N802 allow ..._TRUE name
+    """Return whether the template argument is just t'TRUE' exactly"""
+    return len(s.strings) == 1 and s.strings[0] == 'TRUE'
+
+
 def join_sql_with_AND(clauses: list[Template]) -> Template:  # noqa: N802 allow ..._AND name
     """Join SQL snippets with AND, dropping redundant '...AND TRUE AND...' entries"""
-
-    def _literally_true(s: Template):
-        return len(s.strings) == 1 and s.strings[0] == 'TRUE'
-
-    nontrivial = [sql for sql in clauses if not _literally_true(sql)]
+    nontrivial = [sql for sql in clauses if not is_literally_TRUE(sql)]
     return sql.SQL(' AND ').join(nontrivial) if len(nontrivial) > 0 else t'TRUE'
 
 
@@ -419,7 +420,7 @@ def prepare_query_from_dict_field(
             t"json_query(a, '$' returning {pg_type:i} omit quotes)"
         )
 
-        if _inner_query:
+        if not is_literally_TRUE(_inner_query):
             conditionals.append(t"""
             exists (
                 select 1 FROM (SELECT 1) AS dummy_row -- need at least one row for negation comparisons to work
