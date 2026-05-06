@@ -1,6 +1,6 @@
 import asyncio
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from datetime import date
 from string.templatelib import Template
 from typing import Any
@@ -10,7 +10,7 @@ from psycopg import DatabaseError, sql
 from psycopg.rows import class_row
 from psycopg.types.json import Jsonb
 
-from db.python.filters import GenericFilter
+from db.python.filters import GenericFilter, is_literally_TRUE, join_sql_with_AND
 from db.python.filters.sample import SampleFilter
 from db.python.tables.base import DbBase
 from db.python.tables.meta_table import MetaTable
@@ -51,7 +51,7 @@ class SampleTable(DbBase):
             FROM sample ss
         """
 
-        wheres: list[Template | None] = []
+        wheres: list[Template] = []
 
         # Mandatory filters that apply to the sample table
         wheres.append(
@@ -113,9 +113,9 @@ class SampleTable(DbBase):
             query_template += t' INNER JOIN assay a ON a.sample_id = ss.id'
 
         # WHERE
-        wheres = [w for w in wheres if w is not None]
-        wheres_sql = sql.SQL(' AND ').join(wheres)
-        query_template += t' WHERE {wheres_sql:q}' if len(wheres) > 0 else t''
+        wheres_sql = join_sql_with_AND(wheres)
+        if not is_literally_TRUE(wheres_sql):
+            query_template += t' WHERE {wheres_sql:q}'
 
         # ORDER BY, LIMIT, OFFSET
         query_template += t' ORDER BY pp.id' if limit or skip else t''
@@ -283,7 +283,7 @@ class SampleTable(DbBase):
     async def insert_sample(
         self,
         external_ids: dict[str, str],
-        sample_type: str,
+        sample_type: str | None,
         active: bool,
         meta: dict | None,
         participant_id: int | None,
@@ -346,7 +346,7 @@ class SampleTable(DbBase):
         id_: int,
         meta: dict | None,
         participant_id: int | None,
-        external_ids: dict[str, str | None] | None,
+        external_ids: Mapping[str, str | None] | None,
         type_: str | None,
         active: bool | None = None,
         sample_parent_id: int | None = None,
@@ -731,7 +731,7 @@ class SampleTable(DbBase):
     # endregion HISTORY
 
     async def get_samples_with_missing_participants_by_internal_id(
-        self, project: ProjectId
+        self, project: ProjectId | None
     ) -> list[SampleInternal]:
         """Get samples with missing participants"""
         _, samples = await self.query(

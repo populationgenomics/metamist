@@ -21,7 +21,7 @@ class AnalysisStatsInternal:
             return None
         timestamp = (
             self.timestamp
-            if isinstance(self.timestamp, str)
+            if self.timestamp is None or isinstance(self.timestamp, str)
             else self.timestamp.isoformat()
         )
         return AnalysisStats(

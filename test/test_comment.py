@@ -648,6 +648,7 @@ class TestComment:
         )
 
         sample_external = sample.to_external()
+        assert isinstance(sample_external.id, str)
 
         comment_text = 'Sample Test Comment 1234'
         created_comment = await self.comment_helpers.add_comment_to_sample(
@@ -787,7 +788,7 @@ class TestComment:
         )
         sequencing_group = sequencing_groups[0]
         sequencing_group_id = sequencing_group.to_external().id
-        assert sequencing_group_id
+        assert isinstance(sequencing_group_id, str)
 
         comment_text = 'SequencingGroup Test Comment 1234'
 
@@ -822,6 +823,8 @@ class TestComment:
         )
 
         sample_external = sample.to_external()
+        assert isinstance(sample_external.id, str)
+
         comment_text = 'Sample parent comment'
 
         parent_comment = await self.comment_helpers.add_comment_to_sample(
@@ -858,6 +861,8 @@ class TestComment:
         )
 
         sample_external = sample.to_external()
+        assert isinstance(sample_external.id, str)
+
         initial_parent_comment_text = 'Sample parent comment'
 
         parent_comment = await self.comment_helpers.add_comment_to_sample(
@@ -922,6 +927,8 @@ class TestComment:
         )
 
         sample_external = sample.to_external()
+        assert isinstance(sample_external.id, str)
+
         comment_text = 'Sample parent comment'
 
         created_comment = await self.comment_helpers.add_comment_to_sample(
@@ -962,6 +969,7 @@ class TestComment:
 
         assert sequencing_group.assays is not None
         assay = sequencing_group.assays[0]
+        assert assay.id is not None
 
         project_id = self.project['id']
         project_name = self.project['name']
@@ -994,8 +1002,10 @@ class TestComment:
             affected=2,
         )
 
+        sample_external = sample.to_external()
+        assert isinstance(sample_external.id, str)
         sample_comment = await self.comment_helpers.add_comment_to_sample(
-            sample.to_external().id, 'Sample Comment'
+            sample_external.id, 'Sample Comment'
         )
 
         assay_comment = await self.comment_helpers.add_comment_to_assay(
@@ -1014,9 +1024,12 @@ class TestComment:
             project_id, 'Project Comment'
         )
 
+        sequencing_group_external = sequencing_group.to_external()
+        assert isinstance(sequencing_group_external.id, str)
+
         sequencing_group_comment = (
             await self.comment_helpers.add_comment_to_sequencing_group(
-                sequencing_group.to_external().id, 'Sg Comment'
+                sequencing_group_external.id, 'Sg Comment'
             )
         )
 
@@ -1037,7 +1050,7 @@ class TestComment:
             )
 
         sample_discussion = await self.comment_helpers.get_discussion_on_sample(
-            sample.to_external().id
+            sample_external.id
         )
         assay_discussion = await self.comment_helpers.get_discussion_on_assay(assay.id)
         family_discussion = await self.comment_helpers.get_discussion_on_family(
@@ -1051,7 +1064,7 @@ class TestComment:
         )
         sequencing_group_discussion = (
             await self.comment_helpers.get_discussion_on_sequencing_group(
-                sequencing_group.to_external().id
+                sequencing_group_external.id
             )
         )
 
@@ -1173,6 +1186,7 @@ class TestComment:
         await self.comment_helpers.add_comment_to_project(project.id, 'Project comment')
 
         sample_external = sample.to_external()
+        assert isinstance(sample_external.id, str)
         await self.comment_helpers.add_comment_to_sample(
             sample_external.id, 'Sample comment'
         )
@@ -1196,7 +1210,7 @@ class TestComment:
         )
         sequencing_group = sequencing_groups[0]
         sequencing_group_id = sequencing_group.to_external().id
-        assert sequencing_group_id
+        assert isinstance(sequencing_group_id, str)
         await self.comment_helpers.add_comment_to_sequencing_group(
             sequencing_group_id, 'SG comment'
         )

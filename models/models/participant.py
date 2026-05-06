@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Any
 
 from models.base import OpenApiGenNoneType, SMBase, parse_sql_dict
@@ -27,8 +28,8 @@ class ParticipantInternal(SMBase):
     @classmethod
     def from_db(cls, data: dict):
         """Convert from db keys, mainly converting JSON-encoded fields"""
-        meta = parse_sql_dict(data.pop('meta', {}))
-        external_ids = parse_sql_dict(data.pop('external_ids', {}))
+        meta = parse_sql_dict(data.pop('meta', None) or {})
+        external_ids = parse_sql_dict(data.pop('external_ids', None) or {})
         return ParticipantInternal(**data, meta=meta, external_ids=external_ids)
 
     def to_external(self):
@@ -74,7 +75,7 @@ class ParticipantUpsertInternal(SMBase):
     """Internal upsert model for participant"""
 
     id: int | None = None
-    external_ids: dict[str, str | None] | None = None
+    external_ids: Mapping[str, str | None] | None = None
     reported_sex: int | None = None
     reported_gender: str | None = None
     karyotype: str | None = None

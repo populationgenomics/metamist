@@ -9,7 +9,7 @@ from typing import Any, TypedDict
 from fastapi import Request
 from strawberry.dataloader import DataLoader
 
-from api.utils import group_by
+from api.utils import ensure_nonnone, group_by
 from api.utils.db import GetConnection, get_projectless_db_connection_getter
 from db.python.filters import GenericFilter, get_hashable_value
 from db.python.layers import (
@@ -214,7 +214,7 @@ async def load_assays_for_ids(
         assays = await assaylayer.query(AssayFilter(id=GenericFilter(in_=assay_ids)))
         # in case it's not ordered
         assays_map = {a.id: a for a in assays}
-        return [assays_map.get(a) for a in assay_ids]
+        return [assays_map[a] for a in assay_ids]
 
 
 @connected_data_loader_with_params(LoaderKeys.ASSAYS_FOR_SAMPLES, default_factory=list)
@@ -263,7 +263,7 @@ async def load_samples_for_participant_ids(
     filter.participant_id = GenericFilter(in_=ids)
     async with get_connection() as connection:
         samples = await SampleLayer(connection).query(filter)
-        samples_by_pid = group_by(samples, lambda s: s.participant_id)
+        samples_by_pid = group_by(samples, lambda s: ensure_nonnone(s.participant_id))
     return samples_by_pid
 
 
@@ -280,7 +280,7 @@ async def load_sequencing_groups_for_ids(
         ).get_sequencing_groups_by_ids(sequencing_group_ids)
         # in case it's not ordered
         sequencing_groups_map = {sg.id: sg for sg in sequencing_groups}
-        return [sequencing_groups_map.get(sg) for sg in sequencing_group_ids]
+        return [sequencing_groups_map[sg] for sg in sequencing_group_ids]
 
 
 @connected_data_loader_with_params(
@@ -303,7 +303,7 @@ async def load_sequencing_groups_for_samples(
             _filter.sample.id = GenericFilter(in_=ids)
 
         sequencing_groups = await sglayer.query(_filter)
-        sg_map = group_by(sequencing_groups, lambda sg: sg.sample_id)
+        sg_map = group_by(sequencing_groups, lambda sg: ensure_nonnone(sg.sample_id))
         return sg_map
 
 
@@ -333,7 +333,7 @@ async def load_samples_for_ids(
         samples = await slayer.query(SampleFilter(id=GenericFilter(in_=sample_ids)))
         # in case it's not ordered
         samples_map = {s.id: s for s in samples}
-        return [samples_map.get(s) for s in sample_ids]
+        return [samples_map[s] for s in sample_ids]
 
 
 @connected_data_loader_with_params(
@@ -385,7 +385,7 @@ async def load_participants_for_ids(
         missing_pids = set(participant_ids) - set(p_by_id.keys())
         if missing_pids:
             raise NotFoundError(f'Could not find participants with ids {missing_pids}')
-        return [p_by_id.get(p) for p in participant_ids]
+        return [p_by_id[p] for p in participant_ids]
 
 
 @connected_data_loader(LoaderKeys.SEQUENCING_GROUPS_FOR_ANALYSIS)
@@ -417,9 +417,8 @@ async def load_sequencing_groups_for_project_ids(
         sglayer = SequencingGroupLayer(connection)
         filter.project = GenericFilter(in_=ids)
         sequencing_groups = await sglayer.query(filter_=filter)
-        seq_group_map = group_by(sequencing_groups, lambda sg: sg.project)
-
-        return seq_group_map
+        sg_map = group_by(sequencing_groups, lambda sg: ensure_nonnone(sg.project))
+        return sg_map
 
 
 @connected_data_loader(LoaderKeys.PROJECTS_FOR_IDS)
@@ -497,6 +496,7 @@ async def load_analyses_for_projects(
         analyses = await alayer.query(filter_)
         by_project_id: dict[int, list[AnalysisInternal]] = defaultdict(list)
         for a in analyses:
+            assert a.project
             by_project_id[a.project].append(a)
 
         return by_project_id
@@ -520,6 +520,7 @@ async def load_analyses_for_sequencing_groups(
         analyses = await alayer.query(filter_)
         by_sg_id: dict[int, list[AnalysisInternal]] = defaultdict(list)
         for a in analyses:
+            assert a.sequencing_group_ids
             for sg in a.sequencing_group_ids:
                 by_sg_id[sg].append(a)
         return by_sg_id

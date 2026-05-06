@@ -140,6 +140,7 @@ class PostgresContainer(DockerContainer):
         for statement in statements:
             exit_code, output = self.exec(f'psql "{database_url}" -c "{statement}"')
             if exit_code != 0:
+                assert isinstance(output, bytes)
                 raise RuntimeError(
                     f'Failed to execute SQL with exit code {exit_code}: {output.decode()}'
                 )
@@ -151,6 +152,7 @@ class PostgresContainer(DockerContainer):
             f'dbmate --url "{database_url}?sslmode=disable&search_path=public,main,history" --migrations-dir /db/migrations --no-dump-schema migrate'
         )
         if exit_code != 0:
+            assert isinstance(output, bytes)
             raise RuntimeError(
                 f'dbmate migration failed with exit code {exit_code}: {output.decode()}'
             )
@@ -359,7 +361,7 @@ async def seeded_db(
 
     # Get project name from marker, or default to test-project
     project_name_marker = request.node.get_closest_marker('project_name')
-    project_name: list[str] = (
+    project_name = (
         project_name_marker.args[0] if project_name_marker else 'test-project'
     )
 
@@ -381,9 +383,7 @@ async def seeded_db(
                 VALUES ({project_name}, 'test-dataset', '{{}}')
                 RETURNING id
             """)
-            row = await cur.fetchone()
-            assert row is not None
-            project_id: int = row['id']
+            project_id = (await Connection.must_fetch_one(cur))['id']
 
             # Add test user as project member with configured roles
             for role in roles:
@@ -538,7 +538,7 @@ async def connection_with_project(
 
     # Set the project to test-project, or get the name from marker if available
     project_name_marker = request.node.get_closest_marker('project_name')
-    project_name: list[str] = (
+    project_name = (
         project_name_marker.args[0] if project_name_marker else 'test-project'
     )
     conn.update_project(project_name)

@@ -3,6 +3,7 @@ from datetime import date
 from unittest import mock
 
 import pytest
+from psycopg import sql
 
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
@@ -43,6 +44,7 @@ async def test_sample(connection_with_project: Connection) -> int:
 
     await SampleLayer(connection_with_project).upsert_sample(sample, project=project_id)
 
+    assert sample.id is not None
     return sample.id
 
 
@@ -115,13 +117,16 @@ class TestSequencingGroup:
         sg_layer = SequencingGroupLayer(connection_with_project)
 
         sg_upsert = await sg_layer.upsert_sequencing_groups([sequencing_group_model])
+        assert sg_upsert[0].id is not None
         sg_id = sg_upsert[0].id
         sg = await sg_layer.get_sequencing_group_by_id(sg_id)
+        assert sg.platform is not None
 
         inserted_sg = sg_upsert[0]
         assert inserted_sg.id == sg_id
         assert inserted_sg.type == sg.type
         assert inserted_sg.technology == sg.technology
+        assert inserted_sg.platform is not None
         assert inserted_sg.platform.lower() == sg.platform.lower()
         assert inserted_sg.meta == sg.meta
 
@@ -136,6 +141,7 @@ class TestSequencingGroup:
         sg_layer = SequencingGroupLayer(connection_with_project)
         # Create the initial SG
         initial_sg = await sg_layer.upsert_sequencing_groups([sequencing_group_model])
+        assert initial_sg[0].id
 
         # Create an updated model for upsert
         upsert_sg_model = SequencingGroupUpsertInternal(
@@ -164,6 +170,8 @@ class TestSequencingGroup:
         sg_layer = SequencingGroupLayer(connection_with_project)
         # Create the initial SG
         initial_sg = await sg_layer.upsert_sequencing_groups([sequencing_group_model])
+        assert initial_sg[0].id is not None
+        assert initial_sg[0].assays is not None
 
         new_upsert = SequencingGroupUpsertInternal(
             sample_id=initial_sg[0].sample_id,
@@ -279,6 +287,8 @@ class TestSequencingGroup:
         connection_with_project: Connection,
         sequencing_group_model: SequencingGroupUpsertInternal,
     ):
+        assert sequencing_group_model.assays is not None
+
         sample_layer = SampleLayer(connection_with_project)
         sg_layer = SequencingGroupLayer(connection_with_project)
 
@@ -313,6 +323,7 @@ class TestSequencingGroup:
                 )
             ],
         )
+        assert new_sg.assays is not None
 
         # Add both the fixture sg model and the new model to the db
         await sg_layer.upsert_sequencing_groups([sequencing_group_model, new_sg])
@@ -452,28 +463,31 @@ class TestSequencingGroup:
         ]
 
         # Firstly create two sequencing groups to attach analyses to
-        insert_sgs = f"""
+        insert_sgs = sql.SQL("""
             INSERT INTO sequencing_group (sample_id, type, technology, archived)
             VALUES ({test_sample}, %(type)s, %(technology)s, false)
-            RETURNING id"""
+            RETURNING id""").format(test_sample=test_sample)
 
         async with connection_with_project.pg_connection.cursor() as cur:
             await cur.executemany(insert_sgs, test_sg_data, returning=True)
-            sg_ids = [(await cur.fetchone())['id'] async for _ in cur.results()]
+            sg_ids = [
+                (await Connection.must_fetch_one(cur))['id']
+                async for _ in cur.results()
+            ]
 
         assert len(sg_ids) == 2
 
         # Create a cram and gvcf analysis
-        insert_analyses = f"""
+        insert_analyses = sql.SQL("""
             INSERT INTO analysis (type, project, status)
-            VALUES (%(type)s, {connection_with_project.project_id}, 'completed')
-            RETURNING id"""
+            VALUES (%(type)s, {project_id}, 'completed')
+            RETURNING id""").format(project_id=connection_with_project.project_id)
 
         async with connection_with_project.pg_connection.cursor() as cur:
             await cur.execute(insert_analyses, {'type': 'cram'})
-            cram_id = (await cur.fetchone())['id']
+            cram_id = (await Connection.must_fetch_one(cur))['id']
             await cur.execute(insert_analyses, {'type': 'gvcf'})
-            gvcf_id = (await cur.fetchone())['id']
+            gvcf_id = (await Connection.must_fetch_one(cur))['id']
 
         # Attach the cram analysis to the first sg, gvcf analysis to the second sg
         insert_analysis_sequencing_group = """
@@ -564,7 +578,9 @@ class TestSequencingGroup:
         sg1 = sgs[0].to_external().id
         sg2 = sgs[1].to_external().id
 
-        assert sg1, sg2
+        assert sgs[0].id is not None
+        assert sgs[1].id is not None
+        assert sg1 and sg2
 
         # Check that the sequencing groups aren't initially archived
         sgs_from_db = await sg_layer.get_sequencing_groups_by_ids(
@@ -670,17 +686,20 @@ class TestSequencingGroup:
             },
         ]
 
-        test_data_query = f"""
+        test_data_query = sql.SQL("""
             INSERT INTO sequencing_group_history
                 (id, sample_id, type, technology, archived, sys_period)
             VALUES
-                (%(id)s, %(sample_id)s, %(type)s, %(technology)s, false, tstzrange(%(sg_date)s, '{today.isoformat()}'))"""
+                (%(id)s, %(sample_id)s, %(type)s, %(technology)s, false, tstzrange(%(sg_date)s, {today}))""").format(
+            today=today.isoformat()
+        )
 
         # Insert the test data to the DB
         conn = connection_with_project.pg_connection
         async with conn.transaction(), conn.cursor() as cur:
             await cur.executemany(test_data_query, test_data)
 
+        assert connection_with_project.project_id is not None
         sg_table = SequencingGroupTable(connection_with_project)
         result = await sg_table.get_sequencing_group_counts_by_month(
             [connection_with_project.project_id, project_2]
@@ -754,17 +773,20 @@ class TestSequencingGroup:
             },
         ]
 
-        test_data_query = f"""
+        test_data_query = sql.SQL("""
             INSERT INTO sequencing_group_history
                 (id, sample_id, type, technology, archived, sys_period)
             VALUES
-                (%(id)s, %(sample_id)s, %(type)s, %(technology)s, false, tstzrange(%(sg_date)s, '{today.isoformat()}'))"""
+                (%(id)s, %(sample_id)s, %(type)s, %(technology)s, false, tstzrange(%(sg_date)s, {today}))""").format(
+            today=today.isoformat()
+        )
 
         # Insert the test data to the DB
         conn = connection_with_project.pg_connection
         async with conn.transaction(), conn.cursor() as cur:
             await cur.executemany(test_data_query, test_data)
 
+        assert connection_with_project.project_id is not None
         sg_table = SequencingGroupTable(connection_with_project)
         result = await sg_table.get_sequencing_group_counts_by_month(
             [connection_with_project.project_id]

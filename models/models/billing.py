@@ -132,8 +132,7 @@ class BillingColumn(StrEnum):
         """Convert string to enum"""
         # all column names have underscore in SQL, but dash in UI / stored data
         adjusted_value = value.replace('-', '_')
-        str_to_enum = {v.value: v for k, v in BillingColumn.__members__.items()}
-        return str_to_enum[adjusted_value]
+        return BillingColumn(adjusted_value)
 
     @classmethod
     def raw_cols(cls) -> list[str]:

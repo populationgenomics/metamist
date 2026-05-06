@@ -1,11 +1,12 @@
 from collections import defaultdict
+from collections.abc import Mapping
 from string.templatelib import Template
 
 from psycopg import sql
 from psycopg.types.json import Jsonb
 
 from db.python.connect import Connection
-from db.python.filters import GenericFilter
+from db.python.filters import GenericFilter, is_literally_TRUE, join_sql_with_AND
 from db.python.filters.participant import ParticipantFilter
 from db.python.tables.meta_table import MetaTable
 from db.python.utils import NotFoundError, escape_like_term
@@ -174,12 +175,9 @@ class ParticipantTable:
                 """
 
         # WHERE, ORDER BY, LIMIT, OFFSET
-        wheres_filtered = [w for w in wheres if w is not None]
-        query_template += (
-            t' WHERE {sql.SQL(" AND ").join(wheres_filtered):q}'
-            if wheres_filtered
-            else t''
-        )
+        wheres_sql = join_sql_with_AND(wheres)
+        if not is_literally_TRUE(wheres_sql):
+            query_template += t' WHERE {wheres_sql:q}'
         query_template += t' ORDER BY pp.id' if (limit or skip) else t''
         query_template += t' LIMIT {limit}' if limit else t''
         query_template += t' OFFSET {skip}' if skip else t''
@@ -324,7 +322,7 @@ class ParticipantTable:
 
     async def create_participant(
         self,
-        external_ids: dict[str, str | None],
+        external_ids: dict[str, str],
         reported_sex: int | None,
         reported_gender: str | None,
         karyotype: str | None,
@@ -392,7 +390,7 @@ class ParticipantTable:
     async def update_participant(
         self,
         participant_id: int,
-        external_ids: dict[str, str | None] | None,
+        external_ids: Mapping[str, str | None] | None,
         reported_sex: int | None,
         reported_gender: str | None,
         karyotype: str | None,
@@ -433,6 +431,10 @@ class ParticipantTable:
                     )
                     cur = await conn.execute(_query)
                     row = await cur.fetchone()
+                    if not row:
+                        raise NotFoundError(
+                            f"Couldn't find participant with internal ID {participant_id}"
+                        )
                     project = row['project']
 
                     to_update = [
@@ -648,7 +650,7 @@ class ParticipantTable:
         if sequencing_type:
             wheres.append(t'sg.type = {sequencing_type.lower()}')
 
-        where_str = sql.SQL(' AND ').join(wheres) if wheres else t''
+        where_str = join_sql_with_AND(wheres)
 
         _query = t"""
             SELECT peid.external_id as eid, sg.id as sgid

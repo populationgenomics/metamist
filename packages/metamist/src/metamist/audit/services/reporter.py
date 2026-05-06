@@ -1,6 +1,7 @@
 """Report generation service for audit results."""
 
 import csv
+from collections.abc import Callable
 from datetime import datetime
 from io import StringIO
 
@@ -355,7 +356,9 @@ class Reporter:
         self.audit_logs.info_nl(f'Filtered rows: {len(filtered_rows)} / {len(rows)}.')
         return filtered_rows
 
-    def parse_filter_expressions(self, filter_expressions: list[str]) -> callable:
+    def parse_filter_expressions(
+        self, filter_expressions: list[str]
+    ) -> Callable[[dict], bool]:
         """Parse filter expressions into a callable filter function."""
 
         def matches_filters(row: dict) -> bool:

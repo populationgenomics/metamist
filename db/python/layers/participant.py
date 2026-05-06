@@ -648,8 +648,9 @@ class ParticipantLayer(BaseLayer):
                 )
 
             else:
+                assert participant.external_ids is not None
                 participant.id = await self.pttable.create_participant(
-                    external_ids=participant.external_ids,
+                    external_ids=participant.external_ids,  # type: ignore
                     reported_sex=participant.reported_sex,
                     reported_gender=participant.reported_gender,
                     karyotype=participant.karyotype,
@@ -784,14 +785,14 @@ class ParticipantLayer(BaseLayer):
                 fid, fid
             )
             ld = {k.lower(): v for k, v in d.items()}
-            rows.append({lheader_to_json[h]: ld.get(h) for h in lheaders if ld.get(h)})
+            rows.append({lheader_to_json[h]: ld[h] for h in lheaders if ld.get(h)})
 
         # these two columns must ALWAYS be present
         set_headers = {'individual_id', 'family_id'}
         for row in rows:
             set_headers.update(set(row.keys()))
 
-        rows = [{h: r.get(h) for h in set_headers if h in r} for r in rows]
+        rows = [{h: r[h] for h in set_headers if h in r} for r in rows]
         headers = []  # get ordered headers if we have data for it
         for h in SeqrMetadataKeys.get_ordered_headers():
             header = lheader_to_json.get(h.value.lower())
@@ -925,7 +926,7 @@ class ParticipantLayer(BaseLayer):
         parsers = {k.value: v for k, v in SeqrMetadataKeys.get_key_parsers().items()}
 
         hpo_col_indices = [
-            lheaders_to_idx_map.get(h.lower())
+            lheaders_to_idx_map[h.lower()]
             for h in SeqrMetadataKeys.get_hpo_keys()
             if h.lower() in lheaders_to_idx_map
         ]

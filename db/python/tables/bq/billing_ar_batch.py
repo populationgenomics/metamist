@@ -37,7 +37,7 @@ class BillingArBatchTable(BillingBaseTable):
 
     async def get_batches_by_ar_guid(
         self, ar_guid: str
-    ) -> tuple[datetime | None, datetime | None, list[str]]:
+    ) -> tuple[datetime, datetime, list[str]] | None:
         """
         Get batches for given ar_guid
         """
@@ -63,18 +63,18 @@ class BillingArBatchTable(BillingBaseTable):
             end_day = max(row.end_day for row in query_job_result) + timedelta(days=1)
             return start_day, end_day, [row.batch_id for row in query_job_result]
 
-        # return empty list if no record found
-        return None, None, []
+        # no records found
+        return None
 
     async def get_ar_guid_by_batch_id(
         self, batch_id: str | None
-    ) -> tuple[datetime | None, datetime | None, str | None]:
+    ) -> tuple[datetime, datetime, str] | None:
         """
         Get ar_guid for given batch_id,
         if batch_id is found, but not ar_guid, then return batch_id back
         """
         if batch_id is None:
-            return None, None, None
+            return None
 
         _query = f"""
         SELECT ar_guid,
@@ -104,7 +104,7 @@ class BillingArBatchTable(BillingBaseTable):
             return start_day, end_day, batch_id
 
         # return None if no ar_guid found
-        return None, None, None
+        return None
 
     async def get_records_first_timestamps(
         self,
@@ -152,9 +152,7 @@ class BillingArBatchTable(BillingBaseTable):
             INNER JOIN sequencing_group sg ON sg.sample_id = s.id
             WHERE s.project = ANY({[project_id]})
         """
-        info_record = await (await connection.pg_connection.execute(_query)).fetchone()
-        assert info_record
-        return info_record.get('cnt', 0)
+        return (await connection.execute_must_fetch_one(_query))['cnt']
 
     async def get_total_crams_info(
         self, connection: Connection, project_id: int
@@ -171,11 +169,8 @@ class BillingArBatchTable(BillingBaseTable):
             AND a.status = 'COMPLETED'
             and a.project = ANY({[project_id]})
         """
-        info_record = await (await connection.pg_connection.execute(_query)).fetchone()
-
-        assert info_record
-        total_crams_size = float(info_record.get('total_crams_size') or 0)
-        return total_crams_size
+        info_record = await connection.execute_must_fetch_one(_query)
+        return float(info_record['total_crams_size'])
 
     async def calculate_storage_cost_using_cram_files_info(
         self,
@@ -355,7 +350,7 @@ class BillingArBatchTable(BillingBaseTable):
         rows = await (await connection.pg_connection.execute(_query)).fetchall()
         projects = {row['project']: row['seq_grps'] for row in rows}
         if not projects:
-            return (None, None)
+            return ({}, {})
 
         # get the project dataset (GCP project names)
         project_names: dict[int, str] = {}
@@ -577,7 +572,7 @@ class BillingArBatchTable(BillingBaseTable):
             seq_id_map,
             sample_id_map,
             sample_to_seq_grp,
-        ) = await self.get_sequencing_groups(connection, query.search_ids)
+        ) = await self.get_sequencing_groups(connection, query.search_ids or [])
 
         # Get all batch_id with min/max day for each of the seq group
         batch_ids = self.get_batch_ids_by_seq_groups(sequencing_groups)

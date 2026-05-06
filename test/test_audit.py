@@ -304,6 +304,7 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
             dataset='dataset',
             output=report_path,
         )
+        assert existing_audit_deletion is not None
         assert existing_audit_deletion['output'] == report_path
         result = self.metamist_data_access.update_audit_deletion_analysis(
             existing_analysis=existing_audit_deletion,
@@ -637,8 +638,10 @@ gs://cpg-dataset-main-upload/file2.bam,512000000,SG02,genome,short-read,illumina
         assert rows[0].filepath == 'gs://cpg-dataset-main-upload/file1.bam'
         assert rows[0].filesize == '2048000000'
         assert rows[0].sg_id == 'SG01'
+        assert rows[0].action is not None
         assert rows[0].action.upper() == 'DELETE'
         assert rows[1].filepath == 'gs://cpg-dataset-main-upload/file2.bam'
+        assert rows[1].action is not None
         assert rows[1].action.upper() == 'REVIEW'
 
     def test_get_report_rows_file_not_exists(self):

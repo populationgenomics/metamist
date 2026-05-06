@@ -2,6 +2,7 @@ import pytest
 from psycopg import IntegrityError
 from psycopg.errors import UniqueViolation
 
+from api.utils import ensure_nonnone
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers import FamilyLayer, ParticipantLayer, SampleLayer
@@ -21,6 +22,7 @@ class TestParticipant:
     @pytest.fixture(autouse=True)
     async def set_up(self, connection_with_project: Connection):
         self.player = ParticipantLayer(connection_with_project)
+        assert connection_with_project.project_id is not None
         self.project_id = connection_with_project.project_id
         self.connection = connection_with_project
 
@@ -33,6 +35,10 @@ class TestParticipant:
                 },
             )
         )
+        assert self.p1.id is not None
+        self.p1_id = self.p1.id
+
+        assert self.p1.external_ids is not None
         self.p1_external_ids = {k.lower(): v for k, v in self.p1.external_ids.items()}
 
         self.p2 = await self.player.upsert_participant(
@@ -40,6 +46,8 @@ class TestParticipant:
                 external_ids={PRIMARY_EXTERNAL_ORG: 'P2'},
             )
         )
+        assert self.p2.id is not None
+        self.p2_id = self.p2.id
 
     async def insert(self, participant_id, org, external_id):
         """Directly insert into participant_external_id table"""
@@ -56,23 +64,23 @@ class TestParticipant:
         """Verify that database constraints prevent duplicate external_ids"""
         # Can't have two primary eids
         with pytest.raises(UniqueViolation):
-            await self.insert(self.p1.id, PRIMARY_EXTERNAL_ORG, 'P86')
+            await self.insert(self.p1_id, PRIMARY_EXTERNAL_ORG, 'P86')
 
         # Can't have two eids in the same external organisation
         with pytest.raises(IntegrityError):
-            await self.insert(self.p1.id, 'control', 'Maxwell')
+            await self.insert(self.p1_id, 'control', 'Maxwell')
 
         # Can have eids in lots of organisations, but not if the eid duplicates one in a different org
-        await self.insert(self.p1.id, 'OTHER1', 'Maxwell')
+        await self.insert(self.p1_id, 'OTHER1', 'Maxwell')
         with pytest.raises(IntegrityError):
-            await self.insert(self.p1.id, 'OTHER2', '86')
+            await self.insert(self.p1_id, 'OTHER2', '86')
 
         # Another participant can't have the same eid
         with pytest.raises(IntegrityError):
-            await self.insert(self.p2.id, 'CONTROL', '86')
+            await self.insert(self.p2_id, 'CONTROL', '86')
 
         # But it can have its own eid
-        await self.insert(self.p2.id, 'CONTROL', '99')
+        await self.insert(self.p2_id, 'CONTROL', '99')
 
     @pytest.mark.asyncio
     async def test_insert(self):
@@ -99,6 +107,7 @@ class TestParticipant:
                 },
             )
         )
+        assert result.id is not None
         participants = await self.player.get_participants_by_ids([result.id])
         assert participants[0].external_ids == {
             PRIMARY_EXTERNAL_ORG: 'P10',
@@ -113,14 +122,14 @@ class TestParticipant:
         with pytest.raises(ValueError):
             _ = await self.player.upsert_participant(
                 ParticipantUpsertInternal(
-                    id=self.p1.id,
+                    id=self.p1_id,
                     external_ids={PRIMARY_EXTERNAL_ORG: None},
                 )
             )
 
         result = await self.player.upsert_participant(
             ParticipantUpsertInternal(
-                id=self.p1.id,
+                id=self.p1_id,
                 external_ids={
                     PRIMARY_EXTERNAL_ORG: 'P1B',
                     'CONTROL': '86B',
@@ -130,6 +139,7 @@ class TestParticipant:
                 },
             )
         )
+        assert result.id is not None
         participants = await self.player.get_participants_by_ids([result.id])
         assert participants[0].external_ids == {
             PRIMARY_EXTERNAL_ORG: 'P1B',
@@ -144,7 +154,7 @@ class TestParticipant:
 
         s1 = await slayer.upsert_sample(
             SampleUpsertInternal(
-                external_ids={PRIMARY_EXTERNAL_ORG: 'E1'}, participant_id=self.p1.id
+                external_ids={PRIMARY_EXTERNAL_ORG: 'E1'}, participant_id=self.p1_id
             ),
         )
         sa = await slayer.upsert_sample(
@@ -154,18 +164,23 @@ class TestParticipant:
             SampleUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'EB', 'foo': 'FB'})
         )
 
+        assert s1.id is not None
+        assert sa.id is not None
+        assert sb.id is not None
+
         result = await self.player.fill_in_missing_participants()
         assert result == 'Updated 2 records'
 
         samples = await slayer.get_samples_by(sample_ids=[s1.id, sa.id, sb.id])
 
         participants = await self.player.get_participants_by_ids(
-            [s.participant_id for s in samples]
+            [ensure_nonnone(s.participant_id) for s in samples]
         )
         p_map = {p.id: p for p in participants}
 
         for s in samples:
             expected_eids = self.p1_external_ids if s.id == s1.id else s.external_ids
+            assert s.participant_id is not None
             assert p_map[s.participant_id].external_ids == expected_eids
 
     @pytest.mark.asyncio
@@ -179,12 +194,13 @@ class TestParticipant:
                 external_ids={PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'}
             ),
         )
+        assert child.id is not None
 
         await self.player.add_participant_to_family(
             family_id=fid,
             participant_id=child.id,
-            paternal_id=self.p1.id,
-            maternal_id=self.p2.id,
+            paternal_id=self.p1_id,
+            maternal_id=self.p2_id,
             affected=2,
         )
 
@@ -208,16 +224,17 @@ class TestParticipant:
                 external_ids={PRIMARY_EXTERNAL_ORG: 'P20', 'd': 'D20'}
             ),
         )
+        assert child.id is not None
 
         await self.player.add_participant_to_family(
             family_id=fid,
             participant_id=child.id,
-            paternal_id=self.p1.id,
-            maternal_id=self.p2.id,
+            paternal_id=self.p1_id,
+            maternal_id=self.p2_id,
             affected=2,
         )
 
-        result = await flayer.get_families_by_participants([child.id, self.p1.id])
+        result = await flayer.get_families_by_participants([child.id, self.p1_id])
         assert len(result) == 1
         assert len(result[child.id]) == 1
         assert result[child.id][0].description == 'Blacksmiths'
@@ -227,16 +244,16 @@ class TestParticipant:
     async def test_update_many(self):
         """Exercise update_many_participant_external_ids() method"""
         result = await self.player.update_many_participant_external_ids(
-            {self.p1.id: 'P1B', self.p2.id: 'P2B'}
+            {self.p1_id: 'P1B', self.p2_id: 'P2B'}
         )
         assert result
 
         participants = await self.player.get_participants_by_ids(
-            [self.p1.id, self.p2.id]
+            [self.p1_id, self.p2_id]
         )
         p_map = {p.id: p for p in participants}
-        outp1 = p_map[self.p1.id]
-        outp2 = p_map[self.p2.id]
+        outp1 = p_map[self.p1_id]
+        outp2 = p_map[self.p2_id]
         assert outp1.external_ids == {
             PRIMARY_EXTERNAL_ORG: 'P1B',
             'control': '86',
@@ -252,14 +269,14 @@ class TestParticipant:
 
         _ = await slayer.upsert_sample(
             SampleUpsertInternal(
-                external_ids={PRIMARY_EXTERNAL_ORG: 'SE1'}, participant_id=self.p1.id
+                external_ids={PRIMARY_EXTERNAL_ORG: 'SE1'}, participant_id=self.p1_id
             ),
         )
 
         s2 = await slayer.upsert_sample(
             SampleUpsertInternal(
                 external_ids={PRIMARY_EXTERNAL_ORG: 'SE2', 'other': 'SO1'},
-                participant_id=self.p1.id,
+                participant_id=self.p1_id,
                 sequencing_groups=[
                     SequencingGroupUpsertInternal(
                         type='genome',
@@ -276,8 +293,8 @@ class TestParticipant:
         )
         assert len(result) == 3
         for eid, sgid in result:
-            assert eid in self.p1.external_ids.values()
-            assert sgid == s2.sequencing_groups[0].id
+            assert eid in ensure_nonnone(self.p1.external_ids).values()
+            assert sgid == ensure_nonnone(s2.sequencing_groups)[0].id
 
 
 class TestSample:
@@ -286,6 +303,7 @@ class TestSample:
     @pytest.fixture(autouse=True)
     async def set_up(self, connection_with_project: Connection):
         self.slayer = SampleLayer(connection_with_project)
+        assert connection_with_project.project_id is not None
         self.project_id = connection_with_project.project_id
         self.connection = connection_with_project
 
@@ -298,12 +316,16 @@ class TestSample:
                 },
             )
         )
+        assert self.s1.id is not None
+        self.s1_id = self.s1.id
 
         self.s2 = await self.slayer.upsert_sample(
             SampleUpsertInternal(
                 external_ids={PRIMARY_EXTERNAL_ORG: 'S2'},
             )
         )
+        assert self.s2.id is not None
+        self.s2_id = self.s2.id
 
     async def insert(self, sample_id, org, external_id):
         """Directly insert into sample_external_id table"""
@@ -322,23 +344,23 @@ class TestSample:
         """Verify that database constraints prevent duplicate external_ids"""
         # Can't have two primary eids
         with pytest.raises(IntegrityError):
-            await self.insert(self.s1.id, PRIMARY_EXTERNAL_ORG, 'S86')
+            await self.insert(self.s1_id, PRIMARY_EXTERNAL_ORG, 'S86')
 
         # Can't have two eids in the same external organisation
         with pytest.raises(IntegrityError):
-            await self.insert(self.s1.id, 'control', 'Maxwell')
+            await self.insert(self.s1_id, 'control', 'Maxwell')
 
         # Can have eids in lots of organisations, but not if the eid duplicates one in a different org
-        await self.insert(self.s1.id, 'OTHER1', 'Maxwell')
+        await self.insert(self.s1_id, 'OTHER1', 'Maxwell')
         with pytest.raises(IntegrityError):
-            await self.insert(self.s1.id, 'OTHER2', '86')
+            await self.insert(self.s1_id, 'OTHER2', '86')
 
         # Another sample can't have the same eid
         with pytest.raises(IntegrityError):
-            await self.insert(self.s2.id, 'CONTROL', '86')
+            await self.insert(self.s2_id, 'CONTROL', '86')
 
         # But it can have its own eid
-        await self.insert(self.s2.id, 'CONTROL', '99')
+        await self.insert(self.s2_id, 'CONTROL', '99')
 
     @pytest.mark.asyncio
     async def test_insert(self):
@@ -365,6 +387,7 @@ class TestSample:
                 },
             )
         )
+        assert result.id is not None
         sample = await self.slayer.get_sample_by_id(result.id)
         assert sample.external_ids == {
             PRIMARY_EXTERNAL_ORG: 'S10',
@@ -379,14 +402,14 @@ class TestSample:
         with pytest.raises(ValueError):
             _ = await self.slayer.upsert_sample(
                 SampleUpsertInternal(
-                    id=self.s1.id,
+                    id=self.s1_id,
                     external_ids={PRIMARY_EXTERNAL_ORG: None},
                 )
             )
 
         result = await self.slayer.upsert_sample(
             SampleUpsertInternal(
-                id=self.s1.id,
+                id=self.s1_id,
                 external_ids={
                     PRIMARY_EXTERNAL_ORG: 'S1B',
                     'CONTROL': '86B',
@@ -396,6 +419,7 @@ class TestSample:
                 },
             )
         )
+        assert result.id is not None
         sample = await self.slayer.get_sample_by_id(result.id)
         assert sample.external_ids == {
             PRIMARY_EXTERNAL_ORG: 'S1B',
@@ -412,18 +436,18 @@ class TestSample:
             )
 
         result = await self.slayer.get_single_by_external_id('86', self.project_id)
-        assert result.id == self.s1.id
+        assert result.id == self.s1_id
 
         result = await self.slayer.get_single_by_external_id('S2', self.project_id)
-        assert result.id == self.s2.id
+        assert result.id == self.s2_id
 
     @pytest.mark.asyncio
     async def test_get_internal_to_external(self):
         """Exercise get_internal_to_external_sample_id_map() method"""
         result = await self.slayer.get_internal_to_external_sample_id_map(
-            [self.s1.id, self.s2.id]
+            [self.s1_id, self.s2_id]
         )
-        assert result == {self.s1.id: 'S1', self.s2.id: 'S2'}
+        assert result == {self.s1_id: 'S1', self.s2_id: 'S2'}
 
     @pytest.mark.asyncio
     async def test_get_all(self):
@@ -431,7 +455,7 @@ class TestSample:
         result = await self.slayer.get_all_sample_id_map_by_internal_ids(
             self.project_id
         )
-        assert result == {self.s1.id: 'S1', self.s2.id: 'S2'}
+        assert result == {self.s1_id: 'S1', self.s2_id: 'S2'}
 
     @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
@@ -439,20 +463,20 @@ class TestSample:
         """Exercise get_history_of_sample() method"""
         # First create some history
         await self.slayer.upsert_sample(
-            SampleUpsertInternal(id=self.s1.id, meta={'foo': 'bar'})
+            SampleUpsertInternal(id=self.s1_id, meta={'foo': 'bar'})
         )
 
         await self.slayer.upsert_sample(
             SampleUpsertInternal(
-                id=self.s1.id,
+                id=self.s1_id,
                 external_ids={'fruit': 'apple'},
                 meta={'fruit': 'banana'},
             )
         )
 
-        sample = await self.slayer.get_sample_by_id(self.s1.id)
+        sample = await self.slayer.get_sample_by_id(self.s1_id)
 
-        result = await self.slayer.get_history_of_sample(self.s1.id)
+        result = await self.slayer.get_history_of_sample(self.s1_id)
         assert len(result) == 3
         assert result[0].meta == {}
         assert result[1].meta == {'foo': 'bar'}

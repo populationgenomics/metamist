@@ -4,6 +4,7 @@ from db.python.tables.sample import SampleTable
 from models.models.assay import AssayInternal, AssayUpsertInternal
 from models.models.project import (
     FullWriteAccessRoles,
+    ProjectId,
     ReadAccessRoles,
 )
 
@@ -17,7 +18,7 @@ class AssayLayer(BaseLayer):
         self.sampt = SampleTable(connection)
 
     # GET
-    async def query(self, filter_: AssayFilter = None):
+    async def query(self, filter_: AssayFilter):
         """Query for samples"""
 
         projects, assays = await self.seqt.query(filter_)
@@ -42,7 +43,7 @@ class AssayLayer(BaseLayer):
         return assay
 
     async def get_assay_by_external_id(
-        self, external_assay_id: str, project: int = None
+        self, external_assay_id: str, project: ProjectId | None = None
     ):
         """
         Get assay from an external ID you must have a project specified on the
@@ -96,7 +97,7 @@ class AssayLayer(BaseLayer):
                 sample_id=assay.sample_id,
                 assay_type=assay.type,
                 meta=assay.meta,
-                external_ids=assay.external_ids,
+                external_ids=assay.external_ids,  # type: ignore
                 project=list(project_ids)[0],
             )
             assay.id = seq_id

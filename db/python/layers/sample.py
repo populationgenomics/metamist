@@ -1,7 +1,7 @@
 import datetime
 from typing import Any, NamedTuple
 
-from api.utils import group_by
+from api.utils import ensure_nonnone, group_by
 from db.python.filters import GenericFilter
 from db.python.layers.assay import AssayLayer
 from db.python.layers.base import BaseLayer, Connection
@@ -66,7 +66,7 @@ class SampleLayer(BaseLayer):
             projects, allowed_roles=ReadAccessRoles
         )
 
-        grouped_samples = group_by(samples, lambda s: s.participant_id)
+        grouped_samples = group_by(samples, lambda s: ensure_nonnone(s.participant_id))
 
         return grouped_samples
 
@@ -94,7 +94,7 @@ class SampleLayer(BaseLayer):
     async def get_sample_id_map_by_external_ids(
         self,
         external_ids: list[str],
-        project: ProjectId,
+        project: ProjectId | None = None,
         allow_missing=False,
     ) -> dict[str, int]:
         """Get map of samples {(any) external_id: internal_id}"""
@@ -241,7 +241,7 @@ class SampleLayer(BaseLayer):
                 s = r.sample
                 if not s.id:
                     s.id = await self.st.insert_sample(
-                        external_ids=s.external_ids,
+                        external_ids=s.external_ids or {},  # type: ignore
                         sample_type=s.type,
                         active=True,
                         meta=s.meta,
@@ -276,16 +276,14 @@ class SampleLayer(BaseLayer):
                     for assay in sample.non_sequencing_assays:
                         assay.sample_id = sample.id
                     if process_assays:
-                        await alayer.upsert_assays(
-                            sample.non_sequencing_assays, open_transaction=False
-                        )
+                        await alayer.upsert_assays(sample.non_sequencing_assays)
 
         return sample
 
     async def upsert_samples(
         self,
         samples: list[SampleUpsertInternal],
-        project: ProjectId = None,
+        project: ProjectId | None = None,
     ) -> list[SampleUpsertInternal]:
         """Batch upsert a list of samples with sequences"""
         seqglayer: SequencingGroupLayer = SequencingGroupLayer(self.connection)
@@ -321,7 +319,7 @@ class SampleLayer(BaseLayer):
             ]
             if assays:
                 alayer = AssayLayer(self.connection)
-                await alayer.upsert_assays(assays, open_transaction=False)
+                await alayer.upsert_assays(assays)
 
         return samples
 

@@ -80,6 +80,7 @@ def authenticate(
         # We have to PREFER the IAP's identity, otherwise you could have a case where
         # the JWT is forged, but IAP lets it through and authenticates, but then we take
         # the identity then without checking.
+        assert EXPECTED_AUDIENCE is not None
         author = validate_iap_jwt_and_get_email(
             x_goog_iap_jwt_assertion, audience=EXPECTED_AUDIENCE
         )
@@ -217,7 +218,7 @@ async def dependable_get_bq_connection(author: str = Depends(authenticate)):
 
 
 async def dependable_get_pubsub_connection(
-    author: str = Depends(authenticate), topic: str = None
+    author: str = Depends(authenticate), topic: str | None = None
 ):
     """FastAPI handler for getting connection withOUT project"""
     return await PubSubConnection.get_connection_no_project(author, topic)

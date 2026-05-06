@@ -1,10 +1,10 @@
 import asyncio
+import datetime
 import os
 import re
 import traceback
 from collections import defaultdict
 from collections.abc import Iterable, Iterator
-from datetime import datetime
 from typing import TypeVar
 
 import aiohttp
@@ -16,6 +16,7 @@ from cloudpathlib import AnyPath
 from cpg_utils.cloud import get_google_identity_token
 
 from api.settings import (
+    FAR_FUTURE,
     SEQR_AUDIENCE,
     SEQR_MAP_LOCATION,
     SEQR_SLACK_NOTIFICATION_CHANNEL,
@@ -108,6 +109,8 @@ class SeqrLayer(BaseLayer):
     async def get_synchronisable_types(self, project: Project) -> list[str]:
         """Check the project meta to find out which sequencing_types are synchronisable"""
         sequencing_types = await SequencingTypeTable(connection=self.connection).get()
+        if project.meta is None:
+            return []
         sts = [
             st
             for st in sequencing_types
@@ -122,7 +125,7 @@ class SeqrLayer(BaseLayer):
         sync_individual_metadata: bool = True,
         sync_individuals: bool = True,
         sync_es_index: bool = True,
-        es_index_types: list[SeqrDatasetType] = None,
+        es_index_types: list[SeqrDatasetType] | None = None,
         sync_saved_variants: bool = True,
         sync_cram_map: bool = True,
         post_slack_notification: bool = True,
@@ -210,6 +213,7 @@ class SeqrLayer(BaseLayer):
                     )
                 )
             if sync_es_index:
+                assert es_index_types is not None
                 promises.append(
                     self.update_es_index(
                         sequencing_type=sequencing_type,
@@ -367,15 +371,15 @@ class SeqrLayer(BaseLayer):
         messages = []
         if sequencing_group_ids:
             es_index_analyses = sorted(
-                es_index_analyses, key=lambda el: el.timestamp_completed
+                es_index_analyses, key=lambda el: el.timestamp_completed or FAR_FUTURE
             )
             sequencing_groups_in_new_index = set(
-                es_index_analyses[-1].sequencing_group_ids
+                es_index_analyses[-1].sequencing_group_ids or []
             )
 
             if len(es_index_analyses) > 1:
                 sequencing_groups_in_old_index = set(
-                    es_index_analyses[-2].sequencing_group_ids
+                    es_index_analyses[-2].sequencing_group_ids or []
                 )
                 sequencing_groups_diff = sequencing_group_id_format_list(
                     sequencing_groups_in_new_index - sequencing_groups_in_old_index
@@ -443,7 +447,8 @@ class SeqrLayer(BaseLayer):
             if not any(sid in s for sid in SEQUENCING_GROUPS_TO_IGNORE)
         ]
 
-        filename = f'{project_guid}_pid_sgid_map_{datetime.now().isoformat()}.tsv'
+        now = datetime.datetime.now()
+        filename = f'{project_guid}_pid_sgid_map_{now.isoformat()}.tsv'
         # remove any non-filename compliant filenames
         filename = re.sub(r'[/\\?%*:|\'<>\x7F\x00-\x1F]', '-', filename)
 
@@ -481,7 +486,7 @@ class SeqrLayer(BaseLayer):
 
             es_indexes_filtered_by_type = sorted(
                 es_indexes_filtered_by_type,
-                key=lambda el: el.timestamp_completed,
+                key=lambda el: el.timestamp_completed or FAR_FUTURE,
             )
 
             es_index = es_indexes_filtered_by_type[-1].output

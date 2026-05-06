@@ -10,6 +10,7 @@ from db.python.filters import (
     GenericFilter,
     GenericFilterModel,
     GenericMetaFilter,
+    join_sql_with_AND,
 )
 from db.python.tables.base import DbBase
 from db.python.utils import NotFoundError, to_db_json
@@ -95,8 +96,7 @@ class AnalysisTable(DbBase):
                 RETURNING id
             """
 
-            acur = await self.connection.pg_connection.execute(_query)
-            row = await acur.fetchone()
+            row = await self.connection.execute_must_fetch_one(_query)
             id_of_new_analysis = row['id']
 
             if sequencing_group_ids:
@@ -314,13 +314,14 @@ class AnalysisTable(DbBase):
                     analysis_files[row['analysis_id']]['output'] = ''
 
                 # if analysis_files[row['analysis_id']]['outputs'] is a str, we set it to a list and append the str to it:
-                if isinstance(analysis_files[row['analysis_id']]['outputs'], str):
-                    analysis_files[row['analysis_id']]['outputs'] = [
-                        analysis_files[row['analysis_id']]['outputs']  # type: ignore [list-item]
-                    ]
-                analysis_files[row['analysis_id']]['outputs'].append(  # type: ignore [union-attr]
-                    (file_internal, row['json_structure'])
-                )
+                outputs = analysis_files[row['analysis_id']]['outputs']
+                new_output = (file_internal, row['json_structure'] or '')
+                if isinstance(outputs, str):
+                    outputs = [outputs, new_output]
+                else:
+                    outputs.append(new_output)
+
+                analysis_files[row['analysis_id']]['outputs'] = outputs
             else:
                 # If no file_id, just set to the output.
                 analysis_files[row['analysis_id']]['output'] = row['output']
@@ -543,7 +544,7 @@ class AnalysisTable(DbBase):
         if participant_ids:
             where_conditions.append(t'peid.participant_id = ANY({participant_ids})')
 
-        where_clause = sql.SQL(' AND ').join(where_conditions)
+        where_clause = join_sql_with_AND(where_conditions)
 
         _query = t"""
             SELECT a.id, peid.external_id as participant_id, a.output as output, sg.id as sequencing_group_id

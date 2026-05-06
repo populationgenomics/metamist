@@ -6,7 +6,7 @@ from dateutil.relativedelta import relativedelta
 from psycopg import sql
 from psycopg.rows import class_row
 
-from db.python.filters.generic import GenericFilter
+from db.python.filters.generic import GenericFilter, join_sql_with_AND
 from db.python.filters.sequencing_group import SequencingGroupFilter
 from db.python.tables.base import DbBase
 from db.python.utils import InternalError, to_db_json
@@ -145,7 +145,7 @@ class SequencingGroupTable(DbBase):
         )
         where_templates.append(remaining_filters)
 
-        where = t'WHERE {sql.SQL(" AND ").join(where_templates):q}'
+        where = t'WHERE {join_sql_with_AND(where_templates):q}'
 
         base_query_components.append(where)
 
@@ -344,7 +344,7 @@ class SequencingGroupTable(DbBase):
                 sg_map[sid] = SequencingGroupInternal(**row)
 
         analysis_map: dict[int, list[SequencingGroupInternal]] = {
-            analysis_id: [sg_map.get(sgid) for sgid in sgids]
+            analysis_id: [sg_map[sgid] for sgid in sgids]
             for analysis_id, sgids in mapped_analysis_to_sequencing_group_id.items()
         }
 

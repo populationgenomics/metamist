@@ -1,13 +1,19 @@
 import dataclasses
 import json
 from collections import defaultdict
+from collections.abc import Mapping
 from string.templatelib import Template
 from typing import Any, NamedTuple
 
 from psycopg import sql
 from psycopg.types.json import Jsonb
 
-from db.python.filters import GenericFilter, GenericFilterModel, GenericMetaFilter
+from db.python.filters import (
+    GenericFilter,
+    GenericFilterModel,
+    GenericMetaFilter,
+    join_sql_with_AND,
+)
 from db.python.tables.base import DbBase
 from db.python.utils import NotFoundError
 from models.models.assay import AssayId, AssayInternal
@@ -217,7 +223,7 @@ class AssayTable(DbBase):
                 )
             )
 
-        wheres_q = sql.SQL(' AND ').join(wheres)
+        wheres_q = join_sql_with_AND(wheres)
 
         _query = t"""
             SELECT
@@ -258,7 +264,7 @@ class AssayTable(DbBase):
         self,
         sample_id: int,
         external_ids: dict[str, str] | None,
-        assay_type: str,
+        assay_type: str | None,
         meta: dict[str, Any] | None,
         project: int | None = None,
     ) -> int:
@@ -304,9 +310,7 @@ class AssayTable(DbBase):
                     'audit_log_id': await self.audit_log_id(),
                 },
             )
-            row = await cur.fetchone()
-            assert row
-            id_of_new_assay = row['id']
+            id_of_new_assay = (await self.connection.must_fetch_one(cur))['id']
 
             if external_ids:
                 _project = project or self.project_id
@@ -344,7 +348,7 @@ class AssayTable(DbBase):
         self,
         assay_id: int,
         *,
-        external_ids: dict[str, str | None] | None = None,
+        external_ids: Mapping[str, str | None] | None = None,
         meta: dict[str, Any] | None = None,
         assay_type: str | None = None,
         sample_id: int | None = None,

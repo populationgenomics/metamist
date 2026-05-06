@@ -1,6 +1,6 @@
 import dataclasses
 import datetime
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from enum import Enum
 from string.templatelib import Template
 from typing import Any, TypeVar
@@ -37,6 +37,17 @@ def get_hashable_value(value):  # noqa: PLR0911
         return value.get_hashable_value()
 
     return hash(value)
+
+
+def is_literally_TRUE(s: Template):  # noqa: N802 allow ..._TRUE name
+    """Return whether the template argument is just t'TRUE' exactly"""
+    return len(s.strings) == 1 and s.strings[0] == 'TRUE'
+
+
+def join_sql_with_AND(clauses: list[Template]) -> Template:  # noqa: N802 allow ..._AND name
+    """Join SQL snippets with AND, dropping redundant '...AND TRUE AND...' entries"""
+    nontrivial = [sql for sql in clauses if not is_literally_TRUE(sql)]
+    return sql.SQL(' AND ').join(nontrivial) if len(nontrivial) > 0 else t'TRUE'
 
 
 class GenericFilter[T](SMBase):
@@ -101,7 +112,7 @@ class GenericFilter[T](SMBase):
         """Override to ensure we can hash this object"""
         return hash(self.get_hashable_value())
 
-    def to_sql(self, column: str | Template) -> Template | None:
+    def to_sql(self, column: str | Template) -> Template:
         """
         Convert to SQL, and avoid SQL injection.
 
@@ -115,7 +126,7 @@ class GenericFilter[T](SMBase):
         Returns:
             Template
         """
-        filters: list[Template | None] = []
+        filters: list[Template] = []
 
         # MARIADB BACKWARDS COMPATIBILITY:
         # Goal: Make all string comparisions case insensitive
@@ -195,11 +206,7 @@ class GenericFilter[T](SMBase):
             else:
                 filters.append(t'{column_query:q} IS NOT NULL')
 
-        filters_rm_none: list[Template] = [f for f in filters if f is not None]
-        if len(filters_rm_none) == 0:
-            return None
-
-        return sql.SQL(' AND ').join(filters_rm_none)
+        return join_sql_with_AND(filters)
 
     def transform(self, func: Callable[[T], X]) -> GenericFilter[X]:
         """
@@ -326,10 +333,10 @@ class GenericFilterModel:
 
     def to_sql(
         self,
-        field_overrides: dict[str, str] | None = None,
+        field_overrides: Mapping[str, str | Template] | None = None,
         only: list[str] | None = None,
         exclude: list[str] | None = None,
-    ) -> Template | None:
+    ) -> Template:
         """Convert the model to SQL, and avoid SQL injection"""
 
         _foverrides = field_overrides or {}
@@ -344,7 +351,7 @@ class GenericFilterModel:
             )
 
         fields = dataclasses.fields(self)
-        filters: list[Template | None] = []
+        filters: list[Template] = []
         for field in fields:
             if only and field.name not in only:
                 continue
@@ -366,18 +373,13 @@ class GenericFilterModel:
                         f'Filter {field.name} must be a GenericFilter or dict[str, GenericFilter]'
                     )
 
-        filters_rm_none: list[Template] = [f for f in filters if f is not None]
-
-        if len(filters_rm_none) == 0:
-            return None
-
-        return sql.SQL(' AND ').join(filters_rm_none)
+        return join_sql_with_AND(filters)
 
 
 def prepare_query_from_dict_field(
     filter_: dict[str, Any],
     column_name: str | Template,
-) -> Template | None:
+) -> Template:
     """
     Prepare a SQL query from a dict field, which is a dict of GenericFilters.
     Usually this is a JSON field in the database that we want to query on.
@@ -418,14 +420,12 @@ def prepare_query_from_dict_field(
             t"json_query(a, '$' returning {pg_type:i} omit quotes)"
         )
 
-        if _inner_query:
+        if not is_literally_TRUE(_inner_query):
             conditionals.append(t"""
             exists (
                 select 1 FROM (SELECT 1) AS dummy_row -- need at least one row for negation comparisons to work
                 LEFT JOIN LATERAL jsonb_path_query({column_query:q}, ('$.' || {key})::jsonpath) a ON TRUE
                 where {_inner_query:q}
             )""")
-    if not conditionals:
-        return None
 
-    return sql.SQL(' AND ').join(conditionals)
+    return join_sql_with_AND(conditionals)

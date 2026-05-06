@@ -35,7 +35,7 @@ class FunctionBQFilter:
         self,
         column_name: BillingColumn,
         func_params: str | list[Any] | dict[Any, Any] | None = None,
-        func_operator: str = None,
+        func_operator: str | None = None,
     ) -> tuple[str, list[bigquery.ScalarQueryParameter | bigquery.ArrayQueryParameter]]:
         """
         creates the left side of where :  FUN(column_name, @params)

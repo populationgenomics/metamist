@@ -20,6 +20,7 @@ from models.models import (
     SequencingGroupUpsertInternal,
 )
 from models.models.analysis import AnalysisInternal
+from models.models.output_file import RecursiveDict
 
 
 def custom_get_gcs_client():
@@ -93,6 +94,7 @@ async def fake_sequencing_group(connection_with_project: Connection) -> int:
     )
 
     assert sample.sequencing_groups
+    assert sample.sequencing_groups[0].id
     return sample.sequencing_groups[0].id
 
 
@@ -430,6 +432,7 @@ class TestOutputFiles:
         assert (await row_count('output_file')) == 3
 
         proj_permission_table = ProjectPermissionsTable(connection_with_project)
+        assert connection_with_project.project is not None
         project = connection_with_project.project
         assert await proj_permission_table.delete_project_data(project)
 
@@ -446,7 +449,7 @@ class TestOutputFiles:
         analysis_layer = AnalysisLayer(connection_with_project)
         output_file_table = OutputFileTable(connection_with_project)
 
-        outputs = {
+        outputs: RecursiveDict = {
             'cram': {
                 'basename': 'gs://fakegcs/file3.cram',
                 'secondary_files': {
@@ -468,7 +471,7 @@ class TestOutputFiles:
         )
 
         # Helper to view rows in a table
-        async def all_rows(table: str) -> int:
+        async def all_rows(table: str) -> list[dict[str, Any]]:
             cur = await connection_with_project.pg_connection.execute(
                 t'SELECT * FROM {table:i}'
             )

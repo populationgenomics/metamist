@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from models.base import OpenApiGenNoneType, SMBase, parse_sql_bool, parse_sql_dict
 from models.models.assay import Assay, AssayInternal, AssayUpsert, AssayUpsertInternal
 from models.models.sequencing_group import (
@@ -30,10 +32,10 @@ class SampleInternal(SMBase):
         """
         _id = d.pop('id', None)
         type_ = d.pop('type', None)
-        meta = parse_sql_dict(d.pop('meta', None)) or {}
+        meta = parse_sql_dict(d.pop('meta', None) or {})
         active = parse_sql_bool(d.pop('active', None))
 
-        external_ids = parse_sql_dict(d.pop('external_ids', None))
+        external_ids = parse_sql_dict(d.pop('external_ids', None) or {})
 
         if not external_ids:
             raise ValueError(f'Sample {sample_id_format(_id)} has no external_ids')
@@ -103,7 +105,7 @@ class SampleUpsertInternal(SMBase):
     """Internal upsert model for sample"""
 
     id: int | None = None
-    external_ids: dict[str, str | None] | None = None
+    external_ids: Mapping[str, str | None] | None = None
     meta: dict | None = None
     project: int | None = None
     type: str | None = None

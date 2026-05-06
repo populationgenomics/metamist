@@ -1,6 +1,7 @@
 import codecs
 import csv
 import io
+from collections.abc import Mapping
 from datetime import date
 from typing import Annotated, Any
 
@@ -30,7 +31,7 @@ class FamilyUpdateModel(BaseModel):
     """Model for updating a family"""
 
     id: int
-    external_ids: dict[str, str] | None = None
+    external_ids: Mapping[str, str | None] | None = None
     description: str | None = None
     coded_phenotype: str | None = None
     meta: dict[str, Any] | None = None

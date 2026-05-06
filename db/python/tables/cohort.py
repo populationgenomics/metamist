@@ -5,7 +5,7 @@ from psycopg import sql
 from psycopg.rows import class_row, scalar_row
 from psycopg.types.json import Jsonb
 
-from db.python.filters import GenericFilter, GenericFilterModel
+from db.python.filters import GenericFilter, GenericFilterModel, is_literally_TRUE
 from db.python.tables.base import DbBase
 from db.python.utils import NotFoundError
 from models.base import parse_sql_bool
@@ -69,7 +69,7 @@ class CohortTable(DbBase):
                 'project': 'c.project',
             }
         )
-        if where_params is None and filter_status is None:
+        if is_literally_TRUE(where_params) and filter_status is None:
             raise ValueError(f'Invalid filter: {filter_}')
 
         where_sub_query = (
@@ -128,7 +128,7 @@ class CohortTable(DbBase):
 
         wheres_params = filter_.to_sql(field_overrides={})
 
-        if wheres_params is None:
+        if is_literally_TRUE(wheres_params):
             raise ValueError(f'Invalid filter: {filter_}')
 
         _query = t'SELECT id, name, description, criteria, project FROM cohort_template WHERE {wheres_params:q}'
@@ -174,6 +174,7 @@ class CohortTable(DbBase):
 
         async with self.connection.pg_connection.cursor(row_factory=scalar_row) as cur:
             cohort_template_id = await (await cur.execute(_query)).fetchone()
+            assert isinstance(cohort_template_id, int)
 
         return cohort_template_id
 
@@ -293,12 +294,14 @@ class CohortTable(DbBase):
 
         row = await (await self.connection.pg_connection.execute(_query)).fetchone()
         if row:
-            return parse_sql_bool(row['is_invalid'])
+            is_invalid = parse_sql_bool(row['is_invalid'])
+            assert is_invalid is not None
+            return is_invalid
         return False
 
 
 def _custom_matches_filter(
-    status: CohortStatus, filter_: GenericFilter[CohortStatus]
+    status: CohortStatus, filter_: GenericFilter[CohortStatus] | None
 ) -> bool:
     """
     Util method to filter based on cohort status

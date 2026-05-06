@@ -64,6 +64,7 @@ def etl_notify(request: flask.Request):
             'message': f'Failed to format message: {e}',
         }, 500
 
+    assert SLACK_CHANNEL is not None
     success = None
     try:
         client = WebClient(token=SLACK_BOT_TOKEN)
@@ -108,7 +109,7 @@ def format_slack(message: dict[str, Any]) -> Any | None:
     return message_sections
 
 
-def decode_message(jbody: dict[str, Any]) -> Any | None:
+def decode_message(jbody: dict[str, Any] | None) -> Any | None:
     """
     Decode the message from payload
 

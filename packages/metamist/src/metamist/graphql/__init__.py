@@ -9,16 +9,13 @@ from json.decoder import JSONDecodeError
 from typing import Any, Dict  # noqa: UP035
 
 import backoff
-from gql import Client
+from gql import Client, GraphQLRequest
 from gql import gql as gql_constructor
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.aiohttp import log as aiohttp_logger
 from gql.transport.exceptions import TransportServerError
 from gql.transport.requests import RequestsHTTPTransport
 from gql.transport.requests import log as requests_logger
-
-# this does not import itself, it imports the module
-from graphql import DocumentNode  # type: ignore
 from requests.exceptions import HTTPError
 
 import metamist.configuration
@@ -44,10 +41,10 @@ def get_sm_url():
 
 
 def configure_sync_client(
-    url: str = None,
-    schema: str = None,
-    auth_token: str = None,
-    force_recreate=False,
+    url: str | None = None,
+    schema: str | None = None,
+    auth_token: str | None = None,
+    force_recreate: bool = False,
     use_local_schema: bool = False,
 ):
     """Get sync gql Client"""
@@ -80,7 +77,10 @@ def configure_sync_client(
 
 
 async def configure_async_client(
-    url: str = None, schema: str = None, auth_token: str = None, force_recreate=False
+    url: str | None = None,
+    schema: str | None = None,
+    auth_token: str | None = None,
+    force_recreate: bool = False,
 ) -> Client:
     """Configure an async client for use with the Metamist GraphQL API"""
     global _async_client  # noqa: PLW0603
@@ -112,7 +112,7 @@ async def get_async_client():
 
 def gql(
     request_string: str, should_validate=False, use_local_schema=False
-) -> DocumentNode:
+) -> GraphQLRequest:
     """
     Given a String containing a GraphQL request, parse it into a Document.
     Optionally validate by fetching schema from metamist at SM_URL / SM_ENVIRONMENT
@@ -123,7 +123,7 @@ def gql(
     return doc
 
 
-def validate(doc: DocumentNode, client=None, use_local_schema=False):
+def validate(doc: GraphQLRequest, client=None, use_local_schema=False):
     """
     Validate a GraphQL document against the schema.
     Fetch schema from SM_URL / SM_ENVIRONMENT
@@ -147,7 +147,7 @@ def validate(doc: DocumentNode, client=None, use_local_schema=False):
     max_time=60,
 )
 def query(
-    _query: str | DocumentNode,
+    _query: str | GraphQLRequest,
     variables: dict | None = None,
     client: Client | None = None,
     log_response: bool = False,
@@ -162,7 +162,7 @@ def query(
         requests_logger.setLevel('WARNING')
 
     response = (client or configure_sync_client()).execute_sync(
-        _query if isinstance(_query, DocumentNode) else gql(_query),
+        _query if isinstance(_query, GraphQLRequest) else gql(_query),
         variable_values=variables,
     )
 
@@ -180,7 +180,7 @@ def query(
     max_time=60,
 )
 async def query_async(
-    _query: str | DocumentNode,
+    _query: str | GraphQLRequest,
     variables: dict | None = None,
     client: Client | None = None,
     log_response: bool = False,
@@ -198,7 +198,7 @@ async def query_async(
         client = await configure_async_client()
 
     response = await client.execute_async(
-        _query if isinstance(_query, DocumentNode) else gql(_query),
+        _query if isinstance(_query, GraphQLRequest) else gql(_query),
         variable_values=variables,
     )
 

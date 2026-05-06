@@ -1,7 +1,7 @@
 import dataclasses
 from string.templatelib import Template
 
-from db.python.filters import GenericFilter, GenericFilterModel
+from db.python.filters import GenericFilter, GenericFilterModel, is_literally_TRUE
 from db.python.tables.base import DbBase
 from models.models.family import PedRowInternal
 from models.models.project import ProjectId
@@ -101,7 +101,7 @@ class FamilyParticipantTable(DbBase):
         """
 
         where_params: Template = filter_.to_sql()
-        if where_params is None:
+        if is_literally_TRUE(where_params):
             raise ValueError('No filter provided')
 
         join_type = t'LEFT' if include_participants_not_in_families else t'INNER'

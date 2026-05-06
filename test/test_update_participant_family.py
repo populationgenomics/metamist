@@ -21,13 +21,13 @@ class TestParticipantFamily:
         await fl.update_family(self.fid_2, external_ids={'otherorg': 'OFAM02'})
 
         self.pl = ParticipantLayer(connection_with_project)
-        self.pid = (
-            await self.pl.upsert_participant(
-                ParticipantUpsertInternal(
-                    external_ids={PRIMARY_EXTERNAL_ORG: 'EX01'}, reported_sex=2
-                )
+        upserted = await self.pl.upsert_participant(
+            ParticipantUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'EX01'}, reported_sex=2
             )
-        ).id
+        )
+        assert upserted.id
+        self.pid = upserted.id
         self.pat_pid = (
             await self.pl.upsert_participant(
                 ParticipantUpsertInternal(
@@ -35,6 +35,7 @@ class TestParticipantFamily:
                 )
             )
         ).id
+        assert self.pat_pid
         self.mat_pid = (
             await self.pl.upsert_participant(
                 ParticipantUpsertInternal(
@@ -42,6 +43,7 @@ class TestParticipantFamily:
                 )
             )
         ).id
+        assert self.mat_pid
 
         await self.pl.add_participant_to_family(
             family_id=self.fid_1,
@@ -60,6 +62,9 @@ class TestParticipantFamily:
         fp_row = await self.pl.get_family_participant_data(
             family_id=self.fid_1, participant_id=self.pid
         )
+        assert fp_row.paternal_id
+        assert fp_row.maternal_id
+        assert fp_row.affected
 
         expected_fp_row = {
             'family_id': self.fid_1,

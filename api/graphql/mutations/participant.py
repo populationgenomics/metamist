@@ -88,9 +88,10 @@ class ParticipantMutations:
                     strawberry.asdict(participant)
                 ).to_internal()
             )
+            assert upserted.id
             updated_participant = (await player.get_participants_by_ids([upserted.id]))[
                 0
-            ]  # type: ignore [attr-defined]
+            ]
 
             return GraphQLParticipant.from_internal(updated_participant)
 

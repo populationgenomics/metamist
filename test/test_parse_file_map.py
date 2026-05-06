@@ -13,12 +13,16 @@ from test.conftest import GraphQLQueryFunction, make_graphql_query_mock
 class TestSampleMapParser:
     """Test the TestSampleMapParser"""
 
+    @pytest.fixture(autouse=True)
+    async def set_up(self, connection_with_project: Connection):
+        assert connection_with_project.project is not None
+        self.project = connection_with_project.project
+
     @pytest.mark.asyncio
     @patch('metamist.parser.generic_parser.query_async')
     async def test_single_row_fastq(
         self,
         mock_graphql_query,
-        connection_with_project: Connection,
         graphql_query: GraphQLQueryFunction,
     ):
         """
@@ -33,7 +37,7 @@ class TestSampleMapParser:
         ]
         parser = SampleFileMapParser(
             search_locations=[],
-            project=connection_with_project.project.name,
+            project=self.project.name,
             default_sequencing=DefaultSequencing(),
         )
         fs = ['<sample-id>.filename-R1.fastq.gz', '<sample-id>.filename-R2.fastq.gz']
@@ -88,7 +92,6 @@ class TestSampleMapParser:
     async def test_to_external(
         self,
         mock_graphql_query,
-        connection_with_project: Connection,
         graphql_query: GraphQLQueryFunction,
     ):
         """
@@ -103,7 +106,7 @@ class TestSampleMapParser:
         ]
         parser = SampleFileMapParser(
             search_locations=[],
-            project=connection_with_project.project.name,
+            project=self.project.name,
             default_sequencing=DefaultSequencing(),
         )
         fs = ['<sample-id>.filename-R1.fastq.gz', '<sample-id>.filename-R2.fastq.gz']
@@ -123,7 +126,6 @@ class TestSampleMapParser:
     async def test_two_rows_with_provided_checksums(
         self,
         mock_graphql_query,
-        connection_with_project: Connection,
         graphql_query: GraphQLQueryFunction,
     ):
         """
@@ -141,7 +143,7 @@ class TestSampleMapParser:
         parser = SampleFileMapParser(
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
-            project=connection_with_project.project.name,
+            project=self.project.name,
         )
         fs = [
             '<sample-id>.filename-R1.fastq.gz',
@@ -217,7 +219,6 @@ class TestSampleMapParser:
     async def test_valid_rna_rows(
         self,
         mock_graphql_query,
-        connection_with_project: Connection,
         graphql_query: GraphQLQueryFunction,
     ):
         """
@@ -235,7 +236,7 @@ class TestSampleMapParser:
         parser = SampleFileMapParser(
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
-            project=connection_with_project.project.name,
+            project=self.project.name,
         )
         fs = [
             '<sample-id>.filename-R1.fastq.gz',
@@ -281,7 +282,6 @@ class TestSampleMapParser:
     async def test_invalid_rna_row(
         self,
         mock_graphql_query,
-        connection_with_project: Connection,
         graphql_query: GraphQLQueryFunction,
     ):
         """
@@ -297,7 +297,7 @@ class TestSampleMapParser:
         parser = SampleFileMapParser(
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
-            project=connection_with_project.project.name,
+            project=self.project.name,
         )
         fs = [
             '<sample-id>.filename-R1.fastq.gz',
@@ -317,7 +317,6 @@ class TestSampleMapParser:
     async def test_rna_row_with_default_field_values(
         self,
         mock_graphql_query,
-        connection_with_project: Connection,
         graphql_query: GraphQLQueryFunction,
     ):
         """
@@ -333,7 +332,7 @@ class TestSampleMapParser:
         parser = SampleFileMapParser(
             search_locations=[],
             # doesn't matter, we're going to mock the call anyway
-            project=connection_with_project.project.name,
+            project=self.project.name,
             default_sequencing=DefaultSequencing(facility='VCGS', library='TSStrmRNA'),
             default_read_end_type='paired',
             default_read_length=151,

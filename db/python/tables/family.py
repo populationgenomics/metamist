@@ -1,5 +1,6 @@
 import dataclasses
 from collections import defaultdict
+from collections.abc import Mapping
 from string.templatelib import Template
 from typing import Any
 
@@ -137,7 +138,7 @@ class FamilyTable(DbBase):
 
         for row in rows:
             pid = row.pop('participant_id')
-            projects.add(row.get('project'))
+            projects.add(row['project'])
             ret_map[pid].append(FamilyInternal(**row))
 
         return projects, ret_map
@@ -181,7 +182,7 @@ class FamilyTable(DbBase):
     async def update_family(
         self,
         id_: int,
-        external_ids: dict[str, str | None] | None = None,
+        external_ids: Mapping[str, str | None] | None = None,
         description: str | None = None,
         coded_phenotype: str | None = None,
         meta: dict[str, Any] | None = None,
@@ -281,6 +282,7 @@ class FamilyTable(DbBase):
             RETURNING id
             """)
             new_id = await cur.fetchone()
+            assert isinstance(new_id, int)
 
             await cur.executemany(
                 """
@@ -304,7 +306,7 @@ class FamilyTable(DbBase):
     async def insert_or_update_multiple_families(
         self,
         external_ids: list[str],
-        descriptions: list[str],
+        descriptions: list[str | None],
         coded_phenotypes: list[str | None],
         project: ProjectId | None = None,
         meta: list[dict[str, Any] | None] | None = None,

@@ -25,10 +25,8 @@ class SMBase(BaseModel):
         return cls(**d)
 
 
-def parse_sql_dict(val: str | bytes | dict | None) -> dict | None:
-    """Parse a string from a sql dict"""
-    if val is None:
-        return None
+def parse_sql_dict(val: str | bytes | dict) -> dict:
+    """Parse a string from a sql dict (which must not be None)"""
     if isinstance(val, dict):
         return val
     if isinstance(val, (str, bytes)):
@@ -37,7 +35,7 @@ def parse_sql_dict(val: str | bytes | dict | None) -> dict | None:
     raise ValueError(f'Unknown type for meta: {type(val)}')
 
 
-def parse_sql_bool(val: str | int | bytes) -> bool | None:
+def parse_sql_bool(val: str | int | bytes | None) -> bool | None:
     """Parse a string from a sql bool"""
     if val is None:
         return None

@@ -25,6 +25,7 @@ class TestPedigree:
             header=None, rows=rows, create_missing_participants=True
         )
 
+        assert connection_with_project.project_id is not None
         pedigree_dicts = await fl.get_pedigree(
             project=connection_with_project.project_id,
             replace_with_participant_external_ids=True,
@@ -63,6 +64,7 @@ class TestPedigree:
             )
         )
 
+        assert connection_with_project.project_id is not None
         rows = await fl.get_pedigree(
             project=connection_with_project.project_id,
             include_participants_not_in_families=True,

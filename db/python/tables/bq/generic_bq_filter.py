@@ -44,8 +44,8 @@ class GenericBQFilter(GenericFilter[T]):  # noqa: PLW1641
         """  # noqa: D301
         return NONFIELD_CHARS_REGEX.sub('_', name)
 
-    def to_sql(
-        self, column: str, column_name: str = None
+    def to_sql(  # pyright: ignore [reportIncompatibleMethodOverride]
+        self, column: str, column_name: str | None = None
     ) -> tuple[str, dict[str, T | list[T] | Any | list[Any]]]:
         """
         Convert to SQL, and avoid SQL injection

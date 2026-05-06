@@ -18,10 +18,8 @@ CommentEntityType = StrEnum(
 
 # Timestamps in the db come back without a timezone attached but should be sent through
 # as UTC time, so add the timezone here so it is sent through to the client
-def assume_utc(time: datetime.datetime | None):
+def assume_utc(time: datetime.datetime):
     """Update timestamp to use UTC as timezone"""
-    if time is None:
-        return None
     return time.replace(tzinfo=datetime.UTC)
 
 
@@ -66,27 +64,27 @@ class CommentInternal(SMBase):
 
         history = [
             CommentVersionInternal(
-                author=v.get('author'),
-                timestamp=assume_utc(v.get('timestamp')),
-                status=v.get('status'),
-                content=v.get('content'),
+                author=v['author'],
+                timestamp=assume_utc(v['timestamp']),
+                status=v['status'],
+                content=v.get('content', ''),
             )
             for v in versions[0:-1]
         ]
 
         return CommentInternal(
-            id=first_version.get('comment_id'),
+            id=first_version['comment_id'],
             parent_id=last_version.get('parent_id'),
-            requested_entity_id=first_version.get('requested_entity_id'),
-            comment_entity_type=first_version.get('comment_entity_type'),
-            comment_entity_id=first_version.get('comment_entity_id'),
-            content=last_version.get('content'),
-            author=first_version.get('author'),
-            created_at=assume_utc(first_version.get('timestamp')),
-            updated_at=assume_utc(last_version.get('timestamp')),
+            requested_entity_id=first_version['requested_entity_id'],
+            comment_entity_type=first_version['comment_entity_type'],
+            comment_entity_id=first_version['comment_entity_id'],
+            content=last_version.get('content', ''),
+            author=first_version['author'],
+            created_at=assume_utc(first_version['timestamp']),
+            updated_at=assume_utc(last_version['timestamp']),
             thread=[],
             versions=history,
-            status=last_version.get('status'),
+            status=last_version['status'],
         )
 
 

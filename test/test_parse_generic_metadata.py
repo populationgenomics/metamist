@@ -938,17 +938,20 @@ class TestParseGenericMetadata:
 
         parsed_p: ParsedParticipant = parsed_files[0]
         assert participant.id == parsed_p.internal_pid
+        assert participant.samples is not None
         assert (
             sample_id_format(participant.samples[0].id)
             == parsed_p.samples[0].internal_sid
         )
 
+        assert participant.samples[0].sequencing_groups is not None
         sg: SequencingGroupUpsertInternal = participant.samples[0].sequencing_groups[0]
         sg_parsed: ParsedSequencingGroup = (
             parsed_files[0].samples[0].sequencing_groups[0]
         )
 
         assert sequencing_group_id_format(sg.id) == sg_parsed.internal_seqgroup_id
+        assert sg.assays is not None
         assert len(sg.assays) == len(sg_parsed.assays)
         assert sg.assays[0].id == sg_parsed.assays[0].internal_id
 

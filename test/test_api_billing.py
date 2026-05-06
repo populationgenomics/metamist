@@ -33,7 +33,7 @@ class TestApiBilling:
     def setup_bq_test(self):
         # Initialize BqTest functionality directly
         bq_test = BqTest()
-        bq_test.set_up()
+        bq_test.base_set_up()
         self.layer = bq_test.layer
 
         # make billing enabled by default for all the calls
@@ -88,6 +88,7 @@ class TestApiBilling:
         response = await billing.get_cost_by_ar_guid(
             ar_guid, author=TEST_API_BILLING_USER
         )
+        assert isinstance(response.body, bytes)
         resp_json = json.loads(response.body.decode('utf-8'))
         assert len(resp_json) == 1
 
@@ -140,6 +141,7 @@ class TestApiBilling:
         response = await billing.get_cost_by_batch_id(
             batch_id, author=TEST_API_BILLING_USER
         )
+        assert isinstance(response.body, bytes)
         resp_json = json.loads(response.body.decode('utf-8'))
 
         assert len(resp_json) == 1
@@ -233,7 +235,7 @@ class TestApiBilling:
         self,
         api_function,
         mock_layer_function,
-        mock_get_billing_layer=None,
+        mock_get_billing_layer,
     ):
         """
         Common wrapper for all API calls, to avoid code duplication

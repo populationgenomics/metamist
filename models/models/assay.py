@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Any
 
 from models.base import OpenApiGenNoneType, SMBase
@@ -31,7 +32,7 @@ class AssayInternal(SMBase):  # noqa: PLW1641
             type=self.type,
             external_ids=self.external_ids or {},
             sample_id=sample_id_format(self.sample_id),
-            meta=self.meta,
+            meta=self.meta or {},
         )
 
 
@@ -40,7 +41,7 @@ class AssayUpsertInternal(SMBase):
 
     id: AssayId | None = None
     type: str | None = None
-    external_ids: dict[str, str | None] | None = None
+    external_ids: Mapping[str, str | None] | None = None
     sample_id: int | None = None
     meta: dict | None = None
 
@@ -49,7 +50,7 @@ class AssayUpsertInternal(SMBase):
         return AssayUpsert(
             id=self.id,
             type=self.type,
-            external_ids=self.external_ids,
+            external_ids=self.external_ids,  # type: ignore
             sample_id=sample_id_format(self.sample_id) if self.sample_id else None,
             meta=self.meta,
         )
@@ -80,7 +81,7 @@ class AssayUpsert(SMBase):
 
     id: int | OpenApiGenNoneType = None
     type: str | OpenApiGenNoneType = None
-    external_ids: dict[str, str] | OpenApiGenNoneType = None
+    external_ids: dict[str, str | OpenApiGenNoneType] | OpenApiGenNoneType = None
     sample_id: str | OpenApiGenNoneType = None
     meta: dict[str, Any] | OpenApiGenNoneType = None
 

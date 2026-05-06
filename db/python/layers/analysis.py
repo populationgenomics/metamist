@@ -2,7 +2,8 @@ import datetime
 from collections import defaultdict
 from typing import Any
 
-from api.utils import group_by
+from api.settings import FAR_FUTURE
+from api.utils import ensure_nonnone, group_by
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
@@ -49,6 +50,13 @@ def check_or_parse_date(
     if isinstance(date_, str):
         return datetime.datetime.strptime(date_, '%Y-%m-%d').date()
     raise ValueError(f'Invalid datetime.date {date_!r}')
+
+
+def max_date(date1: datetime.date, date2: datetime.date | None) -> datetime.date:
+    """Return the later of two dates, the latter of which may be None"""
+    if date2 is None:
+        return date1
+    return max(date1, date2)
 
 
 class AnalysisLayer(BaseLayer):
@@ -153,17 +161,17 @@ class AnalysisLayer(BaseLayer):
             NB: Can't use the align datetime.date because the data is not good enough
         """
         # sanity checks
+        start_date = check_or_parse_date(start_date)
         if not start_date:
             raise ValueError('start_date must be set')
-        start_date = check_or_parse_date(start_date)
         end_date = check_or_parse_date(end_date)
 
-        if end_date and start_date and end_date < start_date:
+        if end_date and end_date < start_date:
             raise ValueError(
                 f'end_date ({end_date}) must be after start_date ({start_date})'
             )
 
-        if start_date and start_date < datetime.date(2020, 1, 1):
+        if start_date < datetime.date(2020, 1, 1):
             raise ValueError(f'start_date ({start_date}) must be after 2020-01-01')
 
         project_objs = self.connection.get_and_check_access_to_projects_for_ids(
@@ -178,8 +186,8 @@ class AnalysisLayer(BaseLayer):
         )
 
         sequencing_groups = await sglayer.query(sgfilter)
-        sg_by_id = {sg.id: sg for sg in sequencing_groups}
-        sg_to_project = {sg.id: sg.project for sg in sequencing_groups}
+        sg_by_id = {ensure_nonnone(sg.id): sg for sg in sequencing_groups}
+        sg_to_project = {ensure_nonnone(sg.id): sg.project for sg in sequencing_groups}
 
         cram_list = await self.at.query(
             AnalysisFilter(
@@ -189,7 +197,9 @@ class AnalysisLayer(BaseLayer):
             )
         )
 
-        crams_by_sg = group_by(cram_list, lambda c: c.sequencing_group_ids[0])
+        crams_by_sg = group_by(
+            cram_list, lambda c: ensure_nonnone(c.sequencing_group_ids)[0]
+        )
 
         results: dict[ProportionalDateTemporalMethod, list[ProportionalDateModel]] = {}
         for method in temporal_methods:
@@ -288,7 +298,7 @@ class AnalysisLayer(BaseLayer):
         sg_by_id: dict[SequencingGroupInternalId, SequencingGroupInternal],
         crams: dict[SequencingGroupInternalId, list[AnalysisInternal]],
         project_name_map: dict[ProjectId, str],
-        start_date: datetime.date | None,
+        start_date: datetime.date,
         end_date: datetime.date | None,
     ) -> list[ProportionalDateModel]:
         """
@@ -402,8 +412,8 @@ class AnalysisLayer(BaseLayer):
         )
 
         for sg_id, analyses in crams.items():
+            project = project_name_map[ensure_nonnone(sg_by_id[sg_id].project)]
             for idx, cram in enumerate(analyses):
-                project = project_name_map.get(sg_by_id[sg_id].project)
                 delta = None
                 if idx == 0:
                     # use the sample_create_date for the first analysis
@@ -412,6 +422,7 @@ class AnalysisLayer(BaseLayer):
                 else:
                     # replace with the current analyses timestamp_completed
                     sg_start_date = check_or_parse_date(cram.timestamp_completed)
+                    assert sg_start_date is not None
                     if new_cram_size := cram.meta.get('size'):
                         delta = new_cram_size - analyses[idx - 1].meta.get('size', 0)
                 if not delta:
@@ -422,7 +433,7 @@ class AnalysisLayer(BaseLayer):
                 # this will eventually get the "best" cram size correctly by applying
                 # deltas for multiple crams before the start datetime.date, so the
                 # clamping here is fine.
-                clamped_date = max(sg_start_date, start_date)
+                clamped_date = max_date(sg_start_date, start_date)
                 by_date_diff[clamped_date][project] += delta
 
         return by_date_diff
@@ -449,27 +460,26 @@ class AnalysisLayer(BaseLayer):
                 # it does resolve the same, but most cases come through here
                 by_date[sg_id] = [
                     (
-                        max(sample_create_dates[sg_id], start_date),
+                        max_date(sample_create_dates[sg_id], start_date),
                         analyses[0].meta.get('size') or 0,
                     )
                 ]
             else:
                 for idx, cram in enumerate(
-                    sorted(analyses, key=lambda a: a.timestamp_completed)
+                    sorted(analyses, key=lambda a: a.timestamp_completed or FAR_FUTURE)
                 ):
                     if idx == 0:
                         # use the sample_create_date for the first analysis
                         sg_start_date = sample_create_dates[sg_id]
                     else:
                         # replace with the current analyses timestamp_completed
+                        assert cram.timestamp_completed
                         sg_start_date = cram.timestamp_completed.date()
 
                     if end_date and sg_start_date > end_date:
                         continue
 
-                    clamped_date = (
-                        max(sg_start_date, start_date) if start_date else sg_start_date
-                    )
+                    clamped_date = max_date(sg_start_date, start_date)
 
                     if 'size' not in cram.meta:
                         continue
@@ -481,7 +491,7 @@ class AnalysisLayer(BaseLayer):
     async def get_sgs_added_by_day_by_es_indices(
         self,
         start: datetime.date,
-        end: datetime.date,
+        end: datetime.date | None,
         projects: list[ProjectId],
     ):
         """
@@ -509,11 +519,15 @@ class AnalysisLayer(BaseLayer):
                     timestamp_completed=GenericFilter(
                         # midnight on the day
                         gt=datetime.datetime.combine(start, datetime.time()),
-                        lte=datetime.datetime.combine(end, datetime.time()),
+                        lte=datetime.datetime.combine(end, datetime.time())
+                        if end is not None
+                        else None,
                     ),
                 )
             )
             for jc in joint_calls:
+                assert jc.sequencing_group_ids is not None
+                assert jc.timestamp_completed is not None
                 by_day[jc.timestamp_completed.date()].update(jc.sequencing_group_ids)
 
         es_indices = await self.at.query(
@@ -524,11 +538,15 @@ class AnalysisLayer(BaseLayer):
                 timestamp_completed=GenericFilter(
                     # midnight on the day
                     gt=datetime.datetime.combine(start, datetime.time()),
-                    lte=datetime.datetime.combine(end, datetime.time()),
+                    lte=datetime.datetime.combine(end, datetime.time())
+                    if end is not None
+                    else None,
                 ),
             )
         )
         for es in es_indices:
+            assert es.sequencing_group_ids is not None
+            assert es.timestamp_completed is not None
             by_day[es.timestamp_completed.date()].update(es.sequencing_group_ids)
 
         return by_day
@@ -544,7 +562,7 @@ class AnalysisLayer(BaseLayer):
     async def create_analysis(
         self,
         analysis: AnalysisInternal,
-        project: ProjectId = None,
+        project: ProjectId | None = None,
     ) -> int:
         """Create a new analysis"""
 
@@ -596,7 +614,7 @@ class AnalysisLayer(BaseLayer):
         self,
         analysis_id: int,
         status: AnalysisStatus | None = None,
-        meta: dict[str, Any] = None,
+        meta: dict[str, Any] | None = None,
         output: str | None = None,
         outputs: RecursiveDict | None = None,
         active: bool | None = None,

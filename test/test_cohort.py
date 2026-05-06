@@ -34,6 +34,7 @@ class TestCohortBasic:
     @pytest.fixture(autouse=True)
     async def set_up(self, connection_with_project: Connection):
         self.cohortl = CohortLayer(connection_with_project)
+        assert connection_with_project.project_id is not None
         self.project_id = connection_with_project.project_id
 
     @pytest.mark.asyncio
@@ -169,7 +170,9 @@ class TestCohortData:
     async def set_up(self, connection_with_project: Connection):
         self.cohortl = CohortLayer(connection_with_project)
         self.samplel = SampleLayer(connection_with_project)
+        assert connection_with_project.project_id is not None
         self.project_id = connection_with_project.project_id
+        assert connection_with_project.project is not None
         self.project_name = connection_with_project.project.name
 
         self.sA = await self.samplel.upsert_sample(get_sample_model('A'))
@@ -177,6 +180,13 @@ class TestCohortData:
         self.sC = await self.samplel.upsert_sample(
             get_sample_model('C', 'saliva', 'exome', 'long-read', 'ONT')
         )
+
+        assert self.sA.sequencing_groups is not None
+        assert self.sA.sequencing_groups[0].id is not None
+        assert self.sB.sequencing_groups is not None
+        assert self.sB.sequencing_groups[0].id is not None
+        assert self.sC.sequencing_groups is not None
+        assert self.sC.sequencing_groups[0].id is not None
 
         self.sgA = sequencing_group_id_format(self.sA.sequencing_groups[0].id)
         self.sgA_raw = self.sA.sequencing_groups[0].id
@@ -304,7 +314,7 @@ class TestCohortData:
             ),
         )
         assert isinstance(result.cohort_id, int)
-        assert len(result.sequencing_group_ids) == 2
+        assert result.sequencing_group_ids and len(result.sequencing_group_ids) == 2
         assert self.sgB_raw in result.sequencing_group_ids
         assert self.sgC_raw in result.sequencing_group_ids
 
@@ -322,7 +332,7 @@ class TestCohortData:
             ),
         )
         assert isinstance(result.cohort_id, int)
-        assert len(result.sequencing_group_ids) == 2
+        assert result.sequencing_group_ids and len(result.sequencing_group_ids) == 2
         assert self.sgA_raw in result.sequencing_group_ids
         assert self.sgB_raw in result.sequencing_group_ids
 
@@ -356,7 +366,7 @@ class TestCohortData:
             ),
         )
         assert isinstance(result.cohort_id, int)
-        assert len(result.sequencing_group_ids) == 2
+        assert result.sequencing_group_ids and len(result.sequencing_group_ids) == 2
         assert self.sgA_raw in result.sequencing_group_ids
         assert self.sgB_raw in result.sequencing_group_ids
 
@@ -393,7 +403,7 @@ class TestCohortData:
                 sample_type=['blood'],
             ),
         )
-        assert len(result.sequencing_group_ids) == 1
+        assert result.sequencing_group_ids and len(result.sequencing_group_ids) == 1
         assert self.sgB_raw in result.sequencing_group_ids
 
     @pytest.mark.asyncio
@@ -484,9 +494,10 @@ class TestCohortData:
             dry_run=False,
             template_id=template,
         )
-        assert len(coh1.sequencing_group_ids) == 2
+        assert coh1.sequencing_group_ids and len(coh1.sequencing_group_ids) == 2
 
         sD = await self.samplel.upsert_sample(get_sample_model('D'))  # noqa: N806
+        assert sD.sequencing_groups is not None
         sgD_raw = sD.sequencing_groups[0].id  # noqa: N806
 
         coh2 = await self.cohortl.create_cohort_from_criteria(
@@ -496,7 +507,7 @@ class TestCohortData:
             dry_run=False,
             template_id=template,
         )
-        assert len(coh2.sequencing_group_ids) == 3
+        assert coh2.sequencing_group_ids and len(coh2.sequencing_group_ids) == 3
         assert sgD_raw not in coh1.sequencing_group_ids
         assert sgD_raw in coh2.sequencing_group_ids
 
@@ -561,9 +572,7 @@ class TestCohortData:
             },
         )
 
-        row = await acur.fetchone()
-        assert row
-        cohort_template_id = row['id']
+        cohort_template_id = (await Connection.must_fetch_one(acur))['id']
 
         with pytest.raises(ValueError):
             await self.cohortl.create_cohort_from_criteria(
@@ -586,12 +595,16 @@ class TestCohortData:
                 sg_ids_internal_raw=[self.sgA_raw, self.sgB_raw],
             ),
         )
+        assert created.sequencing_group_ids is not None
         assert len(created.sequencing_group_ids) == 2
 
         queried = await self.cohortl.query(
             CohortFilter(name=GenericFilter(eq='Duo cohort'))
         )
         assert len(queried) == 1
+
+        assert self.sA.sequencing_groups is not None
+        assert self.sB.sequencing_groups is not None
 
         result = await self.cohortl.get_cohort_sequencing_group_ids(int(queried[0].id))
         assert len(result) == 2
@@ -607,6 +620,7 @@ class TestCohortGraphql:
         self.cohortl = CohortLayer(connection_with_project)
         self.samplel = SampleLayer(connection_with_project)
         self.sgl = SequencingGroupLayer(connection_with_project)
+        assert connection_with_project.project_id is not None
         self.project_id = connection_with_project.project_id
 
     @pytest.mark.project_roles(['writer'])

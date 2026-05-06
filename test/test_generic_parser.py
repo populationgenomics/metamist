@@ -52,6 +52,7 @@ class TestGenericParser:
         Test a bunch of things related to nested samples
         They're all sort of sequential, so just do them all in one test
         """
+        assert connection_with_project.project is not None
         mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
 
         slayer = SampleLayer(connection_with_project)
@@ -71,6 +72,7 @@ class TestGenericParser:
                 ],
             )
         )
+        assert u_sample.nested_samples is not None
 
         u_child2 = u_sample.nested_samples[0]
 
@@ -98,8 +100,10 @@ class TestGenericParser:
         # Test 1: test the matching works for all samples including nested
         await p.match_sample_ids([nested_sample])
 
+        assert nested_sample.internal_sid is not None
         assert u_sample.id == sample_id_transform_to_raw(nested_sample.internal_sid)
         assert child_1.internal_sid is None
+        assert child_2.internal_sid is not None
         assert u_child2.id == sample_id_transform_to_raw(child_2.internal_sid)
 
         # Test 2: test the summary generated is correctly counting for nested samples

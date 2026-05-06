@@ -15,7 +15,7 @@ except DefaultCredentialsError as e:
     if IGNORE_GCP_CREDENTIALS_ERROR:
         exception_args = e.args
 
-        def email_from_id_token(*args, **kwargs):  # noqa: ARG001
+        def email_from_id_token(*args, **kwargs) -> str:  # noqa: ARG001
             """Raises DefaultCredentialsError at runtime"""
             raise DefaultCredentialsError(*exception_args)
 

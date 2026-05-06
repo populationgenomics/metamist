@@ -63,7 +63,7 @@ class OutputFileInternal(SMBase):
             file_checksum=kwargs['file_checksum'],
             size=kwargs['size'],
             meta=kwargs['meta'],
-            valid=parse_sql_bool(kwargs['valid']),
+            valid=parse_sql_bool(kwargs['valid']) or False,
             secondary_files=kwargs.get('secondary_files', {}),
         )
 

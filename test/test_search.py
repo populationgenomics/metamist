@@ -35,6 +35,7 @@ class TestSample:
         self.player = ParticipantLayer(connection_with_project)
         self.flayer = FamilyLayer(connection_with_project)
         self.sglayer = SequencingGroupLayer(connection_with_project)
+        assert connection_with_project.project_id is not None
         self.project_id = connection_with_project.project_id
         self.fptable = FamilyParticipantTable(connection_with_project)
 
@@ -183,14 +184,14 @@ class TestSample:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
-    async def test_search_family(self, connection_with_project: Connection):
+    async def test_search_family(self):
         """
         Search family by External ID
         should only return one result
         """
         f_id = await self.flayer.create_family(external_ids={'forg': 'FAMXX01'})
         results = await self.schlay.search(
-            query='FAMXX01', project_ids=[connection_with_project.project_id]
+            query='FAMXX01', project_ids=[self.project_id]
         )
         assert len(results) == 1
         result = results[0]
@@ -207,6 +208,7 @@ class TestSample:
         p = await self.player.upsert_participant(
             ParticipantUpsertInternal(external_ids={PRIMARY_EXTERNAL_ORG: 'X:PART01'})
         )
+        assert p.id is not None
         f_id = await self.flayer.create_family(external_ids={'famxorg': 'X:FAM01'})
         await self.fptable.create_rows(
             [

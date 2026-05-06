@@ -549,6 +549,9 @@ class TestWeb:
     async def setUp(self, connection_with_project: Connection) -> None:
         self.connection = connection_with_project
 
+        assert connection_with_project.project_id is not None
+        self.project_id = connection_with_project.project_id
+
         self.web_layer = WebLayer(connection_with_project)
         self.participant_layer = ParticipantLayer(connection_with_project)
         self.proj_insights_layer = ProjectInsightsLayer(connection_with_project)
@@ -670,7 +673,7 @@ class TestWeb:
         )
 
         nested_participants = await self.web_layer.query_participants(
-            pfilter.to_internal(project=self.connection.project_id), limit=None
+            pfilter.to_internal(project=self.project_id), limit=None
         )
         result = ProjectParticipantGridResponse.from_params(
             participants=nested_participants,
@@ -697,7 +700,7 @@ class TestWeb:
         )
 
         nested_participants = await self.web_layer.query_participants(
-            pfilter.to_internal(project=self.connection.project_id), limit=None
+            pfilter.to_internal(project=self.project_id), limit=None
         )
         assert len(nested_participants) == 0
 
@@ -860,7 +863,7 @@ class TestWeb:
         )
 
         nested_participants = await self.web_layer.query_participants(
-            pfilter.to_internal(project=self.connection.project_id), limit=None
+            pfilter.to_internal(project=self.project_id), limit=None
         )
 
         assert len(nested_participants) == 1
@@ -900,7 +903,7 @@ class TestWeb:
             )
         )
         nested_participants = await self.web_layer.query_participants(
-            pfilter.to_internal(project=self.connection.project_id), limit=None
+            pfilter.to_internal(project=self.project_id), limit=None
         )
 
         assert len(nested_participants) == 1
@@ -1105,29 +1108,51 @@ class WebNonDBTests(unittest.TestCase):
         internal_filter = big_filter.to_internal(project=1)
 
         # participant internal
+        assert internal_filter.id
         assert internal_filter.id.contains == p_id
+        assert internal_filter.meta
         assert internal_filter.meta['pmeta'].contains == 'pm'
+        assert internal_filter.external_id
         assert internal_filter.external_id.contains == 'e'
 
         # family internal
+        assert internal_filter.family
+        assert internal_filter.family.id
         assert internal_filter.family.id.contains == f_id
 
         # sample internal
+        assert internal_filter.sample
+        assert internal_filter.sample.id
         assert internal_filter.sample.id.contains == s_id
+        assert internal_filter.sample.type
         assert internal_filter.sample.type.contains == 't'
+        assert internal_filter.sample.external_id
         assert internal_filter.sample.external_id.contains == 'e'
+        assert internal_filter.sample.meta
         assert internal_filter.sample.meta['smeta'].contains == 'sm'
 
         # sequencing group internal
+        assert internal_filter.sequencing_group
+        assert internal_filter.sequencing_group.id
         assert internal_filter.sequencing_group.id.contains == sg_id
+        assert internal_filter.sequencing_group.type
         assert internal_filter.sequencing_group.type.contains == 't'
+        assert internal_filter.sequencing_group.external_id
         assert internal_filter.sequencing_group.external_id.contains == 'e'
+        assert internal_filter.sequencing_group.meta
         assert internal_filter.sequencing_group.meta['sgmeta'].contains == 'sg'
+        assert internal_filter.sequencing_group.technology
         assert internal_filter.sequencing_group.technology.contains == 't'
+        assert internal_filter.sequencing_group.platform
         assert internal_filter.sequencing_group.platform.contains == 'p'
 
         # assay internal
+        assert internal_filter.assay
+        assert internal_filter.assay.id
         assert internal_filter.assay.id.contains == 5
+        assert internal_filter.assay.type
         assert internal_filter.assay.type.contains == 't'
+        assert internal_filter.assay.external_id
         assert internal_filter.assay.external_id.contains == 'e'
+        assert internal_filter.assay.meta
         assert internal_filter.assay.meta['ameta'].contains == 'a'

@@ -74,7 +74,7 @@ class TestBillingBaseTable(BqTest):
 
     @pytest.fixture(autouse=True)
     def set_up(self):
-        super().set_up()
+        self.base_set_up()
 
         # setup table object
         # base is abstract, so we need to use a child class
@@ -333,9 +333,9 @@ class TestBillingBaseTable(BqTest):
             self.bq_result._rows = bq_result
             self.bq_result.total_bytes_processed = 0
             results = self.table_obj._execute_query(
-                sql_query, sql_params, results_as_list=True
+                sql_query, sql_params, results_as_list=False
             )
-            assert bq_result == results
+            assert bq_result == list(results)
 
     def test_execute_query_with_sql_params(self):
         """Test _execute_query"""
@@ -352,9 +352,9 @@ class TestBillingBaseTable(BqTest):
             self.bq_result._rows = bq_result
             self.bq_result.total_bytes_processed = 0
             results = self.table_obj._execute_query(
-                sql_query, sql_params, results_as_list=True
+                sql_query, sql_params, results_as_list=False
             )
-            assert bq_result == results
+            assert bq_result == list(results)
 
     @pytest.mark.asyncio
     async def test_append_total_running_cost_no_topic(self):
@@ -398,7 +398,7 @@ class TestBillingBaseTable(BqTest):
             is_current_month=False,
             last_loaded_day=None,
             total_monthly={'C': {'ALL': 1000}, 'S': {'ALL': 2000}},
-            total_daily=None,
+            total_daily={},
             total_monthly_category={},
             total_daily_category={},
             results=[],
@@ -717,7 +717,7 @@ class TestBillingBaseTable(BqTest):
         """Test get_running_cost"""
 
         # mockup BQ sql query result for _execute_running_cost_query function
-        self.table_obj._execute_query = mock_execute_query_running_cost
+        self.table_obj._execute_query = mock_execute_query_running_cost  # type: ignore
 
         one_record_result = await self.table_obj.get_running_cost_with_filters(
             BillingRunningCostQueryModel(
@@ -774,7 +774,7 @@ class TestBillingBaseTable(BqTest):
         """Test get_running_cost"""
 
         # mockup BQ sql query result for _execute_running_cost_query function
-        self.table_obj._execute_query = mock_execute_query_running_cost
+        self.table_obj._execute_query = mock_execute_query_running_cost  # type: ignore
         # use the current month to test the current month branch
         current_month_as_string = datetime.now().strftime('%Y%m')
 
@@ -855,7 +855,7 @@ class TestBillingBaseTable(BqTest):
 
         # mockup BQ sql query result for _execute_query to return 3 records.
         # implementation is inside mock_execute_query function
-        self.table_obj._execute_query = mock_execute_query_get_total_cost
+        self.table_obj._execute_query = mock_execute_query_get_total_cost  # type: ignore
 
         results = await self.table_obj.get_total_cost(query)
         assert results == [

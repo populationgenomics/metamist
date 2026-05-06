@@ -3,7 +3,7 @@ import re
 from abc import ABCMeta, abstractmethod
 from collections import Counter, defaultdict
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal, overload
 
 from google.cloud import bigquery
 
@@ -71,11 +71,21 @@ class BillingBaseTable(BqDbBase):
         """Get table name"""
         raise NotImplementedError('Calling Abstract method directly')
 
+    @overload
+    def _execute_query(
+        self, query: str, params: list[Any] | None = None
+    ) -> list[Any]: ...
+    @overload
+    def _execute_query(
+        self, query: str, params: list[Any] | None, results_as_list: Literal[True]
+    ) -> list[Any]: ...
+    @overload
+    def _execute_query(
+        self, query: str, params: list[Any] | None, results_as_list: Literal[False]
+    ) -> bigquery.QueryJob: ...
     def _execute_query(
         self, query: str, params: list[Any] | None = None, results_as_list: bool = True
-    ) -> (
-        list[Any] | bigquery.table.RowIterator | bigquery.table._EmptyRowIterator | None
-    ):
+    ) -> list[Any] | bigquery.QueryJob:
         """Execute query, add BQ labels"""
         if params:
             job_config = bigquery.QueryJobConfig(
@@ -96,6 +106,7 @@ class BillingBaseTable(BqDbBase):
         # creates a new connection instance
         # and queries per requests are run in sequencial order,
         # waiting for the previous one to finish
+        assert query_job.total_bytes_processed is not None
         self._connection.cost += (
             query_job.total_bytes_processed / 1024**4
         ) * BQ_COST_PER_TB
@@ -337,8 +348,8 @@ class BillingBaseTable(BqDbBase):
         return result
 
     async def append_sample_cost(
-        self, connection: Connection | None = None, results: list[dict] | None = None
-    ) -> list[dict] | None:
+        self, connection: Connection | None, results: list[dict]
+    ) -> list[dict]:
         """
         For each topic in results, calculate number of samples per metamist project
         and divide the cost by number of samples to get average sample storage cost
@@ -436,7 +447,7 @@ class BillingBaseTable(BqDbBase):
     async def get_total_cost(
         self,
         query: BillingTotalCostQueryModel,
-    ) -> list[dict] | None:
+    ) -> list[dict]:
         """
         Get Total cost of selected fields for requested time interval from BQ views
         """

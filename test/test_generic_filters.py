@@ -1,7 +1,9 @@
 """Integration tests for GenericFilter against a real PostgreSQL database"""
 
 import dataclasses
+from collections.abc import Mapping
 from datetime import date
+from string.templatelib import Template
 from typing import Any
 
 import pytest
@@ -79,7 +81,7 @@ async def test_data(
 async def execute_filter(
     conn: AsyncConnection[DictRow],
     filter_: GenericFilterTest,
-    field_mapping: dict[str, str] | None = None,
+    field_mapping: Mapping[str, str | Template] | None = None,
 ) -> list[DictRow]:
     """Helper to execute a filter and return results"""
     where_clause = filter_.to_sql(field_mapping)

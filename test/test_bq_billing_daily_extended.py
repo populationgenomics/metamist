@@ -16,7 +16,7 @@ class TestBillingGcpDailyTable(BqTest):
 
     @pytest.fixture(autouse=True)
     def set_up(self):
-        super().set_up()
+        self.base_set_up()
 
         # setup table object
         self.table_obj = BillingDailyExtendedTable(self.connection)

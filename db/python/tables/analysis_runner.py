@@ -4,7 +4,7 @@ import datetime
 from psycopg.rows import class_row
 from psycopg.types.json import Jsonb
 
-from db.python.filters import GenericFilter, GenericFilterModel
+from db.python.filters import GenericFilter, GenericFilterModel, is_literally_TRUE
 from db.python.tables.base import DbBase
 from models.models.analysis_runner import AnalysisRunnerInternal
 from models.models.project import ProjectId
@@ -35,7 +35,9 @@ class AnalysisRunnerTable(DbBase):
         """
 
         where_params = filter_.to_sql()
-        wheres_query = t'WHERE {where_params:q}' if where_params is not None else t''
+        wheres_query = (
+            t'WHERE {where_params:q}' if not is_literally_TRUE(where_params) else t''
+        )
 
         _query = t"""
         SELECT

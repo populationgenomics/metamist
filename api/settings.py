@@ -1,3 +1,4 @@
+import datetime
 import os
 from functools import lru_cache
 
@@ -5,6 +6,7 @@ from cpg_utils.cloud import read_secret
 
 
 TRUTH_SET = ('1', 'y', 't', 'true')
+FAR_FUTURE = datetime.datetime(datetime.MAXYEAR, 12, 31)
 
 LOG_DATABASE_QUERIES = (
     os.getenv('SM_LOG_DATABASE_QUERIES', 'false').lower() in TRUTH_SET
@@ -19,9 +21,9 @@ METAMIST_GCP_PROJECT = os.getenv('METAMIST_GCP_PROJECT')
 DB_POOL_MIN_SIZE = int(os.getenv('SM_DB_POOL_MIN_SIZE', '1'))
 DB_POOL_MAX_SIZE = int(os.getenv('SM_DB_POOL_MAX_SIZE', '10'))
 
-SEQR_URL = os.getenv('SM_SEQR_URL')
+SEQR_URL = os.getenv('SM_SEQR_URL', '')
 SEQR_AUDIENCE = os.getenv('SM_SEQR_AUDIENCE')
-SEQR_MAP_LOCATION = os.getenv('SM_SEQR_MAP_LOCATION')
+SEQR_MAP_LOCATION = os.getenv('SM_SEQR_MAP_LOCATION', '')
 
 # you can set one of the following for pluggin in slack notifications
 _SLACK_SECRET_PROJECT_ID = os.getenv('SM_SLACK_SECRET_PROJECT_ID')
