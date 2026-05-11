@@ -1,9 +1,16 @@
-import { Box, Link as MuiLink, Modal as MuiModal, Typography } from '@mui/material'
+import {
+    Box,
+    FormControlLabel,
+    Link as MuiLink,
+    Modal as MuiModal,
+    Switch,
+    Typography,
+} from '@mui/material'
 import { SelectChangeEvent } from '@mui/material/Select'
 import { debounce } from 'lodash'
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Checkbox, Dropdown, Grid, Message } from 'semantic-ui-react'
+import { Button, Card, Dropdown, Grid, Message } from 'semantic-ui-react'
 
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
@@ -486,34 +493,73 @@ const BillingCostByMonth: React.FunctionComponent = () => {
                         </MuiLink>
                     </Box>
 
-                    <Dropdown
-                        button
-                        className="icon"
-                        floating
-                        labeled
-                        icon="download"
-                        text="Export"
-                        style={{
-                            minWidth: '115px',
-                            maxWidth: '115px',
-                            height: '36px',
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 2,
+                            flexWrap: 'wrap',
+                            justifyContent: 'flex-end',
                         }}
                     >
-                        <Dropdown.Menu>
-                            <Dropdown.Item
-                                key="csv"
-                                text="Export to CSV"
-                                icon="file excel"
-                                onClick={() => exportToFile('csv')}
-                            />
-                            <Dropdown.Item
-                                key="tsv"
-                                text="Export to TSV"
-                                icon="file text outline"
-                                onClick={() => exportToFile('tsv')}
-                            />
-                        </Dropdown.Menu>
-                    </Dropdown>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={includeAvgSampleCost}
+                                    onChange={(e) => {
+                                        const next = e.target.checked
+                                        setIncludeAvgSampleCost(next)
+                                        const url = generateUrl(location, {
+                                            start,
+                                            end,
+                                            topics:
+                                                selectedTopics.length > 0
+                                                    ? selectedTopics.join(',')
+                                                    : undefined,
+                                            includeAvgSampleCost: next ? undefined : 'false',
+                                        })
+                                        navigate(url)
+                                    }}
+                                    size="small"
+                                    color="primary"
+                                />
+                            }
+                            label={
+                                <Typography variant="body2">
+                                    Include Avg. Sample Cost (Est.)
+                                </Typography>
+                            }
+                            sx={{ mr: 0 }}
+                        />
+                        <Dropdown
+                            button
+                            className="icon"
+                            floating
+                            labeled
+                            icon="download"
+                            text="Export"
+                            style={{
+                                minWidth: '115px',
+                                maxWidth: '115px',
+                                height: '36px',
+                            }}
+                        >
+                            <Dropdown.Menu>
+                                <Dropdown.Item
+                                    key="csv"
+                                    text="Export to CSV"
+                                    icon="file excel"
+                                    onClick={() => exportToFile('csv')}
+                                />
+                                <Dropdown.Item
+                                    key="tsv"
+                                    text="Export to TSV"
+                                    icon="file text outline"
+                                    onClick={() => exportToFile('tsv')}
+                                />
+                            </Dropdown.Menu>
+                        </Dropdown>
+                    </Box>
                 </div>
 
                 <Grid columns="equal" stackable doubling>
@@ -546,28 +592,6 @@ const BillingCostByMonth: React.FunctionComponent = () => {
                         />
                     </Grid.Column>
                 </Grid>
-
-                <div style={{ marginTop: '15px' }}>
-                    <Checkbox
-                        toggle
-                        label="Include Avg. Sample Cost (Est.) rows"
-                        checked={includeAvgSampleCost}
-                        onChange={(_, { checked }) => {
-                            const next = Boolean(checked)
-                            setIncludeAvgSampleCost(next)
-                            const url = generateUrl(location, {
-                                start,
-                                end,
-                                topics:
-                                    selectedTopics.length > 0
-                                        ? selectedTopics.join(',')
-                                        : undefined,
-                                includeAvgSampleCost: next ? undefined : 'false',
-                            })
-                            navigate(url)
-                        }}
-                    />
-                </div>
             </Card>
 
             {messageComponent()}
