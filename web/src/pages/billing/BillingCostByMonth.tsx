@@ -3,7 +3,7 @@ import { SelectChangeEvent } from '@mui/material/Select'
 import { debounce } from 'lodash'
 import * as React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Dropdown, Grid, Message } from 'semantic-ui-react'
+import { Button, Card, Checkbox, Dropdown, Grid, Message } from 'semantic-ui-react'
 
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
 import LoadingDucks from '../../shared/components/LoadingDucks/LoadingDucks'
@@ -54,6 +54,11 @@ const BillingCostByMonth: React.FunctionComponent = () => {
     // Topic filtering state
     const [selectedTopics, setSelectedTopics] = React.useState<string[]>(initialTopics)
     const [availableTopics, setAvailableTopics] = React.useState<string[]>([])
+
+    // Toggle to include/exclude Avg Sample Cost (Est.) rows in the table and exports
+    const [includeAvgSampleCost, setIncludeAvgSampleCost] = React.useState<boolean>(
+        searchParams.get('includeAvgSampleCost') !== 'false'
+    )
 
     // use navigate and update url params
     const location = useLocation()
@@ -338,6 +343,7 @@ const BillingCostByMonth: React.FunctionComponent = () => {
                         data={data}
                         months={months}
                         orderedTopics={getOrderedTopics()}
+                        includeAvgSampleCost={includeAvgSampleCost}
                     />
                 </Card>
             </>
@@ -408,25 +414,29 @@ const BillingCostByMonth: React.FunctionComponent = () => {
             ]
             matrix.push(storageRow)
 
-            const sampleCostStorageRow: [string, string, ...string[]] = [
-                topic,
-                CloudSpendCategory.SAMPLE_STORAGE_COST.toString(),
-                ...months.map((m) => {
-                    const val = data[topic]?.[m]?.[CloudSpendCategory.SAMPLE_STORAGE_COST]
-                    return val === undefined ? '' : val.toFixed(2)
-                }),
-            ]
-            matrix.push(sampleCostStorageRow)
+            // Only include Avg. Sample Cost rows when the user opts in. The All Topics row
+            // never has these values, matching the table view.
+            if (includeAvgSampleCost && topic !== 'All Topics') {
+                const sampleCostStorageRow: [string, string, ...string[]] = [
+                    topic,
+                    CloudSpendCategory.SAMPLE_STORAGE_COST.toString(),
+                    ...months.map((m) => {
+                        const val = data[topic]?.[m]?.[CloudSpendCategory.SAMPLE_STORAGE_COST]
+                        return val === undefined ? '' : val.toFixed(2)
+                    }),
+                ]
+                matrix.push(sampleCostStorageRow)
 
-            const sampleComputeCostRow: [string, string, ...string[]] = [
-                topic,
-                CloudSpendCategory.SAMPLE_COMPUTE_COST.toString(),
-                ...months.map((m) => {
-                    const val = data[topic]?.[m]?.[CloudSpendCategory.SAMPLE_COMPUTE_COST]
-                    return val === undefined ? '' : val.toFixed(2)
-                }),
-            ]
-            matrix.push(sampleComputeCostRow)
+                const sampleComputeCostRow: [string, string, ...string[]] = [
+                    topic,
+                    CloudSpendCategory.SAMPLE_COMPUTE_COST.toString(),
+                    ...months.map((m) => {
+                        const val = data[topic]?.[m]?.[CloudSpendCategory.SAMPLE_COMPUTE_COST]
+                        return val === undefined ? '' : val.toFixed(2)
+                    }),
+                ]
+                matrix.push(sampleComputeCostRow)
+            }
         })
 
         exportTable(
@@ -536,6 +546,28 @@ const BillingCostByMonth: React.FunctionComponent = () => {
                         />
                     </Grid.Column>
                 </Grid>
+
+                <div style={{ marginTop: '15px' }}>
+                    <Checkbox
+                        toggle
+                        label="Include Avg. Sample Cost (Est.) rows"
+                        checked={includeAvgSampleCost}
+                        onChange={(_, { checked }) => {
+                            const next = Boolean(checked)
+                            setIncludeAvgSampleCost(next)
+                            const url = generateUrl(location, {
+                                start,
+                                end,
+                                topics:
+                                    selectedTopics.length > 0
+                                        ? selectedTopics.join(',')
+                                        : undefined,
+                                includeAvgSampleCost: next ? undefined : 'false',
+                            })
+                            navigate(url)
+                        }}
+                    />
+                </div>
             </Card>
 
             {messageComponent()}

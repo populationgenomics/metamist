@@ -36,6 +36,7 @@ interface IBillingCostByMonthTableProps {
     data: DataDict
     months: string[]
     orderedTopics: string[]
+    includeAvgSampleCost?: boolean
 }
 
 const BillingCostByMonthTable: React.FunctionComponent<IBillingCostByMonthTableProps> = ({
@@ -45,6 +46,7 @@ const BillingCostByMonthTable: React.FunctionComponent<IBillingCostByMonthTableP
     data,
     months,
     orderedTopics,
+    includeAvgSampleCost = true,
 }) => {
     if (isLoading) {
         return (
@@ -53,12 +55,14 @@ const BillingCostByMonthTable: React.FunctionComponent<IBillingCostByMonthTableP
             </div>
         )
     }
-    const compTypes = [
-        'Compute Cost',
-        'Storage Cost',
-        'Avg. Sample Storage Cost (Est.)',
-        'Avg. Sample Compute Cost (Est.)',
-    ]
+    const compTypes = includeAvgSampleCost
+        ? [
+              'Compute Cost',
+              'Storage Cost',
+              'Avg. Sample Storage Cost (Est.)',
+              'Avg. Sample Compute Cost (Est.)',
+          ]
+        : ['Compute Cost', 'Storage Cost']
 
     // Get all topics in the order they were provided
     const getAllTopics = () => {
