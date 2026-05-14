@@ -2,7 +2,7 @@ from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.tables.analysis_runner import AnalysisRunnerFilter, AnalysisRunnerTable
 from models.models.analysis_runner import AnalysisRunnerInternal
-from models.models.project import ReadAccessRoles, ProjectId
+from models.models.project import ReadAccessRoles
 
 
 class AnalysisRunnerLayer(BaseLayer):
