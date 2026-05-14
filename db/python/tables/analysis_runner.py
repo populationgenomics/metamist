@@ -55,11 +55,15 @@ class AnalysisRunnerTable(DbBase):
         return analysis_runner_internal_list
 
     async def insert_analysis_runner_entry(
-        self, analysis_runner: AnalysisRunnerInternal
+        self, analysis_runner: AnalysisRunnerInternal, project_id: ProjectId| None = None
     ) -> str:
         """
         Insert analysis runner log
         """
+        project_id = project_id if project_id else self.project_id
+        if project_id is None:
+            raise ValueError(f"Project id not provided")
+
         audit_log_id = await self.audit_log_id()
         meta_param = Jsonb(analysis_runner.meta)
 
@@ -71,7 +75,7 @@ class AnalysisRunnerTable(DbBase):
         output_path, audit_log_id
         )
         VALUES (
-        {self.project_id}, {analysis_runner.ar_guid}, {datetime.datetime.now()}, {analysis_runner.access_level},
+        {project_id}, {analysis_runner.ar_guid}, {datetime.datetime.now()}, {analysis_runner.access_level},
         {analysis_runner.repository}, {analysis_runner.commit}, {analysis_runner.script}, {analysis_runner.description},
         {analysis_runner.driver_image}, {analysis_runner.config_path}, {analysis_runner.cwd}, {analysis_runner.environment},
         {analysis_runner.hail_version}, {analysis_runner.batch_url}, {analysis_runner.submitting_user}, {meta_param},

@@ -2,7 +2,7 @@ from db.python.connect import Connection
 from db.python.layers.base import BaseLayer
 from db.python.tables.analysis_runner import AnalysisRunnerFilter, AnalysisRunnerTable
 from models.models.analysis_runner import AnalysisRunnerInternal
-from models.models.project import ReadAccessRoles
+from models.models.project import ReadAccessRoles, ProjectId
 
 
 class AnalysisRunnerLayer(BaseLayer):
@@ -34,7 +34,7 @@ class AnalysisRunnerLayer(BaseLayer):
     # INSERTS
 
     async def insert_analysis_runner_entry(
-        self, analysis_runner: AnalysisRunnerInternal
+        self, analysis_runner: AnalysisRunnerInternal, project: ProjectId | None = None
     ) -> str:
         """Insert analysis runner log"""
-        return await self.at.insert_analysis_runner_entry(analysis_runner)
+        return await self.at.insert_analysis_runner_entry(analysis_runner, project)
