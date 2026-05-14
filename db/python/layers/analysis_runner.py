@@ -34,7 +34,7 @@ class AnalysisRunnerLayer(BaseLayer):
     # INSERTS
 
     async def insert_analysis_runner_entry(
-        self, analysis_runner: AnalysisRunnerInternal, project: ProjectId | None = None
+        self, analysis_runner: AnalysisRunnerInternal
     ) -> str:
         """Insert analysis runner log"""
-        return await self.at.insert_analysis_runner_entry(analysis_runner, project)
+        return await self.at.insert_analysis_runner_entry(analysis_runner)

@@ -72,8 +72,7 @@ class AnalysisRunnerMutations:
                     project=target_project.id,
                     audit_log_id=None,
                     output_path=analysis_runner.output_path,
-                ),
-                target_project.id
+                )
             )
 
             return analysis_id
