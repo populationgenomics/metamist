@@ -17,6 +17,7 @@ class TestAnalysisRunner:
         self.al = AnalysisRunnerLayer(connection_with_project)
         assert connection_with_project.project_id is not None
         self.project_id = connection_with_project.project_id
+        assert connection_with_project.project is not None
         self.project_name = connection_with_project.project.name
 
     def get_test_analysis(self, ar_guid_param: str) -> AnalysisRunnerInternal:
