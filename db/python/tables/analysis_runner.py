@@ -71,7 +71,7 @@ class AnalysisRunnerTable(DbBase):
         output_path, audit_log_id
         )
         VALUES (
-        {self.project_id}, {analysis_runner.ar_guid}, {datetime.datetime.now()}, {analysis_runner.access_level},
+        {analysis_runner.project}, {analysis_runner.ar_guid}, {datetime.datetime.now()}, {analysis_runner.access_level},
         {analysis_runner.repository}, {analysis_runner.commit}, {analysis_runner.script}, {analysis_runner.description},
         {analysis_runner.driver_image}, {analysis_runner.config_path}, {analysis_runner.cwd}, {analysis_runner.environment},
         {analysis_runner.hail_version}, {analysis_runner.batch_url}, {analysis_runner.submitting_user}, {meta_param},

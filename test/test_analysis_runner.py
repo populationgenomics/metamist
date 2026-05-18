@@ -17,6 +17,8 @@ class TestAnalysisRunner:
         self.al = AnalysisRunnerLayer(connection_with_project)
         assert connection_with_project.project_id is not None
         self.project_id = connection_with_project.project_id
+        assert connection_with_project.project is not None
+        self.project_name = connection_with_project.project.name
 
     def get_test_analysis(self, ar_guid_param: str) -> AnalysisRunnerInternal:
         return AnalysisRunnerInternal(
@@ -117,3 +119,48 @@ class TestAnalysisRunner:
 
         result = await self.al.query(AnalysisRunnerFilter())
         assert result
+
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_graph_query(self, graphql_query):
+        """
+        Test createAnalysisRunnerLog mutation
+        """
+        ar_guid = '0511a4bb-1010-4cbf-af6a-1e807be8cad6'
+        analysis_runner_log_entry = (
+            await graphql_query(
+                """
+                mutation CreateLog($project: String!, $input: AnalysisRunnerInput!) {
+                  analysisRunner {
+                    createAnalysisRunnerLog(project: $project, analysisRunner: $input)
+                  }
+                }
+        """,
+                {
+                    'project': self.project_name,
+                    'input': {
+                        'arGuid': ar_guid,
+                        'accessLevel': 'test',
+                        'repository': 'metamist',
+                        'commit': 'some-hash',
+                        'script': 'myFakeScript.py',
+                        'description': 'just analysis things',
+                        'driverImage': 'fake-australia-southeast1-fake-docker.pkg',
+                        'configPath': 'gs://path/to/config.toml',
+                        'cwd': 'scripts',
+                        'environment': 'gcp',
+                        'hailVersion': '1.0',
+                        'batchUrl': 'FAKE://batch.hail.populationgenomics.org.au/batches/fake_2',
+                        'submittingUser': 'fake-user',
+                        'outputPath': 'gs://my-bucket/output/path',
+                        'meta': {
+                            'runtime_minutes': '45',
+                            'status': 'initialized',
+                            'internal_priority': 'low',
+                        },
+                    },
+                },
+            )
+        )['data']['analysisRunner']['createAnalysisRunnerLog']
+
+        assert analysis_runner_log_entry == ar_guid
