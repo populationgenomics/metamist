@@ -494,7 +494,7 @@ class TestAnalysis:
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_get_sg_without_given_type(self):
         """
-        Test getting an analysis by id
+        Test getting sequencing group IDs whose associated analysis is not of a given type
         """
         analysis_id = await self.al.create_analysis(
             AnalysisInternal(
