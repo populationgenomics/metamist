@@ -494,7 +494,7 @@ class TestAnalysis:
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_get_latest_complete_analysis(self):
         """
-        Test getting an analysis by id
+        Test getting the most recently completed analysis' id
         """
         analysis_first_id = await self.al.create_analysis(
             AnalysisInternal(
