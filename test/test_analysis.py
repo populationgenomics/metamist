@@ -490,3 +490,33 @@ class TestAnalysis:
         assert len(analyses) == 1
         assert analyses[0].id == analysis_id
         assert not analyses[0].active
+
+    @pytest.mark.project_roles(['reader', 'writer'])
+    async def test_get_analysis_by_id(self):
+        """
+        Test getting an analysis by id
+        """
+        analysis_first_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.genome_sequencing_group_id],
+                meta={'sequencing_type': 'genome', 'size': 1024},
+                timestamp_completed=datetime(2025, 12, 31)
+            )
+        )
+
+        analysis_last_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.exome_sequencing_group_id],
+                meta={'sequencing_type': 'genome', 'size': 1024},
+                timestamp_completed=datetime(2026, 1, 1)
+            )
+        )
+
+        assert analysis_first_id != analysis_last_id
+
+        latest_complete = await self.al.get_latest_complete_analysis_for_type(self.project_id, 'cram')
+        assert latest_complete.id == analysis_last_id
