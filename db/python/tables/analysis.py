@@ -351,7 +351,7 @@ class AnalysisTable(DbBase):
         if meta:
             for k, v in meta.items():
                 # k_replacer = f'meta_{k}'
-                meta_query += t" AND json_extract(meta, '$.{k}') = {v}"
+                meta_query += t" AND meta::json->>{k} = {v}"
                 # if v is None:
                 #     # mariadb does a bad cast for NULL
                 #     v = 'null'  # noqa: PLW2901
