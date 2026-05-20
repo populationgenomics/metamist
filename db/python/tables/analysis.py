@@ -345,17 +345,11 @@ class AnalysisTable(DbBase):
         meta: dict[str, Any] | None = None,
     ):
         """Find the most recent completed analysis for some analysis type"""
-        values = {'project': project, 'type': analysis_type}
 
         meta_query = t''
         if meta:
             for k, v in meta.items():
-                # k_replacer = f'meta_{k}'
                 meta_query += t" AND meta::json->>{k} = {v}"
-                # if v is None:
-                #     # mariadb does a bad cast for NULL
-                #     v = 'null'  # noqa: PLW2901
-                # values[k_replacer] = v
 
         _query = t"""
             SELECT a.id as id, a.type as type, a.status as status,
