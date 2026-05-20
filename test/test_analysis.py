@@ -507,7 +507,11 @@ class TestAnalysis:
 
         analysis = await self.al.get_analysis_by_id(analysis_id)
         assert analysis.id == analysis_id
-        
-        sg_without_type = await self.al.get_all_sequencing_group_ids_without_analysis_type(self.project_id, 'cram')
+
+        sg_without_type = (
+            await self.al.get_all_sequencing_group_ids_without_analysis_type(
+                self.project_id, 'cram'
+            )
+        )
         assert len(sg_without_type) == 1
         assert sg_without_type[0] == self.exome_sequencing_group_id
