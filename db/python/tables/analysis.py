@@ -349,7 +349,7 @@ class AnalysisTable(DbBase):
         meta_query = t''
         if meta:
             for k, v in meta.items():
-                meta_query += t" AND meta::json->>{k} = {v}"
+                meta_query += t' AND meta::json->>{k} = {v}'
 
         _query = t"""
             SELECT a.id as id, a.type as type, a.status as status,
