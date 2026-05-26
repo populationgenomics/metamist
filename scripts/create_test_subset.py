@@ -236,7 +236,9 @@ def get_sids_by_random_sampling(
 
     # all_sids here is a set of all internal IDs in the project, minus any we already selected
     all_sids = {
-        sid['id'] for sid in sid_output.get('project').get('samples')
+        sid['id']
+        for sid in sid_output.get('project').get('samples')
+        if sid.get('sequencingGroups')  # skip samples with no active SGs — nothing to transfer
     } - samples_so_far
 
     logger.info(
