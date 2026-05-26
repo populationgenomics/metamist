@@ -987,24 +987,28 @@ def transfer_participants(
 
     participants_to_transfer = []
     for participant in participant_data:
-        for alt_id in participant['externalIds'].values():
-            if alt_id in target_project_pid_map:
-                # Participants with id field will be updated & those without will be inserted
-                participant['id'] = target_project_pid_map[alt_id]
-            else:
-                del participant['id']
-            transfer_participant = {
+        # Match a single target participant if any of this source participant's
+        # external_ids already exists there; otherwise leave id None to insert.
+        target_id = next(
+            (
+                target_project_pid_map[alt_id]
+                for alt_id in participant['externalIds'].values()
+                if alt_id in target_project_pid_map
+            ),
+            None,
+        )
+        participants_to_transfer.append(
+            {
                 'external_ids': participant['externalIds'],
                 'meta': participant.get('meta') or {},
                 'karyotype': participant.get('karyotype'),
                 'reported_gender': participant.get('reportedGender'),
                 'reported_sex': participant.get('reportedSex'),
                 'phenotypes': participant.get('phenotypes'),
-                'id': participant.get('id'),
+                'id': target_id,
                 'samples': [],
             }
-            # Participants are being created before the samples are, so this will be empty for now.
-            participants_to_transfer.append(transfer_participant)
+        )
 
     if dry_run:
         logger.info(
