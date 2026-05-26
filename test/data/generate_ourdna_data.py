@@ -206,7 +206,8 @@ def random_list(
 
 
 def make_sequencing_groups(root_external_id: str) -> list[SequencingGroupUpsert]:
-    """Build the two SGs that hang off a whole-blood sample.
+    """
+    Build the two SGs that hang off a whole-blood sample.
 
     Every whole-blood sample gets both a genome SG (one R1+R2 fastq assay) and a
     genotypingarray SG (no assays). This mirrors the prod ourdna 'multi-SG-type'
@@ -485,21 +486,22 @@ def register_enums(enums_api: EnumsApi) -> None:
 
     enums_api.post_assay_types(new_type='sequencing')
 
-    for analysis_type in {a for defn in SG_DEFINITIONS.values() for a in defn['analyses']}:
+    for analysis_type in {
+        a for defn in SG_DEFINITIONS.values() for a in defn['analyses']
+    }:
         enums_api.post_analysis_types(new_type=analysis_type)
 
 
 def attach_sgs_to_whole_blood_samples(sample_api: SampleApi, project: str) -> None:
-    """Find every whole-blood sample without SGs and attach the two-SG set.
+    """
+    Find every whole-blood sample without SGs and attach the two-SG set.
 
     The participant upsert path only collects SGs from top-level samples, so
     SGs declared on nested whole-blood samples are silently dropped. Run this
     as a second pass against the freshly-created whole-blood sample IDs.
     """
     resp = query(WHOLE_BLOOD_WITHOUT_SGS_QUERY, {'project': project})
-    samples = [
-        s for s in resp['project']['samples'] if not s.get('sequencingGroups')
-    ]
+    samples = [s for s in resp['project']['samples'] if not s.get('sequencingGroups')]
     if not samples:
         return
 
@@ -517,7 +519,8 @@ def attach_sgs_to_whole_blood_samples(sample_api: SampleApi, project: str) -> No
 def create_analyses_for_new_sgs(
     analysis_api: AnalysisApi, project: str, existing_sg_ids: set[str]
 ) -> None:
-    """Create one analysis per analysis type for every SG newly added to the project.
+    """
+    Create one analysis per analysis type for every SG newly added to the project.
 
     Genome SGs get a cram + gvcf, array SGs get a genotypingarray_gtc. Paths use
     a FAKE:// scheme so metamist skips GCS validation and stores the path as a
