@@ -913,10 +913,9 @@ def transfer_families(
             )
 
     if dry_run:
-        with open(tmp_family_tsv) as family_file:  # noqa: PTH123
-            logger.info(
-                f'[dry-run] Would fapi.import_families(project={target_project!r}) with TSV:\n{family_file.read()}'
-            )
+        logger.info(
+            f'[dry-run] Would fapi.import_families(project={target_project!r}) with {len(families)} families'
+        )
     else:
         with open(tmp_family_tsv) as family_file:  # noqa: PTH123
             fapi.import_families(file=family_file, project=target_project)
@@ -943,10 +942,10 @@ def transfer_ped(
         tmp_ped.write(ped_tsv)
 
     if dry_run:
+        ped_row_count = max(0, ped_tsv.count('\n') - 1)
         logger.info(
-            f'[dry-run] Would fapi.import_pedigree(project={target_project!r}) with TSV:\n{ped_tsv}'
+            f'[dry-run] Would fapi.import_pedigree(project={target_project!r}) with {ped_row_count} pedigree rows across {len(family_ids)} families'
         )
-        # Target has no participants in dry-run; reuse source IDs.
         return {
             alt_id: participant['id']
             for participant in (participant_data or [])
@@ -1012,10 +1011,8 @@ def transfer_participants(
 
     if dry_run:
         logger.info(
-            f'[dry-run] Would papi.upsert_participants(project={target_project!r}) with {len(participants_to_transfer)} participants:'
+            f'[dry-run] Would papi.upsert_participants(project={target_project!r}) with {len(participants_to_transfer)} participants'
         )
-        for p in participants_to_transfer:
-            logger.info(f'[dry-run]   {p}')
         # Reuse source IDs as placeholders.
         return {
             alt_id: participant['id']
