@@ -79,11 +79,12 @@ QUERY_ALL_DATA = gql(
                         meta
                         type
                     }
-                    analyses(type: {in_: ["cram", "gvcf"]}) {
+                    analyses(type: {in_: ["cram", "gvcf", "genotypingarray_gtc"]}) {
                         active
                         id
                         meta
                         output
+                        outputs
                         status
                         timestampCompleted
                         type
@@ -566,13 +567,6 @@ def transfer_analyses(
     """
     new_sg_data = query(SG_ID_QUERY, {'project': target_project})
 
-    new_sg_map = {}
-    for s in new_sg_data.get('project').get('samples'):
-        sg_ids: list = []
-        for sg in s.get('sequencingGroups'):
-            sg_ids.append(sg.get('id'))
-        new_sg_map[s.get('externalId')] = sg_ids
-
     for s in samples:
         for sg in s['sequencingGroups']:
             new_sg_attributes = sg.get('type'), sg.get('platform'), sg.get('technology')
@@ -591,6 +585,13 @@ def transfer_analyses(
             )
             existing_sgid = existing_sg.get('id') if existing_sg else None
             for analysis in sg['analyses']:
+                # Newer analyses store the path in the structured `outputs` field;
+                # older ones use the plain `output` string. Prefer the former.
+                analysis_path = (
+                    analysis['outputs'].get('path')
+                    if isinstance(analysis.get('outputs'), dict)
+                    else None
+                ) or analysis['output']
                 existing_analysis: dict = {}
                 if existing_sgid:
                     existing_analysis = get_existing_analysis(
@@ -603,15 +604,15 @@ def transfer_analyses(
                     am = AnalysisUpdateModel(
                         type=analysis['type'],
                         output=copy_files_in_dict(
-                            analysis['output'],
+                            analysis_path,
                             project,
-                            (str(sg['id']), new_sg_map[s['externalId']][0]),
+                            (str(sg['id']), new_sequencing_group_id[0]),
                             update_embedded_ids,
                         ),
                         status=AnalysisStatus(
                             analysis['status'].lower().replace('_', '-')
                         ),
-                        sequencing_group_ids=new_sg_map[s['externalId']],
+                        sequencing_group_ids=new_sequencing_group_id,
                         meta=analysis['meta'],
                     )
                     aapi.update_analysis(
@@ -622,9 +623,9 @@ def transfer_analyses(
                     am = Analysis(
                         type=analysis['type'],
                         output=copy_files_in_dict(
-                            analysis['output'],
+                            analysis_path,
                             project,
-                            (str(sg['id']), new_sg_map[s['externalId']][0]),
+                            (str(sg['id']), new_sequencing_group_id[0]),
                             update_embedded_ids,
                         ),
                         status=AnalysisStatus(
