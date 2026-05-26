@@ -257,12 +257,15 @@ def main(
     cohorts: set[str],
     skip_ped: bool,
     update_embedded_ids: bool,
+    local_mode: bool = False,
+    dry_run: bool = False,
 ):
     """
     Script creates a test subset for a given project.
     A new project with a suffix -test is created, and for any files in sample/meta,
     sequence/meta, or analysis/output a copy in the -test namespace is created.
     """
+    skip_gcs = local_mode or dry_run
     if not any(
         [additional_families, additional_samples, samples_n, families_n, cohorts]
     ):
@@ -333,16 +336,31 @@ def main(
         upserted_participant_map = transfer_participants(
             target_project=target_project,
             participant_data=participant_data,
+            dry_run=dry_run,
         )
 
     else:
         logger.info(f'Transferring {len(participant_data)} participants. ')
         family_ids = transfer_families(
-            project, target_project, internal_participant_ids
+            project, target_project, internal_participant_ids, dry_run=dry_run
         )
-        upserted_participant_map = transfer_ped(project, target_project, family_ids)
+        upserted_participant_map = transfer_ped(
+            project,
+            target_project,
+            family_ids,
+            participant_data=participant_data,
+            dry_run=dry_run,
+        )
 
     existing_data = query(EXISTING_DATA_QUERY, {'project': target_project})
+
+    # Skipping GCS means no real files to reheader; disable the Hail Batch jobs.
+    if skip_gcs and update_embedded_ids:
+        logger.info(
+            '--local-mode / --dry-run: disabling --update-embedded-ids '
+            '(no real files to reheader)'
+        )
+        update_embedded_ids = False
 
     # Create batch if needed for running header updating jobs
     if update_embedded_ids:
@@ -360,6 +378,8 @@ def main(
         upserted_participant_map=upserted_participant_map,
         target_project=target_project,
         project=project,
+        skip_gcs=skip_gcs,
+        dry_run=dry_run,
     )
 
     logger.info('Transferring analyses')
@@ -371,6 +391,8 @@ def main(
         old_sid_to_new_sid,
         sample_to_sg_attribute_map,
         update_embedded_ids,
+        skip_gcs=skip_gcs,
+        dry_run=dry_run,
     )
     logger.info('Subset generation complete!')
 
@@ -385,6 +407,8 @@ def transfer_samples_sgs_assays(
     upserted_participant_map: dict[str, int],
     target_project: str,
     project: str,
+    skip_gcs: bool = False,
+    dry_run: bool = False,
 ):
     """
     Transfer samples, sequencing groups, and assays from the original project to the
@@ -411,30 +435,39 @@ def transfer_samples_sgs_assays(
 
         existing_pid: int | None = None
         if s['participant']:
-            existing_pid = upserted_participant_map[s['participant']['externalId']]
+            existing_pid = upserted_participant_map.get(s['participant']['externalId'])
 
         sample_upsert = SampleUpsert(
             external_ids=s['externalIds'],
             type=sample_type or None,
-            meta=(copy_files_in_dict(s['meta'], project) or {}),
+            meta=(copy_files_in_dict(s['meta'], project, skip_gcs=skip_gcs) or {}),
             participant_id=existing_pid,
-            sequencing_groups=upsert_sequencing_groups(s, existing_data, project),
+            sequencing_groups=upsert_sequencing_groups(
+                s, existing_data, project, skip_gcs=skip_gcs
+            ),
             id=existing_sid,
         )
 
         logger.info(f'Processing sample {s["id"]}')
-        logger.info('Creating test sample entry')
-        new_sample_id = sapi.create_sample(
-            project=target_project,
-            sample_upsert=sample_upsert,
-        )
+        if dry_run:
+            logger.info(
+                f'[dry-run] Would sapi.create_sample(project={target_project!r}): {sample_upsert}'
+            )
+            # Placeholder so downstream path-rewrites still work; old==new for dry-run.
+            new_sample_id = s['id']
+        else:
+            logger.info('Creating test sample entry')
+            new_sample_id = sapi.create_sample(
+                project=target_project,
+                sample_upsert=sample_upsert,
+            )
         old_sid_to_new_sid[s['id']] = new_sample_id
 
     return old_sid_to_new_sid, sample_to_sg_attribute_map
 
 
 def upsert_sequencing_groups(
-    sample: dict, existing_data: dict, project: str
+    sample: dict, existing_data: dict, project: str, skip_gcs: bool = False
 ) -> list[SequencingGroupUpsert]:
     """Create SG Upsert Objects for a sample"""
     sgs_to_upsert: list[SequencingGroupUpsert] = []
@@ -451,7 +484,12 @@ def upsert_sequencing_groups(
             technology=sg.get('technology'),
             type=sg.get('type'),
             assays=upsert_assays(
-                sg, existing_sgid, existing_data, sample.get('externalId'), project
+                sg,
+                existing_sgid,
+                existing_data,
+                sample.get('externalId'),
+                project,
+                skip_gcs=skip_gcs,
             ),
         )
         sgs_to_upsert.append(sg_upsert)
@@ -465,6 +503,7 @@ def upsert_assays(
     existing_data: dict,
     sample_external_id,
     project: str,
+    skip_gcs: bool = False,
 ) -> list[AssayUpsert]:
     """Create Assay Upsert Objects for a sequencing group"""
     print(sg)
@@ -481,7 +520,7 @@ def upsert_assays(
             type=assay.get('type'),
             id=existing_assay_id,
             external_ids=assay.get('externalIds') or {},
-            meta=copy_files_in_dict(assay.get('meta'), project),
+            meta=copy_files_in_dict(assay.get('meta'), project, skip_gcs=skip_gcs),
         )
 
         assays_to_upsert.append(assay_upsert)
@@ -561,11 +600,36 @@ def transfer_analyses(
     old_sid_to_new_sid: dict[str, str],
     sample_to_sg_attribute_map: dict[tuple, dict[tuple, str]],
     update_embedded_ids: bool,
+    skip_gcs: bool = False,
+    dry_run: bool = False,
 ):
     """
     This function will transfer the analyses from the original project to the test project.
     """
-    new_sg_data = query(SG_ID_QUERY, {'project': target_project})
+    if dry_run:
+        # Target has no new SGs in dry-run; reuse source IDs as the "new" ids.
+        new_sg_data = {
+            'project': {
+                'samples': [
+                    {
+                        'id': old_sid_to_new_sid.get(s['id'], s['id']),
+                        'externalId': s['externalId'],
+                        'sequencingGroups': [
+                            {
+                                'id': sg['id'],
+                                'type': sg['type'],
+                                'platform': sg['platform'],
+                                'technology': sg['technology'],
+                            }
+                            for sg in s['sequencingGroups']
+                        ],
+                    }
+                    for s in samples
+                ]
+            }
+        }
+    else:
+        new_sg_data = query(SG_ID_QUERY, {'project': target_project})
 
     for s in samples:
         for sg in s['sequencingGroups']:
@@ -608,6 +672,7 @@ def transfer_analyses(
                             project,
                             (str(sg['id']), new_sequencing_group_id[0]),
                             update_embedded_ids,
+                            skip_gcs=skip_gcs,
                         ),
                         status=AnalysisStatus(
                             analysis['status'].lower().replace('_', '-')
@@ -615,10 +680,15 @@ def transfer_analyses(
                         sequencing_group_ids=new_sequencing_group_id,
                         meta=analysis['meta'],
                     )
-                    aapi.update_analysis(
-                        analysis_id=existing_analysis_id,
-                        analysis_update_model=am,
-                    )
+                    if dry_run:
+                        logger.info(
+                            f'[dry-run] Would aapi.update_analysis(analysis_id={existing_analysis_id}): {am}'
+                        )
+                    else:
+                        aapi.update_analysis(
+                            analysis_id=existing_analysis_id,
+                            analysis_update_model=am,
+                        )
                 else:
                     am = Analysis(
                         type=analysis['type'],
@@ -627,6 +697,7 @@ def transfer_analyses(
                             project,
                             (str(sg['id']), new_sequencing_group_id[0]),
                             update_embedded_ids,
+                            skip_gcs=skip_gcs,
                         ),
                         status=AnalysisStatus(
                             analysis['status'].lower().replace('_', '-')
@@ -635,8 +706,15 @@ def transfer_analyses(
                         meta=analysis['meta'],
                     )
 
-                    logger.info(f'Creating {analysis["type"]}analysis entry in test')
-                    aapi.create_analysis(project=target_project, analysis=am)
+                    if dry_run:
+                        logger.info(
+                            f'[dry-run] Would aapi.create_analysis(project={target_project!r}): {am}'
+                        )
+                    else:
+                        logger.info(
+                            f'Creating {analysis["type"]} analysis entry in test'
+                        )
+                        aapi.create_analysis(project=target_project, analysis=am)
 
 
 def get_existing_sample(data: dict, sample_id: str) -> dict | None:
@@ -795,7 +873,10 @@ def get_sids_for_cohorts(
 
 
 def transfer_families(
-    initial_project: str, target_project: str, internal_participant_ids: list[int]
+    initial_project: str,
+    target_project: str,
+    internal_participant_ids: list[int],
+    dry_run: bool = False,
 ) -> list[int]:
     """Pull relevant families from the input project, and copy to target_project"""
     family_data = query(
@@ -831,14 +912,24 @@ def transfer_families(
                 ]
             )
 
-    with open(tmp_family_tsv) as family_file:  # noqa: PTH123
-        fapi.import_families(file=family_file, project=target_project)
+    if dry_run:
+        with open(tmp_family_tsv) as family_file:  # noqa: PTH123
+            logger.info(
+                f'[dry-run] Would fapi.import_families(project={target_project!r}) with TSV:\n{family_file.read()}'
+            )
+    else:
+        with open(tmp_family_tsv) as family_file:  # noqa: PTH123
+            fapi.import_families(file=family_file, project=target_project)
 
     return family_ids
 
 
 def transfer_ped(
-    initial_project: str, target_project: str, family_ids: list[int]
+    initial_project: str,
+    target_project: str,
+    family_ids: list[int],
+    participant_data: list[dict] | None = None,
+    dry_run: bool = False,
 ) -> dict[str, int]:
     """Pull pedigree from the input project, and copy to target_project"""
     ped_tsv = fapi.get_pedigree(
@@ -850,6 +941,17 @@ def transfer_ped(
     # Work-around as import_pedigree takes a file.
     with open(tmp_ped_tsv, 'w') as tmp_ped:  # noqa: PTH123
         tmp_ped.write(ped_tsv)
+
+    if dry_run:
+        logger.info(
+            f'[dry-run] Would fapi.import_pedigree(project={target_project!r}) with TSV:\n{ped_tsv}'
+        )
+        # Target has no participants in dry-run; reuse source IDs.
+        return {
+            alt_id: participant['id']
+            for participant in (participant_data or [])
+            for alt_id in participant['externalIds'].values()
+        }
 
     with open(tmp_ped_tsv) as ped_file:  # noqa: PTH123
         fapi.import_pedigree(
@@ -871,6 +973,7 @@ def transfer_ped(
 def transfer_participants(
     target_project: str,
     participant_data,
+    dry_run: bool = False,
 ) -> dict[str, int]:
     """Transfers relevant participants between projects"""
 
@@ -902,6 +1005,19 @@ def transfer_participants(
             }
             # Participants are being created before the samples are, so this will be empty for now.
             participants_to_transfer.append(transfer_participant)
+
+    if dry_run:
+        logger.info(
+            f'[dry-run] Would papi.upsert_participants(project={target_project!r}) with {len(participants_to_transfer)} participants:'
+        )
+        for p in participants_to_transfer:
+            logger.info(f'[dry-run]   {p}')
+        # Reuse source IDs as placeholders.
+        return {
+            alt_id: participant['id']
+            for participant in participant_data
+            for alt_id in participant['externalIds'].values()
+        }
 
     upserted_participants = papi.upsert_participants(
         target_project, participant_upsert=participants_to_transfer
@@ -1021,21 +1137,20 @@ def copy_files_in_dict(
     dataset: str,
     sid_replacement: tuple[str, str] = None,
     update_embedded_ids: bool = False,
+    skip_gcs: bool = False,
 ):
     """
     Replaces all `gs://cpg-{project}-main*/` paths
     into `gs://cpg-{project}-test*/` and creates copies if needed
     If `d` is dict or list, recursively calls this function on every element
     If `d` is str, replaces the path
+
+    `skip_gcs` rewrites the path but skips all GCS calls.
     """
     if not d:
         return d
     if isinstance(d, str) and d.startswith(f'gs://cpg-{dataset}-main'):
-        logger.info(f'Looking for analysis file {d}')
         old_path = d
-        if not file_exists(old_path):
-            logger.warning(f'File {old_path} does not exist')
-            return d
         new_path = old_path.replace(
             f'gs://cpg-{dataset}-main', f'gs://cpg-{dataset}-test'
         )
@@ -1043,6 +1158,15 @@ def copy_files_in_dict(
         # With the new internal sample ID from the test project
         if sid_replacement is not None:
             new_path = new_path.replace(sid_replacement[0], sid_replacement[1])
+
+        if skip_gcs:
+            logger.info(f'[skip-gcs] Would rewrite {old_path} -> {new_path}')
+            return new_path
+
+        logger.info(f'Looking for analysis file {old_path}')
+        if not file_exists(old_path):
+            logger.warning(f'File {old_path} does not exist')
+            return d
 
         job = None
 
@@ -1078,9 +1202,9 @@ def copy_files_in_dict(
                 logger.error(f'{new_path} already exists')
         return new_path
     if isinstance(d, list):
-        return [copy_files_in_dict(x, dataset) for x in d]
+        return [copy_files_in_dict(x, dataset, skip_gcs=skip_gcs) for x in d]
     if isinstance(d, dict):
-        return {k: copy_files_in_dict(v, dataset) for k, v in d.items()}
+        return {k: copy_files_in_dict(v, dataset, skip_gcs=skip_gcs) for k, v in d.items()}
     return d
 
 
@@ -1159,6 +1283,16 @@ if __name__ == '__main__':
         help='Update IDs embedded within CRAM and VCF files (on by default)',
         default=True,
     )
+    parser.add_argument(
+        '--local-mode',
+        action='store_true',
+        help='Skip GCS calls; still upsert to metamist.',
+    )
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='Implies --local-mode; log metamist upserts without executing them.',
+    )
     args, fail = parser.parse_known_args()
     if fail:
         parser.print_help()
@@ -1174,4 +1308,6 @@ if __name__ == '__main__':
         skip_ped=args.skip_ped,
         cohorts=set(args.cohorts),
         update_embedded_ids=args.update_embedded_ids,
+        local_mode=args.local_mode,
+        dry_run=args.dry_run,
     )
