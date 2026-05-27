@@ -269,6 +269,17 @@ def main(  # noqa: PLR0913
     sequence/meta, or analysis/output a copy in the -test namespace is created.
     """
     skip_gcs = local_mode or dry_run
+
+    # --local-mode is for seeding a local metamist instance only. Refuse otherwise so we
+    # don't accidentally write subset records into a non-local instance with no real
+    # files behind them.
+    if local_mode:
+        sm_environment = os.environ.get('SM_ENVIRONMENT', '').lower()
+        if sm_environment != 'local':
+            raise RuntimeError(
+                f'--local-mode requires SM_ENVIRONMENT=local, got {sm_environment!r}.'
+            )
+
     if not any(
         [additional_families, additional_samples, samples_n, families_n, cohorts]
     ):
@@ -1297,12 +1308,12 @@ if __name__ == '__main__':
     parser.add_argument(
         '--local-mode',
         action='store_true',
-        help='Skip GCS calls; still upsert to metamist.',
+        help='Run against a local metamist instance only (requires SM_ENVIRONMENT=local). Skips GCS calls.',
     )
     parser.add_argument(
         '--dry-run',
         action='store_true',
-        help='Implies --local-mode; log metamist upserts without executing them.',
+        help='Log metamist writes without executing them. Skips GCS calls. Safe against any environment.',
     )
     args, fail = parser.parse_known_args()
     if fail:
