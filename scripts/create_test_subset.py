@@ -317,14 +317,19 @@ def main(  # noqa: PLR0913
         QUERY_ALL_DATA, {'project': project, 'sids': list(additional_samples)}
     )
 
-    # Pull Participant Data
-    participant_data = []
-    internal_participant_ids: list = []
-    for sg in original_project_subset_data.get('project').get('samples', []):
-        participant = sg.get('participant')
+    # Pull Participant Data. One donor can have multiple samples (e.g. a whole-blood
+    # sample and a PBMC sample), so two of the returned samples can point at the same
+    # participant. Keying by participant id keeps one entry per participant. If a
+    # participant shows up twice, both copies hold the same data, so overwriting is
+    # safe — but it does happen silently, with no warning.
+    participants_by_id: dict[int, dict] = {}
+    for sample in original_project_subset_data.get('project').get('samples', []):
+        participant = sample.get('participant')
         if participant:
-            participant_data.append(participant)
-            internal_participant_ids.append(participant.get('id'))
+            participants_by_id[participant['id']] = participant
+
+    participant_data = list(participants_by_id.values())
+    internal_participant_ids: list[int] = list(participants_by_id.keys())
 
     # Populating test project
     target_project = project + '-test'
