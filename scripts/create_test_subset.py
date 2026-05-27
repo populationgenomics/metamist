@@ -234,11 +234,12 @@ def get_sids_by_random_sampling(
     logger.info(f'Querying all samples in {project}')
     sid_output = query(SG_ID_QUERY, variables={'project': project})
 
-    # all_sids here is a set of all internal IDs in the project, minus any we already selected
+    # all_sids here is a set of all internal IDs in the project, minus any we already selected.
+    # Samples with no active sequencing groups are skipped — nothing to transfer.
     all_sids = {
         sid['id']
         for sid in sid_output.get('project').get('samples')
-        if sid.get('sequencingGroups')  # skip samples with no active SGs — nothing to transfer
+        if sid.get('sequencingGroups')
     } - samples_so_far
 
     logger.info(
@@ -249,7 +250,7 @@ def get_sids_by_random_sampling(
     return random.sample(sorted(all_sids), sample_count)
 
 
-def main(
+def main(  # noqa: PLR0913
     project: str,
     samples_n: int,
     families_n: int,
@@ -1135,7 +1136,7 @@ def extra_file_commands(batch, job, new_path: str):
         batch.write_output(job.new_md5, new_path)
 
 
-def copy_files_in_dict(
+def copy_files_in_dict(  # noqa: PLR0911
     d,
     dataset: str,
     sid_replacement: tuple[str, str] = None,
@@ -1207,7 +1208,9 @@ def copy_files_in_dict(
     if isinstance(d, list):
         return [copy_files_in_dict(x, dataset, skip_gcs=skip_gcs) for x in d]
     if isinstance(d, dict):
-        return {k: copy_files_in_dict(v, dataset, skip_gcs=skip_gcs) for k, v in d.items()}
+        return {
+            k: copy_files_in_dict(v, dataset, skip_gcs=skip_gcs) for k, v in d.items()
+        }
     return d
 
 
