@@ -5,8 +5,18 @@ import pytest
 from db.python.connect import Connection
 from db.python.filters.generic import GenericFilter
 from db.python.filters.sample import SampleFilter
+from db.python.filters.sequencing_group import SequencingGroupFilter
 from db.python.layers.sample import SampleLayer
-from models.models import PRIMARY_EXTERNAL_ORG, SampleUpsertInternal
+from db.python.layers.sequencing_group import SequencingGroupLayer
+from models.models import (
+    PRIMARY_EXTERNAL_ORG,
+    AnalysisInternal,
+    AssayUpsertInternal,
+    ParticipantUpsertInternal,
+    SampleUpsertInternal,
+    SequencingGroupUpsertInternal,
+    parse_sql_bool,
+)
 
 
 class TestSample:
@@ -275,6 +285,101 @@ class TestSample:
 
         assert history[0].external_ids == {}
         assert history[1].external_ids == {}
+
+    @pytest.mark.project_roles(['reader', 'writer'])
+    async def test_merge_samples(self, connection_with_project: Connection):
+        """
+        Test that update_analysis(active=False) is effective
+        """
+
+        project_id = connection_with_project.project_id
+        sl = SampleLayer(connection_with_project)
+        sgl = SequencingGroupLayer(connection_with_project)
+
+        meta_keep_key = 'meta01'
+        meta_keep_value = 'meta :)'
+        meta_merge_key = 'meta02'
+        meta_merge_value = 'meta :('
+
+        keep_sample = await sl.upsert_sample(
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test01'},
+                type='blood',
+                meta={meta_keep_key: meta_keep_value},
+                active=True,
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={},
+                        sample_id=None,
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta={
+                                    'sequencing_type': 'genome',
+                                    'sequencing_technology': 'short-read',
+                                    'sequencing_platform': 'illumina',
+                                },
+                            )
+                        ],
+                    )
+                ],
+            )
+        )
+
+        merge_sample = await sl.upsert_sample(
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'Test02'},
+                type='blood',
+                meta={meta_merge_key: meta_merge_value},
+                active=True,
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='exome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={},
+                        sample_id=None,
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta={
+                                    'sequencing_type': 'exome',
+                                    'sequencing_technology': 'short-read',
+                                    'sequencing_platform': 'illumina',
+                                },
+                            )
+                        ],
+                    ),
+                ],
+            )
+        )
+
+        assert keep_sample.id
+        assert merge_sample.id
+
+        keep_sg = await sgl.query(SequencingGroupFilter(sample=SequencingGroupFilter.SequencingGroupSampleFilter(id=GenericFilter(eq=keep_sample.id))))
+        merge_sg = await sgl.query(SequencingGroupFilter(sample=SequencingGroupFilter.SequencingGroupSampleFilter(id=GenericFilter(eq=merge_sample.id))))
+
+        samples = await sl.get_samples_by(project_ids=[project_id])
+        assert len(samples) == 2
+
+        new_sample = await sl.merge_samples(keep_sample.id, merge_sample.id)
+
+        samples = await sl.get_samples_by(project_ids=[project_id])
+        # Check that the "keep" sample is the only one remaining
+        assert len(samples) == 1
+        assert new_sample.id == keep_sample.id
+        # Check that the meta fields have been merged
+        assert new_sample.meta[meta_keep_key] == meta_keep_value
+        assert new_sample.meta[meta_merge_key] == meta_merge_value
+        # Check that the sequencing groups all belong to the same sample now
+        new_sample_sgs = await sgl.query(SequencingGroupFilter(sample=SequencingGroupFilter.SequencingGroupSampleFilter(id=GenericFilter(eq=new_sample.id))))
+        new_sample_sgs_ids = [sg.id for sg in new_sample_sgs]
+        assert keep_sg[0].id in new_sample_sgs_ids
+        assert merge_sg[0].id in new_sample_sgs_ids
 
 
 class TestSampleUnwrapping(unittest.TestCase):
