@@ -6,16 +6,14 @@ from db.python.connect import Connection
 from db.python.filters.generic import GenericFilter
 from db.python.filters.sample import SampleFilter
 from db.python.filters.sequencing_group import SequencingGroupFilter
+from db.python.layers.assay import AssayLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
-    AnalysisInternal,
     AssayUpsertInternal,
-    ParticipantUpsertInternal,
     SampleUpsertInternal,
     SequencingGroupUpsertInternal,
-    parse_sql_bool,
 )
 
 
@@ -289,10 +287,11 @@ class TestSample:
     @pytest.mark.project_roles(['reader', 'writer'])
     async def test_merge_samples(self, connection_with_project: Connection):
         """
-        Test that update_analysis(active=False) is effective
+        Test that merge_samples(id_keep, id_merge) performs the correct modifications to the database
         """
 
         project_id = connection_with_project.project_id
+        al = AssayLayer(connection_with_project)
         sl = SampleLayer(connection_with_project)
         sgl = SequencingGroupLayer(connection_with_project)
 
@@ -360,8 +359,33 @@ class TestSample:
         assert keep_sample.id
         assert merge_sample.id
 
-        keep_sg = await sgl.query(SequencingGroupFilter(sample=SequencingGroupFilter.SequencingGroupSampleFilter(id=GenericFilter(eq=keep_sample.id))))
-        merge_sg = await sgl.query(SequencingGroupFilter(sample=SequencingGroupFilter.SequencingGroupSampleFilter(id=GenericFilter(eq=merge_sample.id))))
+        # Retrieve the created sg ids
+        keep_sg = await sgl.query(
+            SequencingGroupFilter(
+                sample=SequencingGroupFilter.SequencingGroupSampleFilter(
+                    id=GenericFilter(eq=keep_sample.id)
+                )
+            )
+        )
+        assert keep_sg[0].id
+        merge_sg = await sgl.query(
+            SequencingGroupFilter(
+                sample=SequencingGroupFilter.SequencingGroupSampleFilter(
+                    id=GenericFilter(eq=merge_sample.id)
+                )
+            )
+        )
+        assert merge_sg[0].id
+        # Assert that initially the sgs belong to different samples
+        assert keep_sg[0].sample_id == keep_sample.id
+        assert merge_sg[0].sample_id == merge_sample.id
+
+        # Assert that initially the assays belong to different samples
+        assays = await al.get_assays_for_sequencing_group_ids(
+            [keep_sg[0].id, merge_sg[0].id]
+        )
+        assert assays[keep_sg[0].id][0].sample_id == keep_sample.id
+        assert assays[merge_sg[0].id][0].sample_id == merge_sample.id
 
         samples = await sl.get_samples_by(project_ids=[project_id])
         assert len(samples) == 2
@@ -369,17 +393,28 @@ class TestSample:
         new_sample = await sl.merge_samples(keep_sample.id, merge_sample.id)
 
         samples = await sl.get_samples_by(project_ids=[project_id])
+
         # Check that the "keep" sample is the only one remaining
         assert len(samples) == 1
         assert new_sample.id == keep_sample.id
+
         # Check that the meta fields have been merged
         assert new_sample.meta[meta_keep_key] == meta_keep_value
         assert new_sample.meta[meta_merge_key] == meta_merge_value
+
         # Check that the sequencing groups all belong to the same sample now
-        new_sample_sgs = await sgl.query(SequencingGroupFilter(sample=SequencingGroupFilter.SequencingGroupSampleFilter(id=GenericFilter(eq=new_sample.id))))
-        new_sample_sgs_ids = [sg.id for sg in new_sample_sgs]
-        assert keep_sg[0].id in new_sample_sgs_ids
-        assert merge_sg[0].id in new_sample_sgs_ids
+        new_sample_sgs = await sgl.get_sequencing_groups_by_ids(
+            [keep_sg[0].id, merge_sg[0].id]
+        )
+        assert new_sample_sgs[0].sample_id == keep_sample.id
+        assert new_sample_sgs[1].sample_id == keep_sample.id
+
+        # Check that the assays all belong to the same sample now
+        assays = await al.get_assays_for_sequencing_group_ids(
+            [keep_sg[0].id, merge_sg[0].id]
+        )
+        assert assays[keep_sg[0].id][0].sample_id == new_sample.id
+        assert assays[merge_sg[0].id][0].sample_id == new_sample.id
 
 
 class TestSampleUnwrapping(unittest.TestCase):
