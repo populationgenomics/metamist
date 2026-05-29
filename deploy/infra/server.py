@@ -57,9 +57,9 @@ def create_server_resources(
     cloud_run = gcp.cloudrunv2.Service(
         'metamist',
         name=f'metamist-{config.stack}',
-        ingress='INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER',
+        ingress='INGRESS_TRAFFIC_ALL',
         location=config.region,
-        default_uri_disabled=True,
+        default_uri_disabled=False,
         template=gcp.cloudrunv2.ServiceTemplateArgs(
             service_account=service_account.email,
             timeout='300s',

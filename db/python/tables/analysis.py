@@ -350,7 +350,7 @@ class AnalysisTable(DbBase):
         if meta:
             for k, v in meta.items():
                 if v is None:
-                    meta_query += t' AND meta::json->>{k} IS NULL'    
+                    meta_query += t' AND meta::json->>{k} IS NULL'
                 else:
                     meta_query += t' AND meta::json->>{k} = {v}'
 
@@ -406,9 +406,9 @@ class AnalysisTable(DbBase):
 
         _query = t"""
             SELECT sg.id as id
-            FROM sequencing_group sg
-            WHERE sg.project = {project_id} AND
-                id NOT IN (
+            FROM sequencing_group sg INNER JOIN sample s ON sg.sample_id = s.id
+            WHERE s.project = {project_id} AND
+                sg.id NOT IN (
                     SELECT a_sg.sequencing_group_id FROM analysis_sequencing_group a_sg
                     LEFT JOIN analysis a ON a_sg.analysis_id = a.id
                     WHERE a.type = LOWER({analysis_type.lower()}) AND a.active
