@@ -490,3 +490,28 @@ class TestAnalysis:
         assert len(analyses) == 1
         assert analyses[0].id == analysis_id
         assert not analyses[0].active
+
+    @pytest.mark.project_roles(['reader', 'writer'])
+    async def test_get_sg_without_given_type(self):
+        """
+        Test getting sequencing group IDs whose associated analysis is not of a given type
+        """
+        analysis_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.genome_sequencing_group_id],
+                meta={'sequencing_type': 'genome', 'size': 1024},
+            )
+        )
+
+        analysis = await self.al.get_analysis_by_id(analysis_id)
+        assert analysis.id == analysis_id
+
+        sg_without_type = (
+            await self.al.get_all_sequencing_group_ids_without_analysis_type(
+                self.project_id, 'cram'
+            )
+        )
+        assert len(sg_without_type) == 1
+        assert sg_without_type[0] == self.exome_sequencing_group_id
