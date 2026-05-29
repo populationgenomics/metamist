@@ -496,7 +496,7 @@ class TestAnalysis:
         """
         Test getting the most recently completed analysis' id
         """
-        analysis_first_id = await self.al.create_analysis(
+        analysis_first = await self.al.create_analysis(
             AnalysisInternal(
                 type='cram',
                 status=AnalysisStatus.COMPLETED,
@@ -506,19 +506,35 @@ class TestAnalysis:
             )
         )
 
-        analysis_last_id = await self.al.create_analysis(
+        # This analysis is not the absolutel last to be completed, but it is the last that matches
+        # the meta filtering criteria, so it should be selected
+        analysis_last_matching_meta = await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.exome_sequencing_group_id],
+                meta={'sequencing_type': 'genome', 'size': None},
+                timestamp_completed=datetime(2026, 1, 1),
+            )
+        )
+
+        # This is the absolute last to be completed, but its meta does not match the filter
+        # so it should not be selected
+        analysis_last = await self.al.create_analysis(
             AnalysisInternal(
                 type='cram',
                 status=AnalysisStatus.COMPLETED,
                 sequencing_group_ids=[self.exome_sequencing_group_id],
                 meta={'sequencing_type': 'genome', 'size': 1024},
-                timestamp_completed=datetime(2026, 1, 1),
+                timestamp_completed=datetime(2026, 1, 2),
             )
         )
 
-        assert analysis_first_id != analysis_last_id
+        assert analysis_last_matching_meta != analysis_first
+        assert analysis_last_matching_meta != analysis_last
 
         latest_complete = await self.al.get_latest_complete_analysis_for_type(
-            self.project_id, 'cram'
+            self.project_id, 'cram', {'sequencing_type': 'genome', 'size': None}
         )
-        assert latest_complete.id == analysis_last_id
+
+        assert latest_complete.id == analysis_last_matching_meta
