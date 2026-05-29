@@ -64,9 +64,9 @@ SG_QUERY = gql(
     """
 )
 
-WHOLE_BLOOD_WITHOUT_SGS_QUERY = gql(
+WHOLE_BLOOD_QUERY = gql(
     """
-    query WholeBloodWithoutSGs($project: String!) {
+    query WholeBlood($project: String!) {
         project(name: $project) {
             samples(type: {eq: "whole-blood"}) {
                 id
@@ -475,21 +475,13 @@ def register_enums(enums_api: EnumsApi) -> None:
     for typ in sample_types:
         enums_api.post_sample_types(new_type=typ)
 
-    for typ in (SG_TYPE_GENOME, SG_TYPE_ARRAY):
-        enums_api.post_sequencing_types(new_type=typ)
-
-    for plat in {defn['platform'] for defn in SG_DEFINITIONS.values()}:
-        enums_api.post_sequencing_platforms(new_type=plat)
-
-    for tech in {defn['technology'] for defn in SG_DEFINITIONS.values()}:
-        enums_api.post_sequencing_technologys(new_type=tech)
-
     enums_api.post_assay_types(new_type='sequencing')
-
-    for analysis_type in {
-        a for defn in SG_DEFINITIONS.values() for a in defn['analyses']
-    }:
-        enums_api.post_analysis_types(new_type=analysis_type)
+    for sequencing_type, defn in SG_DEFINITIONS.items():
+        enums_api.post_sequencing_types(new_type=sequencing_type)
+        enums_api.post_sequencing_platforms(new_type=defn['platform'])
+        enums_api.post_sequencing_technologys(new_type=defn['technology'])
+        for analysis_type in defn['analyses']:
+            enums_api.post_analysis_types(new_type=analysis_type)
 
 
 def attach_sgs_to_whole_blood_samples(sample_api: SampleApi, project: str) -> None:
@@ -500,7 +492,7 @@ def attach_sgs_to_whole_blood_samples(sample_api: SampleApi, project: str) -> No
     SGs declared on nested whole-blood samples are silently dropped. Run this
     as a second pass against the freshly-created whole-blood sample IDs.
     """
-    resp = query(WHOLE_BLOOD_WITHOUT_SGS_QUERY, {'project': project})
+    resp = query(WHOLE_BLOOD_QUERY, {'project': project})
     samples = [s for s in resp['project']['samples'] if not s.get('sequencingGroups')]
     if not samples:
         return
@@ -524,8 +516,7 @@ def create_analyses_for_new_sgs(
 
     Genome SGs get a cram + gvcf, array SGs get a genotypingarray_gtc. Paths use
     a FAKE:// scheme so metamist skips GCS validation and stores the path as a
-    plain string in analysis_outputs — Harper's PR exercises the SG-matching
-    code regardless of whether outputs comes back as a string or a dict.
+    plain string in analysis_outputs.
     """
     sg_resp = query(SG_QUERY, {'project': project})
     new_sgs = [
@@ -541,22 +532,21 @@ def create_analyses_for_new_sgs(
         existing_analysis_types = {a['type'] for a in sg.get('analyses') or []}
 
         for analysis_type in SG_DEFINITIONS[sg_type]['analyses']:
-            if analysis_type in existing_analysis_types:
-                continue
-            path = ANALYSIS_PATH_TEMPLATES[analysis_type].format(sg_id=sg_id)
-            analysis_api.create_analysis(
-                project=project,
-                analysis=Analysis(
-                    type=analysis_type,
-                    status=AnalysisStatus('completed'),
-                    sequencing_group_ids=[sg_id],
-                    output=path,
-                    meta={'sequencing_type': sg_type},
-                ),
-            )
+            if analysis_type not in existing_analysis_types:
+                path = ANALYSIS_PATH_TEMPLATES[analysis_type].format(sg_id=sg_id)
+                analysis_api.create_analysis(
+                    project=project,
+                    analysis=Analysis(
+                        type=analysis_type,
+                        status=AnalysisStatus('completed'),
+                        sequencing_group_ids=[sg_id],
+                        output=path,
+                        meta={'sequencing_type': sg_type},
+                    ),
+                )
 
 
-def main(project='ourdna', num_participants=5):
+def main(project: str, num_participants: int):
     """Doing the generation for you"""
     project_api = ProjectApi()
     participant_api = ParticipantApi()
