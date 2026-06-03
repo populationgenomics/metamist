@@ -216,8 +216,8 @@ class TestSequencingGroup:
             [initial_sg_id]
         )
         new_sg_assays = await a_layer.get_assays_for_sequencing_group_ids([new_sg_id])
-        old_sg_assays_ids = set([a.id for a in old_sg_assays[initial_sg_id]])
-        new_sg_assays_ids = set([a.id for a in new_sg_assays[new_sg_id]])
+        old_sg_assays_ids = set(a.id for a in old_sg_assays[initial_sg_id])
+        new_sg_assays_ids = set(a.id for a in new_sg_assays[new_sg_id])
         assert len(old_sg_assays_ids) == 1
         assert (
             len(new_sg_assays_ids) == 2
