@@ -199,7 +199,7 @@ class TestSequencingGroup:
                         'sequencing_platform': 'short-read',
                         'sequencing_technology': 'illumina',
                     },
-                )
+                ),
             ],
         )
 
@@ -212,13 +212,19 @@ class TestSequencingGroup:
         assert new_sg_id != initial_sg_id
 
         # Check that the first assay belongs to both the old and new sequencing group
-        old_sg_assays = (await a_layer.get_assays_for_sequencing_group_ids([initial_sg_id]))
-        new_sg_assays = (await a_layer.get_assays_for_sequencing_group_ids([new_sg_id]))
+        old_sg_assays = await a_layer.get_assays_for_sequencing_group_ids(
+            [initial_sg_id]
+        )
+        new_sg_assays = await a_layer.get_assays_for_sequencing_group_ids([new_sg_id])
         old_sg_assays_ids = set([a.id for a in old_sg_assays[initial_sg_id]])
         new_sg_assays_ids = set([a.id for a in new_sg_assays[new_sg_id]])
         assert len(old_sg_assays_ids) == 1
-        assert len(new_sg_assays_ids) == 2 # Using sets ensures that the sg has two unique assays
-        assert old_sg_assays_ids.intersection(new_sg_assays_ids) == {initial_sg[0].assays[0].id}
+        assert (
+            len(new_sg_assays_ids) == 2
+        )  # Using sets ensures that the sg has two unique assays
+        assert old_sg_assays_ids.intersection(new_sg_assays_ids) == {
+            initial_sg[0].assays[0].id
+        }
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
