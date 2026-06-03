@@ -65,6 +65,10 @@ const BillingCostByMonthTable: React.FunctionComponent<IBillingCostByMonthTableP
         return orderedTopics
     }
 
+    // Sum a single row (topic + compute type) across all visible invoice months.
+    const rowTotal = (key: string, compType: string): number =>
+        months.reduce((sum, month) => sum + (data[key]?.[month]?.[compType] ?? 0), 0)
+
     const dataToBody = (data: DataDict) => {
         const allTopics = getAllTopics()
 
@@ -89,6 +93,9 @@ const BillingCostByMonthTable: React.FunctionComponent<IBillingCostByMonthTableP
                                         : null}
                                 </SUITable.Cell>
                             ))}
+                            <SUITable.Cell key={`${key}-${index}-total`}>
+                                <b>{formatMoney(rowTotal(key, compType))}</b>
+                            </SUITable.Cell>
                         </SUITable.Row>
                     )
                 )}
@@ -110,6 +117,7 @@ const BillingCostByMonthTable: React.FunctionComponent<IBillingCostByMonthTableP
                         <SUITable.HeaderCell colSpan={months.length}>
                             Invoice Month
                         </SUITable.HeaderCell>
+                        <SUITable.HeaderCell></SUITable.HeaderCell>
                     </SUITable.Row>
                     <SUITable.Row>
                         <SUITable.HeaderCell>Topic</SUITable.HeaderCell>
@@ -119,6 +127,7 @@ const BillingCostByMonthTable: React.FunctionComponent<IBillingCostByMonthTableP
                                 {date2Month(month)}
                             </SUITable.HeaderCell>
                         ))}
+                        <SUITable.HeaderCell>Total</SUITable.HeaderCell>
                     </SUITable.Row>
                 </SUITable.Header>
                 <SUITable.Body>{dataToBody(data)}</SUITable.Body>
