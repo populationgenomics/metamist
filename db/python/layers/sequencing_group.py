@@ -243,11 +243,6 @@ class SequencingGroupLayer(BaseLayer):
                     to_update.append(sg)
                     continue
 
-                # if we need to insert any assays, then the group will have to change
-                if any(not assay.id for assay in sg.assays):
-                    to_replace.append(sg)
-                    continue
-
                 assert sg.id is not None
                 existing_sequences = set(sequence_to_group.get(int(sg.id), []))
                 new_assay_ids = set(sq.id for sq in sg.assays)
@@ -276,7 +271,7 @@ class SequencingGroupLayer(BaseLayer):
             )
 
         for sg in to_replace:
-            await self.recreate_sequencing_group_with_new_assays(
+            sg.id = await self.recreate_sequencing_group_with_new_assays(
                 sequencing_group_id=int(ensure_nonnone(sg.id)),
                 assays=[s.id for s in sg.assays] if sg.assays else [],
                 meta=sg.meta or {},
