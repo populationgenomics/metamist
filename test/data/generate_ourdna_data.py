@@ -529,7 +529,7 @@ def create_analyses_for_new_sgs(
     for sg in new_sgs:
         sg_id = sg['id']
         sg_type = sg['type']
-        existing_analysis_types = {a['type'] for a in sg.get('analyses') or []}
+        existing_analysis_types = {a['type'] for a in sg.get('analyses', [])}
 
         for analysis_type in SG_DEFINITIONS[sg_type]['analyses']:
             if analysis_type not in existing_analysis_types:
