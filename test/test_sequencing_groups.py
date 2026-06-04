@@ -132,6 +132,31 @@ class TestSequencingGroup:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
+    async def test_insert_sequencing_group_with_external_ids(
+        self,
+        connection_with_project: Connection,
+        test_sample: int,
+    ):
+        """Test that external IDs are properly attached during sequencing group upsert"""
+        sg_layer = SequencingGroupLayer(connection_with_project)
+
+        external_ids = {'ext1': 'test-external-id1', 'ext2': 'test-external-id2'}
+        sg_upsert = SequencingGroupUpsertInternal(
+            type='genome',
+            technology='short-read',
+            platform='ILLUMINA',
+            sample_id=test_sample,
+            external_ids=external_ids
+        )
+
+        new_sg = await sg_layer.upsert_sequencing_groups([sg_upsert])
+        assert new_sg[0].id is not None
+
+        sg = await sg_layer.get_sequencing_group_by_id(new_sg[0].id)
+        assert sg.external_ids == external_ids
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
     async def test_update_sequencing_group(
         self,
         connection_with_project: Connection,
