@@ -173,6 +173,7 @@ class SequencingGroupLayer(BaseLayer):
                 technology=ensure_nonnone(seqgroup.technology),
                 platform=ensure_nonnone(seqgroup.platform),
                 meta={**seqgroup.meta, **meta} if seqgroup.meta else meta,
+                external_ids=seqgroup.external_ids,
                 assay_ids=assays,
             )
 
@@ -267,6 +268,7 @@ class SequencingGroupLayer(BaseLayer):
                 technology=ensure_nonnone(sg.technology),
                 platform=ensure_nonnone(sg.platform),
                 meta=sg.meta,
+                external_ids=sg.external_ids,
                 assay_ids=assay_ids,
             )
 

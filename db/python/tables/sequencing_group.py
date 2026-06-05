@@ -1,4 +1,5 @@
 from collections import defaultdict
+from collections.abc import Mapping
 from datetime import date
 from string.templatelib import Template
 
@@ -357,7 +358,7 @@ class SequencingGroupTable(DbBase):
         technology: str,
         platform: str,
         assay_ids: list[int],
-        external_ids: dict[str, str] | None = None,
+        external_ids: Mapping[str, str | None] | None = None,
         meta: dict | None = None,
     ) -> int:
         """Create sequence group"""
@@ -404,9 +405,9 @@ class SequencingGroupTable(DbBase):
 
         external_id_query = """
         INSERT INTO sequencing_group_external_id
-            (project, sequencing_group_id, external_id, name, null_if_archived, audit_log_id)
+            (project, sequencing_group_id, external_id, name, audit_log_id)
         VALUES
-            (%(project)s, %(sequencing_group_id)s, %(external_id)s, %(name)s, %(null_if_archived)s, %(audit_log_id)s)
+            (%(project)s, %(sequencing_group_id)s, %(external_id)s, %(name)s, %(audit_log_id)s)
         """
 
         _sg_assay_linker = """
@@ -429,7 +430,7 @@ class SequencingGroupTable(DbBase):
                 eid_values = [
                     {
                         'project': self.connection.project_id,
-                        'sequencing_group_id': new_sg_id,
+                        'sequencing_group_id': new_sg_id['id'],
                         'name': name.lower(),
                         'external_id': eid,
                         'audit_log_id': audit_log_id,
