@@ -45,6 +45,71 @@ aapi = AnalysisApi()
 fapi = FamilyApi()
 papi = ParticipantApi()
 
+
+class DryRunAnalysisApi(AnalysisApi):
+    """Dry-run AnalysisApi that merely logs update methods."""
+
+    def create_analysis(self, project, analysis):
+        logger.info(f'[dry-run] Would aapi.create_analysis({project=}): {analysis}')
+
+    def update_analysis(self, analysis_id, analysis_update_model):
+        logger.info(
+            f'[dry-run] Would aapi.update_analysis({analysis_id=}): {analysis_update_model}'
+        )
+
+
+class DryRunFamilyApi(FamilyApi):
+    """Dry-run FamilyApi that merely logs update methods."""
+
+    def import_families(self, file, project):
+        families = file.readlines()
+        logger.info(
+            f'[dry-run] Would fapi.import_families({project=}) with {len(families)} families'
+        )
+
+    def import_pedigree(self, file, has_header, project, create_missing_participants):  # noqa: ARG002
+        ped_row_count = max(0, file.read().count('\n') - 1)
+        logger.info(
+            f'[dry-run] Would fapi.import_pedigree({project=}) with {ped_row_count} pedigree rows'
+        )
+
+
+class DryRunParticipantApi(ParticipantApi):
+    """Dry-run ParticipantApi that merely logs update methods."""
+
+    def __init__(self):
+        super().__init__()
+        self.count = 100000
+
+    def _new_id(self, pid):
+        if pid:
+            return pid
+        self.count += 1
+        return self.count
+
+    def upsert_participants(self, project, participant_upsert):
+        logger.info(
+            f'[dry-run] Would papi.upsert_participants({project=}) with {len(participant_upsert)} participants'
+        )
+        # Return with >100000 placeholder ids for "newly created" participants
+        return [{**p, 'id': self._new_id(p.get('id'))} for p in participant_upsert]
+
+
+class DryRunSampleApi(SampleApi):
+    """Dry-run SampleApi that merely logs update methods."""
+
+    def __init__(self):
+        super().__init__()
+        self.count = 0
+
+    def create_sample(self, project, sample_upsert):
+        logger.info(f'[dry-run] Would sapi.create_sample({project=}): {sample_upsert}')
+        if sample_upsert.id is not None:
+            return sample_upsert.id
+        self.count += 1
+        return f'NEWSAMPLE{self.count}'
+
+
 DEFAULT_SAMPLES_N = 10
 
 PRIMARY_EXTERNAL_ORG = ''
@@ -268,6 +333,14 @@ def main(  # noqa: PLR0913
     A new project with a suffix -test is created, and for any files in sample/meta,
     sequence/meta, or analysis/output a copy in the -test namespace is created.
     """
+    if dry_run:
+        # Replace FooApi globals with dry-run versions that merely log updates.
+        global sapi, aapi, fapi, papi  # noqa: PLW0603
+        sapi = DryRunSampleApi()
+        aapi = DryRunAnalysisApi()
+        fapi = DryRunFamilyApi()
+        papi = DryRunParticipantApi()
+
     skip_gcs = local_mode or dry_run
 
     # --local-mode is for seeding a local metamist instance only. Refuse otherwise so we
@@ -355,20 +428,17 @@ def main(  # noqa: PLR0913
         upserted_participant_map = transfer_participants(
             target_project=target_project,
             participant_data=participant_data,
-            dry_run=dry_run,
         )
 
     else:
         logger.info(f'Transferring {len(participant_data)} participants. ')
         family_ids = transfer_families(
-            project, target_project, internal_participant_ids, dry_run=dry_run
+            project, target_project, internal_participant_ids
         )
         upserted_participant_map = transfer_ped(
             project,
             target_project,
             family_ids,
-            participant_data=participant_data,
-            dry_run=dry_run,
         )
 
     existing_data = query(EXISTING_DATA_QUERY, {'project': target_project})
@@ -398,7 +468,6 @@ def main(  # noqa: PLR0913
         target_project=target_project,
         project=project,
         skip_gcs=skip_gcs,
-        dry_run=dry_run,
     )
 
     logger.info('Transferring analyses')
@@ -427,7 +496,6 @@ def transfer_samples_sgs_assays(
     target_project: str,
     project: str,
     skip_gcs: bool = False,
-    dry_run: bool = False,
 ):
     """
     Transfer samples, sequencing groups, and assays from the original project to the
@@ -468,18 +536,11 @@ def transfer_samples_sgs_assays(
         )
 
         logger.info(f'Processing sample {s["id"]}')
-        if dry_run:
-            logger.info(
-                f'[dry-run] Would sapi.create_sample(project={target_project!r}): {sample_upsert}'
-            )
-            # Placeholder so downstream path-rewrites still work; old==new for dry-run.
-            new_sample_id = s['id']
-        else:
-            logger.info('Creating test sample entry')
-            new_sample_id = sapi.create_sample(
-                project=target_project,
-                sample_upsert=sample_upsert,
-            )
+        logger.info('Creating test sample entry')
+        new_sample_id = sapi.create_sample(
+            project=target_project,
+            sample_upsert=sample_upsert,
+        )
         old_sid_to_new_sid[s['id']] = new_sample_id
 
     return old_sid_to_new_sid, sample_to_sg_attribute_map
@@ -699,15 +760,10 @@ def transfer_analyses(
                         sequencing_group_ids=new_sequencing_group_id,
                         meta=analysis['meta'],
                     )
-                    if dry_run:
-                        logger.info(
-                            f'[dry-run] Would aapi.update_analysis(analysis_id={existing_analysis_id}): {am}'
-                        )
-                    else:
-                        aapi.update_analysis(
-                            analysis_id=existing_analysis_id,
-                            analysis_update_model=am,
-                        )
+                    aapi.update_analysis(
+                        analysis_id=existing_analysis_id,
+                        analysis_update_model=am,
+                    )
                 else:
                     am = Analysis(
                         type=analysis['type'],
@@ -725,15 +781,8 @@ def transfer_analyses(
                         meta=analysis['meta'],
                     )
 
-                    if dry_run:
-                        logger.info(
-                            f'[dry-run] Would aapi.create_analysis(project={target_project!r}): {am}'
-                        )
-                    else:
-                        logger.info(
-                            f'Creating {analysis["type"]} analysis entry in test'
-                        )
-                        aapi.create_analysis(project=target_project, analysis=am)
+                    logger.info(f'Creating {analysis["type"]} analysis entry in test')
+                    aapi.create_analysis(project=target_project, analysis=am)
 
 
 def get_existing_sample(data: dict, sample_id: str) -> dict | None:
@@ -895,7 +944,6 @@ def transfer_families(
     initial_project: str,
     target_project: str,
     internal_participant_ids: list[int],
-    dry_run: bool = False,
 ) -> list[int]:
     """Pull relevant families from the input project, and copy to target_project"""
     family_data = query(
@@ -931,13 +979,8 @@ def transfer_families(
                 ]
             )
 
-    if dry_run:
-        logger.info(
-            f'[dry-run] Would fapi.import_families(project={target_project!r}) with {len(families)} families'
-        )
-    else:
-        with open(tmp_family_tsv) as family_file:  # noqa: PTH123
-            fapi.import_families(file=family_file, project=target_project)
+    with open(tmp_family_tsv) as family_file:  # noqa: PTH123
+        fapi.import_families(file=family_file, project=target_project)
 
     return family_ids
 
@@ -946,8 +989,6 @@ def transfer_ped(
     initial_project: str,
     target_project: str,
     family_ids: list[int],
-    participant_data: list[dict] | None = None,
-    dry_run: bool = False,
 ) -> dict[str, int]:
     """Pull pedigree from the input project, and copy to target_project"""
     ped_tsv = fapi.get_pedigree(
@@ -960,17 +1001,6 @@ def transfer_ped(
     with open(tmp_ped_tsv, 'w') as tmp_ped:  # noqa: PTH123
         tmp_ped.write(ped_tsv)
 
-    if dry_run:
-        ped_row_count = max(0, ped_tsv.count('\n') - 1)
-        logger.info(
-            f'[dry-run] Would fapi.import_pedigree(project={target_project!r}) with {ped_row_count} pedigree rows across {len(family_ids)} families'
-        )
-        return {
-            alt_id: participant['id']
-            for participant in (participant_data or [])
-            for alt_id in participant['externalIds'].values()
-        }
-
     with open(tmp_ped_tsv) as ped_file:  # noqa: PTH123
         fapi.import_pedigree(
             file=ped_file,
@@ -978,6 +1008,8 @@ def transfer_ped(
             project=target_project,
             create_missing_participants=True,
         )
+
+    # TODO Special-case for dry_run if we want to see SampleUpsert participant_id values.
 
     # Get map of external participant id to internal
     participant_output = query(PARTICIPANT_QUERY, {'project': target_project})
@@ -991,7 +1023,6 @@ def transfer_ped(
 def transfer_participants(
     target_project: str,
     participant_data,
-    dry_run: bool = False,
 ) -> dict[str, int]:
     """Transfers relevant participants between projects"""
 
@@ -1027,17 +1058,6 @@ def transfer_participants(
                 'samples': [],
             }
         )
-
-    if dry_run:
-        logger.info(
-            f'[dry-run] Would papi.upsert_participants(project={target_project!r}) with {len(participants_to_transfer)} participants'
-        )
-        # Reuse source IDs as placeholders.
-        return {
-            alt_id: participant['id']
-            for participant in participant_data
-            for alt_id in participant['externalIds'].values()
-        }
 
     upserted_participants = papi.upsert_participants(
         target_project, participant_upsert=participants_to_transfer
