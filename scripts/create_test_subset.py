@@ -315,7 +315,7 @@ def get_sids_by_random_sampling(
     return random.sample(sorted(all_sids), sample_count)
 
 
-def main(  # noqa: PLR0913
+def main(
     project: str,
     samples_n: int,
     families_n: int,
@@ -325,7 +325,6 @@ def main(  # noqa: PLR0913
     cohorts: set[str],
     skip_ped: bool,
     update_embedded_ids: bool,
-    local_mode: bool = False,
     dry_run: bool = False,
 ):
     """
@@ -341,17 +340,9 @@ def main(  # noqa: PLR0913
         fapi = DryRunFamilyApi()
         papi = DryRunParticipantApi()
 
-    skip_gcs = local_mode or dry_run
-
-    # --local-mode is for seeding a local metamist instance only. Refuse otherwise so we
-    # don't accidentally write subset records into a non-local instance with no real
-    # files behind them.
-    if local_mode:
-        sm_environment = os.environ.get('SM_ENVIRONMENT', '').lower()
-        if sm_environment != 'local':
-            raise RuntimeError(
-                f'--local-mode requires SM_ENVIRONMENT=local, got {sm_environment!r}.'
-            )
+    # Skip GCS when seeding a local instance (no real files) or doing a dry-run.
+    sm_environment = os.environ.get('SM_ENVIRONMENT', '').lower()
+    skip_gcs = (sm_environment == 'local') or dry_run
 
     if not any(
         [additional_families, additional_samples, samples_n, families_n, cohorts]
@@ -446,7 +437,7 @@ def main(  # noqa: PLR0913
     # Skipping GCS means no real files to reheader; disable the Hail Batch jobs.
     if skip_gcs and update_embedded_ids:
         logger.info(
-            '--local-mode / --dry-run: disabling --update-embedded-ids '
+            'SM_ENVIRONMENT == "local" / --dry-run: disabling --update-embedded-ids '
             '(no real files to reheader)'
         )
         update_embedded_ids = False
@@ -1326,11 +1317,6 @@ if __name__ == '__main__':
         default=True,
     )
     parser.add_argument(
-        '--local-mode',
-        action='store_true',
-        help='Run against a local metamist instance only (requires SM_ENVIRONMENT=local). Skips GCS calls.',
-    )
-    parser.add_argument(
         '--dry-run',
         action='store_true',
         help='Log metamist writes without executing them. Skips GCS calls. Safe against any environment.',
@@ -1350,6 +1336,5 @@ if __name__ == '__main__':
         skip_ped=args.skip_ped,
         cohorts=set(args.cohorts),
         update_embedded_ids=args.update_embedded_ids,
-        local_mode=args.local_mode,
         dry_run=args.dry_run,
     )
