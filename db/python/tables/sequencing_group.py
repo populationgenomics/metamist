@@ -425,7 +425,7 @@ class SequencingGroupTable(DbBase):
             new_sg_id = await cur.fetchone()
             if not new_sg_id:
                 raise InternalError('A new sequencing_group row was not created')
-            
+
             if external_ids:
                 eid_values = [
                     {
