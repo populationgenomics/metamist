@@ -18,6 +18,7 @@ from models.models.cohort import (
     NewCohortInternal,
 )
 from models.models.project import FullWriteAccessRoles, ProjectId, ReadAccessRoles
+from models.utils.sequencing_group_id_format import sequencing_group_id_format
 
 
 logger = get_logger()
@@ -218,9 +219,40 @@ class CohortLayer(BaseLayer):
                     )
                 raise ValueError(self.COHORT_SG_CRITERIA_ERROR_MSG)
 
-            projects = list(
-                await self.sglayer.get_projects_given_sg_ids(sg_ids_internal_raw)
+            # Every sequencing group passed in must belong to the project the
+            # cohort is being created in. Otherwise the cohort would reference
+            # sequencing groups (and their assays/analyses) that are out of
+            # scope for the project, producing a broken, unusable cohort.
+            requested_sgs = await self.sglayer.query(
+                SequencingGroupFilter(
+                    id=GenericFilter(in_=sg_ids_internal_raw),
+                    active_only=None,  # consider both active/inactive SGs
+                )
             )
+            if not requested_sgs:
+                raise ValueError(
+                    'Could not find any sequencing groups for the given ids'
+                )
+
+            external_sg_ids = sorted(
+                sg.id
+                for sg in requested_sgs
+                if sg.id and sg.project != project_to_write
+            )
+            if external_sg_ids:
+                dest_project = self.connection.project_id_map.get(project_to_write)
+                dest_project_name = (
+                    dest_project.name if dest_project else str(project_to_write)
+                )
+                raise ValueError(
+                    'The following sequencing groups do not belong to project '
+                    f'{dest_project_name}: '
+                    f'{", ".join(sequencing_group_id_format(s) for s in external_sg_ids)}. '
+                    'All sequencing groups in a cohort must belong to the project '
+                    'the cohort is created in.'
+                )
+
+            projects = [project_to_write]
         else:
             projects = cohort_criteria.projects
 

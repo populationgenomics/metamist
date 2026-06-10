@@ -1,4 +1,5 @@
 import datetime
+import uuid
 from random import randint
 
 from pymysql.err import IntegrityError
@@ -7,6 +8,11 @@ from db.python.filters import GenericFilter
 from db.python.layers import CohortLayer, SampleLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.cohort import CohortFilter
+from db.python.tables.project import (
+    GROUP_NAME_MEMBERS_ADMIN,
+    GROUP_NAME_PROJECT_CREATORS,
+    ProjectPermissionsTable,
+)
 from db.python.utils import to_db_json
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -21,6 +27,7 @@ from models.models.cohort import (
     NewCohort,
     NewCohortInternal,
 )
+from models.models.project import ProjectMemberUpdate
 from models.utils.cohort_id_format import cohort_id_format
 from models.utils.sequencing_group_id_format import sequencing_group_id_format
 from test.testbase import DbIsolatedTest, run_as_sync
@@ -289,6 +296,89 @@ class TestCohortData(DbIsolatedTest):
                     sg_ids_internal_raw=[random_sg_id_1, random_sg_id_1 + 1],
                 ),
             )
+
+    async def _add_group_member_direct(self, group_name: str):
+        """Directly add the test author to the group with the given name"""
+        group_id = await self.connection.connection.fetch_val(
+            'SELECT id FROM `group` WHERE name = :name',
+            {'name': group_name},
+        )
+        await self.connection.connection.execute(
+            """
+            INSERT INTO group_member (group_id, member, audit_log_id)
+            VALUES (:group_id, :member, :audit_log_id);
+            """,
+            {
+                'group_id': group_id,
+                'member': self.author,
+                'audit_log_id': await self.audit_log_id(),
+            },
+        )
+
+    async def _create_second_project_with_sg(self) -> int:
+        """
+        Create a second project the author can write to, add a sample/SG to it,
+        and return the raw sequencing group id belonging to that project.
+        """
+        await self._add_group_member_direct(GROUP_NAME_PROJECT_CREATORS)
+        await self._add_group_member_direct(GROUP_NAME_MEMBERS_ADMIN)
+
+        unique_name = f'second-test-{uuid.uuid4().hex[:8]}'
+        ppt = ProjectPermissionsTable(self.connection)
+        second_project_id = await ppt.create_project(
+            project_name=unique_name,
+            dataset_name=unique_name,
+            author=self.author,
+        )
+
+        project_id_map, _ = await ppt.get_projects_accessible_by_user(user=self.author)
+        second_project = project_id_map[second_project_id]
+        await ppt.set_project_members(
+            project=second_project,
+            members=[
+                ProjectMemberUpdate(member=self.author, roles=['reader', 'writer'])
+            ],
+        )
+        await self.connection.refresh_projects()
+
+        foreign_sample = await self.samplel.upsert_sample(
+            get_sample_model('FOREIGN'), project=second_project_id
+        )
+        return foreign_sample.sequencing_groups[0].id
+
+    @run_as_sync
+    async def test_create_cohort_fails_when_sg_in_another_project(self):
+        """SGs passed in sg_ids_internal must belong to the cohort's project"""
+        foreign_sg_raw = await self._create_second_project_with_sg()
+
+        with self.assertRaises(ValueError) as context:
+            await self.cohortl.create_cohort_from_criteria(
+                project_to_write=self.project_id,
+                description='Cohort with a foreign SG',
+                cohort_name='Foreign SG cohort',
+                dry_run=False,
+                cohort_criteria=CohortCriteriaInternal(
+                    sg_ids_internal_raw=[self.sgB_raw, foreign_sg_raw],
+                ),
+            )
+        self.assertIn('do not belong to project', str(context.exception))
+
+    @run_as_sync
+    async def test_create_cohort_dry_run_fails_when_sg_in_another_project(self):
+        """Project-membership validation must also apply to dry runs"""
+        foreign_sg_raw = await self._create_second_project_with_sg()
+
+        with self.assertRaises(ValueError) as context:
+            await self.cohortl.create_cohort_from_criteria(
+                project_to_write=self.project_id,
+                description='Cohort with a foreign SG',
+                cohort_name='Foreign SG cohort dry run',
+                dry_run=True,
+                cohort_criteria=CohortCriteriaInternal(
+                    sg_ids_internal_raw=[self.sgB_raw, foreign_sg_raw],
+                ),
+            )
+        self.assertIn('do not belong to project', str(context.exception))
 
     @run_as_sync
     async def test_create_cohort_by_excluded_sgs(self):
