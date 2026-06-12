@@ -389,9 +389,9 @@ def get_unrecorded_analysis_files(
             file_paths = []  # File does not exist
 
         for source_path in file_paths:  # Rename and add to move list
-            new_path = source_path.replace(source_bucket_name, destination_bucket_name).replace(
-                source_sequencing_group_id, new_sequencing_group_id
-            )
+            new_path = source_path.replace(
+                source_bucket_name, destination_bucket_name
+            ).replace(source_sequencing_group_id, new_sequencing_group_id)
             files_to_move.append((to_path(source_path), to_path(new_path)))
 
     return files_to_move
