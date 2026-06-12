@@ -362,6 +362,11 @@ def get_unrecorded_analysis_files(
     else:
         source_bucket_name = f'cpg-{source_dataset}-main'
 
+    if new_dataset.endswith('-test'):
+        destination_bucket_name = f'cpg-{new_dataset}'
+    else:
+        destination_bucket_name = f'cpg-{new_dataset}-main'
+
     files_to_move = []
     for source_path_template in UNRECORDED_ANALYSIS_FILES + UNRECORDED_ANALYSIS_FOLDERS:
         source_path = source_path_template.format(
@@ -384,7 +389,7 @@ def get_unrecorded_analysis_files(
             file_paths = []  # File does not exist
 
         for source_path in file_paths:  # Rename and add to move list
-            new_path = source_path.replace(source_dataset, new_dataset).replace(
+            new_path = source_path.replace(source_bucket_name, destination_bucket_name).replace(
                 source_sequencing_group_id, new_sequencing_group_id
             )
             files_to_move.append((to_path(source_path), to_path(new_path)))
