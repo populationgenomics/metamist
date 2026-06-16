@@ -271,18 +271,10 @@ class SequencingGroupLayer(BaseLayer):
             )
 
         for sg in to_replace:
-            # Ensure that all assays have been correctly added to the DB
-            new_assay_ids = []
-            for assay in sg.assays or []:
-                if assay.id is None:
-                    raise ValueError(
-                        'Attempting to replace sequencing-group using non-existent assays'
-                    )
-                new_assay_ids.append(assay.id)
             # Recreate the sequencing group with the new assays in the DB
             sg.id = await self.recreate_sequencing_group_with_new_assays(
                 sequencing_group_id=int(ensure_nonnone(sg.id)),
-                assays=new_assay_ids,
+                assays=[ensure_nonnone(a.id) for a in sg.assays] if sg.assays else [],
                 meta=sg.meta or {},
             )
 
