@@ -1215,6 +1215,7 @@ class GenericParser(CloudHelper):
                     'sequencing_library',
                     'read_end_type',
                     'read_length',
+                    'chx',
                 )
             elif assay.meta.get('sequencing_technology') == 'long-read':
                 # lift all assay meta into the sequencing group meta for long-read
