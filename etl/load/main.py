@@ -404,9 +404,7 @@ def prepare_parser_map() -> dict[str, type[GenericParser]]:
     """
     parser_map = {}
 
-    for entry_point in importlib.metadata.entry_points().select(
-        group='metamist_parser'
-    ):
+    for entry_point in importlib.metadata.entry_points(group='metamist_parser'):
         parser_cls = entry_point.load()
         parser_map[entry_point.name] = parser_cls
 
