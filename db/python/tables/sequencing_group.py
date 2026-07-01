@@ -421,10 +421,10 @@ class SequencingGroupTable(DbBase):
                 assay_id_insert_values = [
                     {
                         'seqgroup': new_sg_id['id'],
-                        'assayid': s,
+                        'assayid': a_id,
                         'audit_log_id': await self.audit_log_id(),
                     }
-                    for s in assay_ids
+                    for a_id in assay_ids
                 ]
                 async with conn.cursor() as cur:
                     await cur.executemany(_sg_assay_linker, assay_id_insert_values)
