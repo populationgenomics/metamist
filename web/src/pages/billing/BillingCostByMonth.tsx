@@ -1,4 +1,11 @@
-import { Box, Link as MuiLink, Modal as MuiModal, Typography } from '@mui/material'
+import {
+    Box,
+    FormControlLabel,
+    Link as MuiLink,
+    Modal as MuiModal,
+    Switch,
+    Typography,
+} from '@mui/material'
 import { SelectChangeEvent } from '@mui/material/Select'
 import { debounce } from 'lodash'
 import * as React from 'react'
@@ -55,6 +62,11 @@ const BillingCostByMonth: React.FunctionComponent = () => {
     const [selectedTopics, setSelectedTopics] = React.useState<string[]>(initialTopics)
     const [availableTopics, setAvailableTopics] = React.useState<string[]>([])
 
+    // Toggle to include/exclude Avg Sample Cost (Est.) rows in the table and exports
+    const [includeAvgSampleCost, setIncludeAvgSampleCost] = React.useState<boolean>(
+        searchParams.get('includeAvgSampleCost') === 'true'
+    )
+
     // use navigate and update url params
     const location = useLocation()
     const navigate = useNavigate()
@@ -79,6 +91,7 @@ const BillingCostByMonth: React.FunctionComponent = () => {
             start: st,
             end: ed,
             topics: topics && topics.length > 0 ? topics.join(',') : undefined,
+            includeAvgSampleCost: includeAvgSampleCost ? 'true' : undefined,
         })
         navigate(url)
     }
@@ -338,6 +351,7 @@ const BillingCostByMonth: React.FunctionComponent = () => {
                         data={data}
                         months={months}
                         orderedTopics={getOrderedTopics()}
+                        includeAvgSampleCost={includeAvgSampleCost}
                     />
                 </Card>
             </>
@@ -414,27 +428,31 @@ const BillingCostByMonth: React.FunctionComponent = () => {
             ]
             matrix.push(storageRow)
 
-            const sampleCostStorageRow: [string, string, ...string[]] = [
-                topic,
-                CloudSpendCategory.SAMPLE_STORAGE_COST.toString(),
-                ...months.map((m) => {
-                    const val = data[topic]?.[m]?.[CloudSpendCategory.SAMPLE_STORAGE_COST]
-                    return val === undefined ? '' : val.toFixed(2)
-                }),
-                categoryTotal(topic, CloudSpendCategory.SAMPLE_STORAGE_COST),
-            ]
-            matrix.push(sampleCostStorageRow)
+            // Only include Avg. Sample Cost rows when the user opts in. The All Topics row
+            // never has these values, matching the table view.
+            if (includeAvgSampleCost && topic !== 'All Topics') {
+                const sampleCostStorageRow: [string, string, ...string[]] = [
+                    topic,
+                    CloudSpendCategory.SAMPLE_STORAGE_COST.toString(),
+                    ...months.map((m) => {
+                        const val = data[topic]?.[m]?.[CloudSpendCategory.SAMPLE_STORAGE_COST]
+                        return val === undefined ? '' : val.toFixed(2)
+                    }),
+                    categoryTotal(topic, CloudSpendCategory.SAMPLE_STORAGE_COST),
+                ]
+                matrix.push(sampleCostStorageRow)
 
-            const sampleComputeCostRow: [string, string, ...string[]] = [
-                topic,
-                CloudSpendCategory.SAMPLE_COMPUTE_COST.toString(),
-                ...months.map((m) => {
-                    const val = data[topic]?.[m]?.[CloudSpendCategory.SAMPLE_COMPUTE_COST]
-                    return val === undefined ? '' : val.toFixed(2)
-                }),
-                categoryTotal(topic, CloudSpendCategory.SAMPLE_COMPUTE_COST),
-            ]
-            matrix.push(sampleComputeCostRow)
+                const sampleComputeCostRow: [string, string, ...string[]] = [
+                    topic,
+                    CloudSpendCategory.SAMPLE_COMPUTE_COST.toString(),
+                    ...months.map((m) => {
+                        const val = data[topic]?.[m]?.[CloudSpendCategory.SAMPLE_COMPUTE_COST]
+                        return val === undefined ? '' : val.toFixed(2)
+                    }),
+                    categoryTotal(topic, CloudSpendCategory.SAMPLE_COMPUTE_COST),
+                ]
+                matrix.push(sampleComputeCostRow)
+            }
         })
 
         exportTable(
@@ -484,34 +502,73 @@ const BillingCostByMonth: React.FunctionComponent = () => {
                         </MuiLink>
                     </Box>
 
-                    <Dropdown
-                        button
-                        className="icon"
-                        floating
-                        labeled
-                        icon="download"
-                        text="Export"
-                        style={{
-                            minWidth: '115px',
-                            maxWidth: '115px',
-                            height: '36px',
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 2,
+                            flexWrap: 'wrap',
+                            justifyContent: 'flex-end',
                         }}
                     >
-                        <Dropdown.Menu>
-                            <Dropdown.Item
-                                key="csv"
-                                text="Export to CSV"
-                                icon="file excel"
-                                onClick={() => exportToFile('csv')}
-                            />
-                            <Dropdown.Item
-                                key="tsv"
-                                text="Export to TSV"
-                                icon="file text outline"
-                                onClick={() => exportToFile('tsv')}
-                            />
-                        </Dropdown.Menu>
-                    </Dropdown>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={includeAvgSampleCost}
+                                    onChange={(e) => {
+                                        const next = e.target.checked
+                                        setIncludeAvgSampleCost(next)
+                                        const url = generateUrl(location, {
+                                            start,
+                                            end,
+                                            topics:
+                                                selectedTopics.length > 0
+                                                    ? selectedTopics.join(',')
+                                                    : undefined,
+                                            includeAvgSampleCost: next ? 'true' : undefined,
+                                        })
+                                        navigate(url)
+                                    }}
+                                    size="small"
+                                    color="primary"
+                                />
+                            }
+                            label={
+                                <Typography variant="body2">
+                                    Include Avg. Sample Cost (Est.)
+                                </Typography>
+                            }
+                            sx={{ mr: 0 }}
+                        />
+                        <Dropdown
+                            button
+                            className="icon"
+                            floating
+                            labeled
+                            icon="download"
+                            text="Export"
+                            style={{
+                                minWidth: '115px',
+                                maxWidth: '115px',
+                                height: '36px',
+                            }}
+                        >
+                            <Dropdown.Menu>
+                                <Dropdown.Item
+                                    key="csv"
+                                    text="Export to CSV"
+                                    icon="file excel"
+                                    onClick={() => exportToFile('csv')}
+                                />
+                                <Dropdown.Item
+                                    key="tsv"
+                                    text="Export to TSV"
+                                    icon="file text outline"
+                                    onClick={() => exportToFile('tsv')}
+                                />
+                            </Dropdown.Menu>
+                        </Dropdown>
+                    </Box>
                 </div>
 
                 <Grid columns="equal" stackable doubling>
