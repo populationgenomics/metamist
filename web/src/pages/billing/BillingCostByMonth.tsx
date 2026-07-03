@@ -64,7 +64,7 @@ const BillingCostByMonth: React.FunctionComponent = () => {
 
     // Toggle to include/exclude Avg Sample Cost (Est.) rows in the table and exports
     const [includeAvgSampleCost, setIncludeAvgSampleCost] = React.useState<boolean>(
-        searchParams.get('includeAvgSampleCost') !== 'false'
+        searchParams.get('includeAvgSampleCost') === 'true'
     )
 
     // use navigate and update url params
@@ -91,6 +91,7 @@ const BillingCostByMonth: React.FunctionComponent = () => {
             start: st,
             end: ed,
             topics: topics && topics.length > 0 ? topics.join(',') : undefined,
+            includeAvgSampleCost: includeAvgSampleCost ? 'true' : undefined,
         })
         navigate(url)
     }
@@ -516,7 +517,7 @@ const BillingCostByMonth: React.FunctionComponent = () => {
                                                 selectedTopics.length > 0
                                                     ? selectedTopics.join(',')
                                                     : undefined,
-                                            includeAvgSampleCost: next ? undefined : 'false',
+                                            includeAvgSampleCost: next ? 'true' : undefined,
                                         })
                                         navigate(url)
                                     }}

@@ -46,7 +46,7 @@ const BillingCostByMonthTable: React.FunctionComponent<IBillingCostByMonthTableP
     data,
     months,
     orderedTopics,
-    includeAvgSampleCost = true,
+    includeAvgSampleCost = false,
 }) => {
     if (isLoading) {
         return (
