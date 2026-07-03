@@ -438,7 +438,6 @@ const BillingCostByMonth: React.FunctionComponent = () => {
                         const val = data[topic]?.[m]?.[CloudSpendCategory.SAMPLE_STORAGE_COST]
                         return val === undefined ? '' : val.toFixed(2)
                     }),
-                    categoryTotal(topic, CloudSpendCategory.SAMPLE_STORAGE_COST),
                 ]
                 matrix.push(sampleCostStorageRow)
 
@@ -449,7 +448,6 @@ const BillingCostByMonth: React.FunctionComponent = () => {
                         const val = data[topic]?.[m]?.[CloudSpendCategory.SAMPLE_COMPUTE_COST]
                         return val === undefined ? '' : val.toFixed(2)
                     }),
-                    categoryTotal(topic, CloudSpendCategory.SAMPLE_COMPUTE_COST),
                 ]
                 matrix.push(sampleComputeCostRow)
             }
