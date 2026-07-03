@@ -232,7 +232,7 @@ function SampleMetricsRow({ project }: { project: string }) {
                         title="Total aliquots"
                         description="Sum of all buffy coat, PBMC, plasma and whole blood aliquots registered in Metamist."
                         query={`
-                        select count(*) as count
+                        select sum(meta_aliquot_count) as total_aliquots 
                         from sample
                         where type in ('buffy-coat', 'pbmc', 'plasma', 'whole-blood')
                     `}
