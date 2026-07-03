@@ -397,7 +397,11 @@ const BillingCostByMonth: React.FunctionComponent = () => {
     const exportToFile = (format: 'csv' | 'tsv') => {
         // Export all topics
         const allTopics = getOrderedTopics()
-        const headerFields = ['Topic', 'Cost Type', ...months]
+        const headerFields = ['Topic', 'Cost Type', ...months, 'Total']
+
+        // Sum a category across all exported months for a topic (the row total).
+        const categoryTotal = (topic: string, category: CloudSpendCategory): string =>
+            months.reduce((sum, m) => sum + (data[topic]?.[m]?.[category] ?? 0), 0).toFixed(2)
 
         const matrix: string[][] = []
 
@@ -409,6 +413,7 @@ const BillingCostByMonth: React.FunctionComponent = () => {
                     const val = data[topic]?.[m]?.[CloudSpendCategory.COMPUTE_COST]
                     return val === undefined ? '' : val.toFixed(2)
                 }),
+                categoryTotal(topic, CloudSpendCategory.COMPUTE_COST),
             ]
             matrix.push(computeRow)
 
@@ -419,6 +424,7 @@ const BillingCostByMonth: React.FunctionComponent = () => {
                     const val = data[topic]?.[m]?.[CloudSpendCategory.STORAGE_COST]
                     return val === undefined ? '' : val.toFixed(2)
                 }),
+                categoryTotal(topic, CloudSpendCategory.STORAGE_COST),
             ]
             matrix.push(storageRow)
 
