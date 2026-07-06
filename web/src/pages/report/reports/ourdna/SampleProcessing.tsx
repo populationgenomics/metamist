@@ -1,8 +1,11 @@
 import { Box, Card, Typography } from '@mui/material'
 import * as Plot from '@observablehq/plot'
+import { useMemo } from 'react'
 import Report from '../../components/Report'
 import { ReportItemMetric, ReportItemPlot, ReportItemTable } from '../../components/ReportItem'
 import ReportRow from '../../components/ReportRow'
+import { formatQuery } from '../../data/formatQuery'
+import { useProjectDbQuery } from '../../data/projectDatabase'
 
 const ROW_HEIGHT = 450
 const METRIC_HEIGHT = 220
@@ -191,6 +194,136 @@ function ProcessingTimesByAncestry(props: { project: string }) {
                     }),
                 ],
             })}
+        />
+    )
+}
+
+//TODO check, can there be sample entries which are currently processing
+const ANCESTRY_GROUPS = [
+    'Filipino',
+    'Vietnamese',
+    'Samoan',
+    'Fijian',
+    'Tongan',
+    'Lebanese',
+    'Jordanian',
+    'Palestinian',
+    'Syrian',
+]
+
+const BIOBANK_SAMPLE_DISTRIBUTION_QUERY = [
+    {
+        name: 'blood_samples',
+        query: `
+            with p_ancestries as (
+                select
+                    participant_id,
+                    unnest(p.meta_ancestry_participant_ancestry) AS ancestry
+                from participant p
+            )
+            select
+                s.participant_id,
+                s.meta_processing_site as processing_site,
+                ancestry,
+                sample_id
+            from sample s
+            join p_ancestries on s.participant_id = p_ancestries.participant_id
+            where ancestry in ('Filipino', 'Vietnamese', 'Samoan', 'Fijian', 'Tongan', 'Lebanese', 'Jordanian', 'Palestinian', 'Syrian') and 
+            s.meta_processing_site in ('bbv', 'westmead') and type = 'blood'
+        `,
+    },
+    {
+        name: 'result',
+        query: `
+            select
+                ancestry,
+                processing_site,
+                round(count(sample_id) * 100.0/ sum(count(sample_id)) over (partition by ancestry),1) as pct
+            from blood_samples group by 1, 2
+        `,
+    },
+]
+
+const ANCESTRY_COUNT_QUERY = [
+    BIOBANK_SAMPLE_DISTRIBUTION_QUERY[0],
+    {
+        name: 'result',
+        query: `SELECT count(distinct ancestry) as count FROM blood_samples`,
+    },
+]
+const ANCESTRY_COUNT_QUERY_FORMATTED = formatQuery(ANCESTRY_COUNT_QUERY)
+
+const BIOBANK_SAMPLE_DISTRIBUTION_PLOT = (data: any) => ({
+    marginLeft: 100,
+    marginBottom: 40,
+    x: { percent: true, axis: null },
+    y: { label: null },
+    color: {
+        legend: true,
+        domain: ['bbv', 'westmead'],
+        range: ['#a6c8e8', '#f4b8b8'],
+    },
+    marks: [
+        Plot.barX(
+            data,
+            Plot.stackX(
+                { offset: 'normalize', order: ['bbv', 'westmead'] },
+                {
+                    y: 'ancestry',
+                    fill: 'processing_site',
+                    x: 'pct',
+                    tip: true,
+                    title: (d: any) => `${d.processing_site}: ${d.pct}%`,
+                }
+            )
+        ),
+        Plot.text([{ x: 0.5 }], {
+            x: 'x',
+            text: () => '|',
+            frameAnchor: 'top',
+            dy: -1,
+            fontSize: 12,
+        }),
+        Plot.text([{ x: 0.5 }], {
+            x: 'x',
+            text: () => '50%',
+            frameAnchor: 'top',
+            dy: -12,
+            fontSize: 11,
+        }),
+        Plot.text([{ x: 0.5 }], {
+            x: 'x',
+            text: () => '|',
+            frameAnchor: 'bottom',
+            dy: -1,
+            fontSize: 12,
+        }),
+        Plot.text([{ x: 0.5 }], {
+            x: 'x',
+            text: () => '50%',
+            frameAnchor: 'bottom',
+            dy: 14,
+            fontSize: 11,
+        }),
+    ],
+})
+
+function BioBankSampleDistributionChart({ project }: { project: string }) {
+    const countResult = useProjectDbQuery(project, ANCESTRY_COUNT_QUERY_FORMATTED)
+    const height = useMemo(() => {
+        if (countResult?.status !== 'success') return ANCESTRY_GROUPS.length * 100 + 100
+        const count = countResult.data.toArray()[0]?.count
+        return (count ? count : 1) * 60 + 100
+    }, [countResult])
+
+    return (
+        <ReportItemPlot
+            height={height}
+            flexGrow={1}
+            title="Community cohorts and biobank sample distribution"
+            project={project}
+            query={BIOBANK_SAMPLE_DISTRIBUTION_QUERY}
+            plot={BIOBANK_SAMPLE_DISTRIBUTION_PLOT}
         />
     )
 }
@@ -616,6 +749,9 @@ export default function ProcessingTimes({ project }: { project: string }) {
                         ],
                     })}
                 />
+            </ReportRow>
+            <ReportRow>
+                <BioBankSampleDistributionChart project={project} />
             </ReportRow>
         </Report>
     )
