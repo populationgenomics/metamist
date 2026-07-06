@@ -253,60 +253,6 @@ const ANCESTRY_COUNT_QUERY = [
 ]
 const ANCESTRY_COUNT_QUERY_FORMATTED = formatQuery(ANCESTRY_COUNT_QUERY)
 
-const BIOBANK_SAMPLE_DISTRIBUTION_PLOT = (data: any) => ({
-    marginLeft: 100,
-    marginBottom: 40,
-    x: { percent: true, axis: null },
-    y: { label: null },
-    color: {
-        legend: true,
-        domain: ['bbv', 'westmead'],
-        range: ['#a6c8e8', '#f4b8b8'],
-    },
-    marks: [
-        Plot.barX(
-            data,
-            Plot.stackX(
-                { offset: 'normalize', order: ['bbv', 'westmead'] },
-                {
-                    y: 'ancestry',
-                    fill: 'processing_site',
-                    x: 'percentage',
-                    tip: true,
-                }
-            )
-        ),
-        Plot.text([{ x: 0.5 }], {
-            x: 'x',
-            text: () => '|',
-            frameAnchor: 'top',
-            dy: -1,
-            fontSize: 12,
-        }),
-        Plot.text([{ x: 0.5 }], {
-            x: 'x',
-            text: () => '50%',
-            frameAnchor: 'top',
-            dy: -12,
-            fontSize: 11,
-        }),
-        Plot.text([{ x: 0.5 }], {
-            x: 'x',
-            text: () => '|',
-            frameAnchor: 'bottom',
-            dy: -1,
-            fontSize: 12,
-        }),
-        Plot.text([{ x: 0.5 }], {
-            x: 'x',
-            text: () => '50%',
-            frameAnchor: 'bottom',
-            dy: 14,
-            fontSize: 11,
-        }),
-    ],
-})
-
 function BioBankSampleDistributionChart({ project }: { project: string }) {
     const countResult = useProjectDbQuery(project, ANCESTRY_COUNT_QUERY_FORMATTED)
     const height = useMemo(() => {
@@ -322,7 +268,59 @@ function BioBankSampleDistributionChart({ project }: { project: string }) {
             title="Community cohorts and biobank sample distribution"
             project={project}
             query={BIOBANK_SAMPLE_DISTRIBUTION_QUERY}
-            plot={BIOBANK_SAMPLE_DISTRIBUTION_PLOT}
+            plot={(data) => ({
+                marginLeft: 100,
+                marginBottom: 40,
+                x: { percent: true, axis: null },
+                y: { label: null },
+                color: {
+                    legend: true,
+                    domain: ['bbv', 'westmead'],
+                    range: ['#a6c8e8', '#f4b8b8'],
+                },
+                marks: [
+                    Plot.barX(
+                        data,
+                        Plot.stackX(
+                            { offset: 'normalize', order: ['bbv', 'westmead'] },
+                            {
+                                y: 'ancestry',
+                                fill: 'processing_site',
+                                x: 'percentage',
+                                tip: true,
+                            }
+                        )
+                    ),
+                    Plot.text([{ x: 0.5 }], {
+                        x: 'x',
+                        text: () => '|',
+                        frameAnchor: 'top',
+                        dy: -1,
+                        fontSize: 12,
+                    }),
+                    Plot.text([{ x: 0.5 }], {
+                        x: 'x',
+                        text: () => '50%',
+                        frameAnchor: 'top',
+                        dy: -12,
+                        fontSize: 11,
+                    }),
+                    Plot.text([{ x: 0.5 }], {
+                        x: 'x',
+                        text: () => '|',
+                        frameAnchor: 'bottom',
+                        dy: -1,
+                        fontSize: 12,
+                    }),
+                    Plot.text([{ x: 0.5 }], {
+                        x: 'x',
+                        text: () => '50%',
+                        frameAnchor: 'bottom',
+                        dy: 14,
+                        fontSize: 11,
+                    }),
+                ],
+            })}
         />
     )
 }
