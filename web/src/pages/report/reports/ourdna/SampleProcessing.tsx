@@ -198,7 +198,7 @@ function ProcessingTimesByAncestry(props: { project: string }) {
     )
 }
 
-//TODO check, can there be sample entries which are currently processing
+//TODO check, the location of the plot
 const ANCESTRY_GROUPS = [
     'Filipino',
     'Vietnamese',
@@ -238,7 +238,7 @@ const BIOBANK_SAMPLE_DISTRIBUTION_QUERY = [
             select
                 ancestry,
                 processing_site,
-                round(count(sample_id) * 100.0/ sum(count(sample_id)) over (partition by ancestry),1) as pct
+                round(count(sample_id) * 100.0/ sum(count(sample_id)) over (partition by ancestry),1) as percentage
             from blood_samples group by 1, 2
         `,
     },
@@ -271,9 +271,8 @@ const BIOBANK_SAMPLE_DISTRIBUTION_PLOT = (data: any) => ({
                 {
                     y: 'ancestry',
                     fill: 'processing_site',
-                    x: 'pct',
+                    x: 'percentage',
                     tip: true,
-                    title: (d: any) => `${d.processing_site}: ${d.pct}%`,
                 }
             )
         ),
