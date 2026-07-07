@@ -247,7 +247,7 @@ const BIOBANK_SAMPLE_DISTRIBUTION_QUERY = [
 const ANCESTRY_COUNT_QUERY = [
     BIOBANK_SAMPLE_DISTRIBUTION_QUERY[0],
     {
-        name: 'result',
+        name: 'ancestries',
         query: `SELECT count(distinct ancestry) as count FROM blood_samples`,
     },
 ]
@@ -256,7 +256,7 @@ const ANCESTRY_COUNT_QUERY_FORMATTED = formatQuery(ANCESTRY_COUNT_QUERY)
 function BioBankSampleDistributionChart({ project }: { project: string }) {
     const countResult = useProjectDbQuery(project, ANCESTRY_COUNT_QUERY_FORMATTED)
     const height = useMemo(() => {
-        if (countResult?.status !== 'success') return ANCESTRY_GROUPS.length * 100 + 100
+        if (countResult?.status !== 'success') return ANCESTRY_GROUPS.length * 60 + 100
         const count = countResult.data.toArray()[0]?.count
         return (count ? count : 1) * 60 + 100
     }, [countResult])
