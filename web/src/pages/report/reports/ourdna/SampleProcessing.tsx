@@ -9,6 +9,7 @@ import { useProjectDbQuery } from '../../data/projectDatabase'
 
 const ROW_HEIGHT = 450
 const METRIC_HEIGHT = 220
+const DEFAULT_ANCESTRY_HEIGHT = 60
 
 const PROCESS_DURATION_QUERY = `
     with times as (
@@ -198,19 +199,9 @@ function ProcessingTimesByAncestry(props: { project: string }) {
     )
 }
 
-//TODO check, the location of the plot
-const ANCESTRY_GROUPS = [
-    'Filipino',
-    'Vietnamese',
-    'Samoan',
-    'Fijian',
-    'Tongan',
-    'Lebanese',
-    'Jordanian',
-    'Palestinian',
-    'Syrian',
-]
-
+// As of now European cohort is identified by the screening_ancestry_group
+// as ancestry_participant_ancestry does not contain sufficient information
+// See https://cpg-populationanalysis.atlassian.net/browse/SET-1178
 const BIOBANK_SAMPLE_DISTRIBUTION_QUERY = [
     {
         name: 'blood_samples',
@@ -218,8 +209,16 @@ const BIOBANK_SAMPLE_DISTRIBUTION_QUERY = [
             with p_ancestries as (
                 select
                     participant_id,
-                    unnest(p.meta_ancestry_participant_ancestry) AS ancestry
+                    unnest(p.meta_ancestry_participant_ancestry) AS ancestry,
                 from participant p
+
+                UNION ALL
+
+                select
+                    participant_id,
+                    'European' as ancestry,
+                from participant 
+                where meta_screening_ancestry_group = ['<div>None of the above</div>']
             )
             select
                 s.participant_id,
@@ -228,7 +227,7 @@ const BIOBANK_SAMPLE_DISTRIBUTION_QUERY = [
                 sample_id
             from sample s
             join p_ancestries on s.participant_id = p_ancestries.participant_id
-            where ancestry in ('Filipino', 'Vietnamese', 'Samoan', 'Fijian', 'Tongan', 'Lebanese', 'Jordanian', 'Palestinian', 'Syrian') and 
+            where ancestry in ('Filipino', 'Vietnamese', 'Samoan', 'Fijian', 'Tongan', 'Lebanese', 'Jordanian', 'Palestinian', 'Syrian', 'European') and 
             s.meta_processing_site in ('bbv', 'westmead') and type = 'blood'
         `,
     },
@@ -256,9 +255,9 @@ const ANCESTRY_COUNT_QUERY_FORMATTED = formatQuery(ANCESTRY_COUNT_QUERY)
 function BioBankSampleDistributionChart({ project }: { project: string }) {
     const countResult = useProjectDbQuery(project, ANCESTRY_COUNT_QUERY_FORMATTED)
     const height = useMemo(() => {
-        if (countResult?.status !== 'success') return ANCESTRY_GROUPS.length * 60 + 100
+        if (countResult?.status !== 'success') return DEFAULT_ANCESTRY_HEIGHT + 125
         const count = countResult.data.toArray()[0]?.count
-        return (count ? count : 1) * 60 + 100
+        return (count ? count : 1) * DEFAULT_ANCESTRY_HEIGHT + 125
     }, [countResult])
 
     return (
@@ -270,7 +269,7 @@ function BioBankSampleDistributionChart({ project }: { project: string }) {
             query={BIOBANK_SAMPLE_DISTRIBUTION_QUERY}
             plot={(data) => ({
                 marginLeft: 100,
-                marginBottom: 40,
+                marginBottom: 50,
                 x: { percent: true, axis: null },
                 y: { label: null },
                 color: {
