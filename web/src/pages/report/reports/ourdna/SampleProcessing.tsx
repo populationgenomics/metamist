@@ -455,17 +455,37 @@ function SampleMetricsRow({ project }: { project: string }) {
                         flexGrow={1}
                         cardVariant="outlined"
                         showActions={false}
+                        title="Assisted walk-in"
+                        description={
+                            <>
+                                The number of participants with <b>blood</b> samples registered in
+                                Metamist and collection event type <b>assisted-walk-in</b>.
+                            </>
+                        }
+                        query={`
+                            select count(distinct participant_id) as count
+                            from sample
+                            where type = 'blood' and meta_collection_event_type = 'assisted-walk-in'
+                        `}
+                    />
+                    <ReportItemMetric
+                        project={project}
+                        height={METRIC_HEIGHT}
+                        flexBasis={300}
+                        flexGrow={1}
+                        cardVariant="outlined"
+                        showActions={false}
                         title="Pre-organised event"
                         description={
                             <>
                                 The number of participants with <b>blood</b> samples registered in
-                                Metamist and collection event type <b>pre-organised event</b>.
+                                Metamist and collection event type <b>pre-organised-event</b>.
                             </>
                         }
                         query={`
                         select count(distinct participant_id) as count
                         from sample
-                        where type = 'blood' and meta_collection_event_type = 'pre-organised event'
+                        where type = 'blood' and meta_collection_event_type = 'pre-organised-event'
                     `}
                     />
                 </ReportRow>
