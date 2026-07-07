@@ -336,7 +336,7 @@ function SampleMetricsRow({ project }: { project: string }) {
                         query={`
                         select count(distinct participant_id) as count
                         from sample
-                        where type = 'blood' and meta_collection_event_type = 'pre-organised event'
+                        where type = 'blood' and meta_collection_event_type = 'pre-organised-event'
                     `}
                     />
                 </ReportRow>
