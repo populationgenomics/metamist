@@ -324,9 +324,9 @@ function BioBankSampleDistributionChart({ project }: { project: string }) {
     )
 }
 
-function SampleMetricsRow({ project }: { project: string }) {
+function SampleMetricsSection({ project }: { project: string }) {
     return (
-        <Card sx={{ padding: 2, marginBottom: 2 }}>
+        <Card sx={{ padding: 2}}>
             <Typography fontWeight={'bold'} fontSize={16} marginBottom={2}>
                 Sample Metrics
             </Typography>
@@ -497,7 +497,7 @@ function SampleMetricsRow({ project }: { project: string }) {
 export default function ProcessingTimes({ project }: { project: string }) {
     return (
         <Report>
-            <SampleMetricsRow project={project} />
+            <SampleMetricsSection project={project} />
             <ReportRow>
                 <ReportItemPlot
                     height={ROW_HEIGHT + 100}
