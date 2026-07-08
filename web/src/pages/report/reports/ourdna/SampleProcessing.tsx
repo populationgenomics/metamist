@@ -743,25 +743,45 @@ export default function ProcessingTimes({ project }: { project: string }) {
                     project={project}
                     query={[
                         {
-                            name: 'result',
+                            name: 'categorised',
                             query: `
-                                select
-                                    count(distinct participant_id) as count,
-                                    type
-                                from sample s
-                                group by 2
+                            select
+                                    type,
+                                    CASE
+                                        WHEN type not in ('buffy-coat', 'guthrie-card', 'pbmc', 'plasma', 'whole-blood') THEN '>=1 aliquot'
+                                        WHEN meta_aliquot_count > 0 THEN '>=1 aliquot'
+                                        WHEN meta_aliquot_count = 0 THEN '0 aliquots'
+                                        ELSE 'no data'
+                                    END as status,
+                                    count(distinct participant_id) as count
+                                from sample group by 1, 2
                             `,
                         },
                     ]}
                     plot={(data) => ({
                         marginLeft: 100,
                         marks: [
-                            Plot.barX(data, {
-                                y: 'type',
-                                x: 'count',
-                                fill: 'type',
-                                tip: true,
-                            }),
+                            Plot.barX(
+                                data,
+                                Plot.stackX(
+                                    { order: ['>=1 aliquot', '0 aliquots', 'no data'] },
+                                    {
+                                        y: 'type',
+                                        x: 'count',
+                                        z: 'status',
+                                        fill: 'type',
+                                        fillOpacity: (d: { status: string }) =>
+                                            d.status === '>=1 aliquot'
+                                                ? 1.0
+                                                : d.status === '0 aliquots'
+                                                  ? 0.6
+                                                  : 0.3,
+                                        tip: true,
+                                        title: (d: { status: string; count: number }) =>
+                                            `${d.status}: ${d.count}`,
+                                    }
+                                )
+                            ),
                         ],
                     })}
                 />
