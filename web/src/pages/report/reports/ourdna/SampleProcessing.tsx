@@ -326,7 +326,7 @@ function BioBankSampleDistributionChart({ project }: { project: string }) {
 
 function SampleMetricsSection({ project }: { project: string }) {
     return (
-        <Card sx={{ padding: 2}}>
+        <Card sx={{ padding: 2 }}>
             <Typography fontWeight={'bold'} fontSize={16} marginBottom={2}>
                 Sample Metrics
             </Typography>
@@ -746,15 +746,15 @@ export default function ProcessingTimes({ project }: { project: string }) {
                             name: 'categorised',
                             query: `
                             select
-                                    type,
-                                    CASE
-                                        WHEN type not in ('buffy-coat', 'guthrie-card', 'pbmc', 'plasma', 'whole-blood') THEN 'not_applicable'
-                                        WHEN meta_aliquot_count > 0 THEN '>=1 aliquot'
-                                        WHEN meta_aliquot_count = 0 THEN '0 aliquots'
-                                        ELSE 'no data'
-                                    END as status,
-                                    count(distinct participant_id) as count
-                                from sample group by 1, 2
+                                type,
+                                CASE
+                                    WHEN type not in ('buffy-coat', 'guthrie-card', 'pbmc', 'plasma', 'whole-blood') THEN 'not_applicable'
+                                    WHEN meta_aliquot_count > 0 THEN '>=1 aliquot'
+                                    WHEN meta_aliquot_count = 0 THEN '0 aliquots'
+                                    ELSE 'no data'
+                                END as status,
+                                count(distinct participant_id) as count
+                            from sample group by 1, 2
                             `,
                         },
                     ]}
