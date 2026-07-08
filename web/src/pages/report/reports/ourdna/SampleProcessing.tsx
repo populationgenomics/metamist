@@ -1,11 +1,21 @@
-import { Box, FormControl, InputLabel, MenuItem, Select, SelectChangeEvent } from '@mui/material'
+import {
+    Box,
+    Card,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    Select,
+    SelectChangeEvent,
+    Typography,
+} from '@mui/material'
 import * as Plot from '@observablehq/plot'
 import { useState } from 'react'
 import Report from '../../components/Report'
-import { ReportItemPlot, ReportItemTable } from '../../components/ReportItem'
+import { ReportItemMetric, ReportItemPlot, ReportItemTable } from '../../components/ReportItem'
 import ReportRow from '../../components/ReportRow'
 
 const ROW_HEIGHT = 450
+const METRIC_HEIGHT = 220
 
 const PROCESS_DURATION_QUERY = `
     with times as (
@@ -195,6 +205,176 @@ function ProcessingTimesByAncestry(props: { project: string }) {
     )
 }
 
+function SampleMetricsSection({ project }: { project: string }) {
+    return (
+        <Card sx={{ padding: 2 }}>
+            <Typography fontWeight={'bold'} fontSize={16} marginBottom={2}>
+                Sample Metrics
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <ReportRow gap={0.5}>
+                    <ReportItemMetric
+                        project={project}
+                        height={METRIC_HEIGHT}
+                        flexBasis={300}
+                        flexGrow={1}
+                        cardVariant="outlined"
+                        showActions={false}
+                        title="Total samples"
+                        description={
+                            <>
+                                The number of participants that have <b>blood</b> samples registered
+                                in Metamist.
+                            </>
+                        }
+                        query={`
+                        select count(distinct participant_id) as count
+                        from sample where type = 'blood'
+                    `}
+                    />
+                    <ReportItemMetric
+                        project={project}
+                        height={METRIC_HEIGHT}
+                        flexBasis={300}
+                        flexGrow={1}
+                        cardVariant="outlined"
+                        showActions={false}
+                        title="Total aliquots"
+                        description="Sum of all buffy coat, PBMC, plasma and whole blood aliquots registered in Metamist."
+                        query={`
+                        select sum(meta_aliquot_count) as total_aliquots 
+                        from sample
+                        where type in ('buffy-coat', 'pbmc', 'plasma', 'whole-blood')
+                    `}
+                    />
+                </ReportRow>
+                <ReportRow gap={0.5}>
+                    <ReportItemMetric
+                        project={project}
+                        height={METRIC_HEIGHT}
+                        flexBasis={300}
+                        flexGrow={1}
+                        cardVariant="outlined"
+                        showActions={false}
+                        title="Biobanking Victoria"
+                        description={
+                            <>
+                                The number of participants with <b>blood</b> samples registered in
+                                Metamist and processing site <b>bbv</b>.
+                            </>
+                        }
+                        query={`
+                        select count(distinct participant_id) as count
+                        from sample where type = 'blood' and meta_processing_site = 'bbv'
+                    `}
+                    />
+                    <ReportItemMetric
+                        project={project}
+                        height={METRIC_HEIGHT}
+                        flexBasis={300}
+                        flexGrow={1}
+                        cardVariant="outlined"
+                        showActions={false}
+                        title="Westmead Biobank"
+                        description={
+                            <>
+                                The number of participants with <b>blood</b> samples registered in
+                                Metamist and processing site <b>westmead</b>.
+                            </>
+                        }
+                        query={`
+                        select count(distinct participant_id) as count
+                        from sample where type = 'blood' and meta_processing_site = 'westmead'
+                    `}
+                    />
+                </ReportRow>
+                <ReportRow gap={0.5}>
+                    <ReportItemMetric
+                        project={project}
+                        height={METRIC_HEIGHT}
+                        flexBasis={300}
+                        flexGrow={1}
+                        cardVariant="outlined"
+                        showActions={false}
+                        title="OSS"
+                        description={
+                            <>
+                                The number of participants with <b>blood</b> samples registered in
+                                Metamist and collection event type <b>one-stop-shop</b>.
+                            </>
+                        }
+                        query={`
+                        select count(distinct participant_id) as count
+                        from sample
+                        where type = 'blood' and meta_collection_event_type = 'one-stop-shop'
+                    `}
+                    />
+                    <ReportItemMetric
+                        project={project}
+                        height={METRIC_HEIGHT}
+                        flexBasis={300}
+                        flexGrow={1}
+                        cardVariant="outlined"
+                        showActions={false}
+                        title="Walk-ins"
+                        description={
+                            <>
+                                The number of participants with <b>blood</b> samples registered in
+                                Metamist and collection event type <b>walk-in</b>.
+                            </>
+                        }
+                        query={`
+                        select count(distinct participant_id) as count
+                        from sample
+                        where type = 'blood' and meta_collection_event_type = 'walk-in'
+                    `}
+                    />
+                    <ReportItemMetric
+                        project={project}
+                        height={METRIC_HEIGHT}
+                        flexBasis={300}
+                        flexGrow={1}
+                        cardVariant="outlined"
+                        showActions={false}
+                        title="Assisted walk-in"
+                        description={
+                            <>
+                                The number of participants with <b>blood</b> samples registered in
+                                Metamist and collection event type <b>assisted-walk-in</b>.
+                            </>
+                        }
+                        query={`
+                            select count(distinct participant_id) as count
+                            from sample
+                            where type = 'blood' and meta_collection_event_type = 'assisted-walk-in'
+                        `}
+                    />
+                    <ReportItemMetric
+                        project={project}
+                        height={METRIC_HEIGHT}
+                        flexBasis={300}
+                        flexGrow={1}
+                        cardVariant="outlined"
+                        showActions={false}
+                        title="Pre-organised event"
+                        description={
+                            <>
+                                The number of participants with <b>blood</b> samples registered in
+                                Metamist and collection event type <b>pre-organised-event</b>.
+                            </>
+                        }
+                        query={`
+                        select count(distinct participant_id) as count
+                        from sample
+                        where type = 'blood' and meta_collection_event_type = 'pre-organised-event'
+                    `}
+                    />
+                </ReportRow>
+            </Box>
+        </Card>
+    )
+}
+
 export default function ProcessingTimes({ project }: { project: string }) {
     const [viabilityColour, setViabilityColour] = useState('biobank')
 
@@ -204,6 +384,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
 
     return (
         <Report>
+            <SampleMetricsSection project={project} />
             <ReportRow>
                 <ReportItemPlot
                     height={ROW_HEIGHT + 100}
