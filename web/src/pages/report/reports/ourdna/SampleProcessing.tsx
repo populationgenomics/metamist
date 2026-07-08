@@ -748,7 +748,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                             select
                                     type,
                                     CASE
-                                        WHEN type not in ('buffy-coat', 'guthrie-card', 'pbmc', 'plasma', 'whole-blood') THEN '>=1 aliquot'
+                                        WHEN type not in ('buffy-coat', 'guthrie-card', 'pbmc', 'plasma', 'whole-blood') THEN 'not_applicable'
                                         WHEN meta_aliquot_count > 0 THEN '>=1 aliquot'
                                         WHEN meta_aliquot_count = 0 THEN '0 aliquots'
                                         ELSE 'no data'
@@ -760,6 +760,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
                     ]}
                     plot={(data) => ({
                         marginLeft: 100,
+                        color: { scheme: 'Dark2' },
                         marks: [
                             Plot.barX(
                                 data,
@@ -777,8 +778,15 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                                   ? 0.6
                                                   : 0.3,
                                         tip: true,
-                                        title: (d: { status: string; count: number }) =>
-                                            `${d.status}: ${d.count}`,
+                                        title: (d: {
+                                            type: string
+                                            status: string
+                                            count: number
+                                        }) => {
+                                            return d.status != 'not_applicable'
+                                                ? `${d.status}: ${d.count}`
+                                                : null
+                                        },
                                     }
                                 )
                             ),
