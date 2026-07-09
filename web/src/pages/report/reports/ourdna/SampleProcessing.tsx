@@ -9,7 +9,7 @@ import {
     Typography,
 } from '@mui/material'
 import * as Plot from '@observablehq/plot'
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import Report from '../../components/Report'
 import { ReportItemMetric, ReportItemPlot, ReportItemTable } from '../../components/ReportItem'
 import ReportRow from '../../components/ReportRow'
@@ -335,7 +335,7 @@ function BioBankSampleDistributionChart({ project }: { project: string }) {
 
 function SampleMetricsSection({ project }: { project: string }) {
     return (
-        <Card sx={{ padding: 2}}>
+        <Card sx={{ padding: 2 }}>
             <Typography fontWeight={'bold'} fontSize={16} marginBottom={2}>
                 Sample Metrics
             </Typography>
@@ -760,11 +760,16 @@ export default function ProcessingTimes({ project }: { project: string }) {
                         {
                             name: 'categorised',
                             query: `
-                                select
-                                    count(distinct participant_id) as count,
-                                    type
-                                from sample s
-                                group by 2
+                            select
+                                type,
+                                CASE
+                                    WHEN type not in ('buffy-coat', 'guthrie-card', 'pbmc', 'plasma', 'whole-blood') THEN 'not_applicable'
+                                    WHEN meta_aliquot_count > 0 THEN '>=1 aliquot'
+                                    WHEN meta_aliquot_count = 0 THEN '0 aliquots'
+                                    ELSE 'no data'
+                                END as status,
+                                count(distinct participant_id) as count
+                            from sample group by 1, 2
                             `,
                         },
                     ]}
@@ -774,30 +779,38 @@ export default function ProcessingTimes({ project }: { project: string }) {
                         marks: [
                             Plot.barX(
                                 data,
-                                Plot.stackX(
-                                    { order: ['>=1 aliquot', '0 aliquots', 'no data'] },
+                                Plot.filter(
+                                    (d: { status: string }) => d.status === 'not_applicable',
                                     {
                                         y: 'type',
                                         x: 'count',
-                                        z: 'status',
                                         fill: 'type',
-                                        fillOpacity: (d: { status: string }) =>
-                                            d.status === '>=1 aliquot'
-                                                ? 1.0
-                                                : d.status === '0 aliquots'
-                                                  ? 0.6
-                                                  : 0.3,
-                                        tip: true,
-                                        title: (d: {
-                                            type: string
-                                            status: string
-                                            count: number
-                                        }) => {
-                                            return d.status != 'not_applicable'
-                                                ? `${d.status}: ${d.count}`
-                                                : null
-                                        },
+                                        fillOpacity: 1,
                                     }
+                                )
+                            ),
+                            Plot.barX(
+                                data,
+                                Plot.filter(
+                                    (d: { status: string }) => d.status !== 'not_applicable',
+                                    Plot.stackX(
+                                        { order: ['>=1 aliquot', '0 aliquots', 'no data'] },
+                                        {
+                                            y: 'type',
+                                            x: 'count',
+                                            z: 'status',
+                                            fill: 'type',
+                                            fillOpacity: (d: { status: string }) =>
+                                                d.status === '>=1 aliquot'
+                                                    ? 1.0
+                                                    : d.status === '0 aliquots'
+                                                      ? 0.6
+                                                      : 0.3,
+                                            tip: true,
+                                            title: (d: { status: string; count: number }) =>
+                                                `${d.status}: ${d.count}`,
+                                        }
+                                    )
                                 )
                             ),
                         ],
