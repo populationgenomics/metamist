@@ -226,7 +226,7 @@ const BIOBANK_SAMPLE_DISTRIBUTION_QUERY = [
                 select
                     participant_id,
                     'European' as ancestry,
-                from participant 
+                from participant
                 where meta_screening_ancestry_group = ['<div>None of the above</div>']
             )
             select
@@ -236,7 +236,7 @@ const BIOBANK_SAMPLE_DISTRIBUTION_QUERY = [
                 sample_id
             from sample s
             join p_ancestries on s.participant_id = p_ancestries.participant_id
-            where ancestry in ('Filipino', 'Vietnamese', 'Samoan', 'Fijian', 'Tongan', 'Lebanese', 'Jordanian', 'Palestinian', 'Syrian', 'European') and 
+            where ancestry in ('Filipino', 'Vietnamese', 'Samoan', 'Fijian', 'Tongan', 'Lebanese', 'Jordanian', 'Palestinian', 'Syrian', 'European') and
             s.meta_processing_site in ('bbv', 'westmead') and type = 'blood'
         `,
     },
@@ -370,7 +370,7 @@ function SampleMetricsSection({ project }: { project: string }) {
                         title="Total aliquots"
                         description="Sum of all buffy coat, PBMC, plasma and whole blood aliquots registered in Metamist."
                         query={`
-                        select sum(meta_aliquot_count) as total_aliquots 
+                        select sum(meta_aliquot_count) as total_aliquots
                         from sample
                         where type in ('buffy-coat', 'pbmc', 'plasma', 'whole-blood')
                     `}
