@@ -397,6 +397,25 @@ class TestCohortData(DbIsolatedTest):
         self.assertIn(self.sgB_raw, result.sequencing_group_ids)
 
     @run_as_sync
+    async def test_create_cohort_fails_when_no_matching_sample(self):
+        """Create cohort from a sample type with no matching samples"""
+        with self.assertRaises(ValueError):
+            await self.cohortl.create_cohort_from_criteria(
+                project_to_write=self.project_id,
+                description='Missing samples of type',
+                cohort_name='Missing samples of type cohort 1',
+                dry_run=False,
+                cohort_criteria=CohortCriteriaInternal(
+                    projects=[self.project_id],
+                    excluded_sgs_internal_raw=[self.sgA_raw],
+                    sg_technology=['short-read'],
+                    sg_platform=['illumina'],
+                    sg_type=['genome'],
+                    sample_type=['non_existent'],
+                ),
+            )
+
+    @run_as_sync
     async def test_create_duplicate_cohort(self):
         """Can't create cohorts with duplicate names"""
         _ = await self.cohortl.create_cohort_from_criteria(
