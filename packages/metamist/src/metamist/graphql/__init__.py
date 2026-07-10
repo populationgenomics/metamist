@@ -85,7 +85,7 @@ async def configure_async_client(
     schema: str = None,
     auth_token: str = None,
     force_recreate=False,
-    execute_timeout: int | float | None = 30,
+    execute_timeout: int | float = 30,
 ) -> Client:
     """Configure an async client for use with the Metamist GraphQL API"""
     global _async_client  # noqa: PLW0603
