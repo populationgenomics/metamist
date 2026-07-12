@@ -266,7 +266,7 @@ function BioBankSampleDistributionChart({ project }: { project: string }) {
     const height = useMemo(() => {
         if (countResult?.status !== 'success') return DEFAULT_ANCESTRY_HEIGHT + 125
         const count = countResult.data.toArray()[0]?.count
-        return (count ? count : 1) * DEFAULT_ANCESTRY_HEIGHT + 125
+        return (count || 1) * DEFAULT_ANCESTRY_HEIGHT + 125
     }, [countResult])
 
     return (
@@ -800,12 +800,16 @@ export default function ProcessingTimes({ project }: { project: string }) {
                                             x: 'count',
                                             z: 'status',
                                             fill: 'type',
-                                            fillOpacity: (d: { status: string }) =>
-                                                d.status === '>=1 aliquot'
-                                                    ? 1.0
-                                                    : d.status === '0 aliquots'
-                                                      ? 0.6
-                                                      : 0.3,
+                                            fillOpacity: (d: { status: string }) => {
+                                                switch (d.status) {
+                                                    case '>=1 aliquot':
+                                                        return 1.0
+                                                    case '0 aliquots':
+                                                        return 0.6
+                                                    default:
+                                                        return 0.3
+                                                }
+                                            },
                                             tip: true,
                                             title: (d: { status: string; count: number }) =>
                                                 `${d.status}: ${d.count}`,
