@@ -345,17 +345,14 @@ class AnalysisTable(DbBase):
         meta: dict[str, Any] | None = None,
     ):
         """Find the most recent completed analysis for some analysis type"""
-        values = {'project': project, 'type': analysis_type}
 
-        meta_str = ''
+        meta_query = t''
         if meta:
             for k, v in meta.items():
-                k_replacer = f'meta_{k}'
-                meta_str += f" AND json_extract(meta, '$.{k}') = :{k_replacer}"
                 if v is None:
-                    # mariadb does a bad cast for NULL
-                    v = 'null'  # noqa: PLW2901
-                values[k_replacer] = v
+                    meta_query += t' AND meta::json->>{k} IS NULL'
+                else:
+                    meta_query += t' AND meta::json->>{k} = {v}'
 
         _query = t"""
             SELECT a.id as id, a.type as type, a.status as status,
@@ -367,7 +364,7 @@ class AnalysisTable(DbBase):
             INNER JOIN sequencing_group sg ON a_sg.sequencing_group_id = sg.id
             WHERE a.id = (
                 SELECT id FROM analysis
-                WHERE active AND type = LOWER({analysis_type.lower()}) AND project = {project} AND status = 'completed' AND timestamp_completed IS NOT NULL {meta_str}
+                WHERE active AND type = LOWER({analysis_type.lower()}) AND project = {project} AND status = 'completed' AND timestamp_completed IS NOT NULL {meta_query:q}
                 ORDER BY timestamp_completed DESC
                 LIMIT 1
             )
@@ -409,9 +406,9 @@ class AnalysisTable(DbBase):
 
         _query = t"""
             SELECT sg.id as id
-            FROM sequencing_group sg
-            WHERE sg.project = {project_id} AND
-                id NOT IN (
+            FROM sequencing_group sg INNER JOIN sample s ON sg.sample_id = s.id
+            WHERE s.project = {project_id} AND
+                sg.id NOT IN (
                     SELECT a_sg.sequencing_group_id FROM analysis_sequencing_group a_sg
                     LEFT JOIN analysis a ON a_sg.analysis_id = a.id
                     WHERE a.type = LOWER({analysis_type.lower()}) AND a.active

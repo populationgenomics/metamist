@@ -7,7 +7,7 @@ from psycopg import sql
 
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
-from db.python.layers import SampleLayer, SequencingGroupLayer
+from db.python.layers import AssayLayer, SampleLayer, SequencingGroupLayer
 from db.python.tables.sequencing_group import (
     SequencingGroupFilter,
     SequencingGroupTable,
@@ -157,6 +157,74 @@ class TestSequencingGroup:
         sg_from_db = await sg_layer.get_sequencing_group_by_id(initial_sg[0].id)
 
         assert sg_from_db.meta == {'another-meta': 'field', 'meta-key': 'meta-value'}
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_update_with_new_assays(
+        self,
+        connection_with_project: Connection,
+        sequencing_group_model: SequencingGroupUpsertInternal,
+        test_sample: int,
+    ):
+        """Test updating metadata on a sequencing group"""
+        sg_layer = SequencingGroupLayer(connection_with_project)
+        a_layer = AssayLayer(connection_with_project)
+        # Create the initial SG
+        initial_sg = await sg_layer.upsert_sequencing_groups([sequencing_group_model])
+        initial_sg_id = initial_sg[0].id
+        assert initial_sg_id
+        assert initial_sg[0].assays
+        assert initial_sg[0].assays[0].id
+
+        # Create an updated model for upsert
+        upsert_sg_model = SequencingGroupUpsertInternal(
+            id=initial_sg[0].id,
+            sample_id=test_sample,
+            assays=[
+                AssayUpsertInternal(
+                    id=initial_sg[0].assays[0].id,
+                    type='sequencing',
+                    external_ids={},
+                    meta={
+                        'sequencing_type': 'genome',
+                        'sequencing_platform': 'short-read',
+                        'sequencing_technology': 'illumina',
+                    },
+                ),
+                AssayUpsertInternal(
+                    type='sequencing',
+                    external_ids={},
+                    meta={
+                        'sequencing_type': 'exome',
+                        'sequencing_platform': 'short-read',
+                        'sequencing_technology': 'illumina',
+                    },
+                ),
+            ],
+        )
+
+        # When updating the assays of an existing sequencing group, the sg is archived and a new
+        # copy is created with the updated assays
+        # Check that the sequencing group is given a new ID
+        new_sg = await sg_layer.upsert_sequencing_groups([upsert_sg_model])
+        new_sg_id = new_sg[0].id
+        assert new_sg_id
+        assert new_sg_id != initial_sg_id
+
+        # Check that the first assay belongs to both the old and new sequencing group
+        old_sg_assays = await a_layer.get_assays_for_sequencing_group_ids(
+            [initial_sg_id]
+        )
+        new_sg_assays = await a_layer.get_assays_for_sequencing_group_ids([new_sg_id])
+        old_sg_assays_ids = {a.id for a in old_sg_assays[initial_sg_id]}
+        new_sg_assays_ids = {a.id for a in new_sg_assays[new_sg_id]}
+        assert len(old_sg_assays_ids) == 1
+        assert (
+            len(new_sg_assays_ids) == 2
+        )  # Using sets ensures that the sg has two unique assays
+        assert old_sg_assays_ids.intersection(new_sg_assays_ids) == {
+            initial_sg[0].assays[0].id
+        }
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
