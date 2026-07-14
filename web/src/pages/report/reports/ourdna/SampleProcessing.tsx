@@ -274,6 +274,9 @@ function BioBankSampleDistributionChart({ project }: { project: string }) {
             height={height}
             flexGrow={1}
             title="Community cohorts and biobank sample distribution"
+            description="The above data is based on self-identified ancestry
+            (Screening_ancestry_group for European cohort and Ancestry_partcipant_ancestry for all other cohorts).
+            For samples team internal use only. Not for reporting purposes."
             project={project}
             query={BIOBANK_SAMPLE_DISTRIBUTION_QUERY}
             plot={(data) => ({
