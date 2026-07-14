@@ -1259,7 +1259,7 @@ wheels = [
 
 [[package]]
 name = "metamist"
-version = "7.14.1"
+version = "7.14.2"
 source = { editable = "packages/metamist" }
 dependencies = [
     { name = "backoff" },
@@ -1290,7 +1290,7 @@ requires-dist = [
 
 [[package]]
 name = "metamist-root"
-version = "7.14.1"
+version = "7.14.2"
 source = { virtual = "." }
 dependencies = [
     { name = "aiohttp" },
