@@ -99,8 +99,9 @@ class BillingDailyExtendedTable(BillingBaseTable):
             -- get all data we need for aggregations in one go
             WITH d AS (
                     SELECT topic, ar_guid,
-                    CASE WHEN compute_category IS NULL AND batch_id IS NOT NULL THEN
-                    'hail batch' ELSE compute_category END AS category,
+                    CASE WHEN compute_category IS NULL AND batch_id IS NOT NULL THEN 'hail batch'
+                    ELSE CASE WHEN compute_category IS NULL THEN 'unknown'
+                    ELSE compute_category END END AS category,
                     batch_id, CAST(job_id AS INT) job_id,
                     sku, cost,
                     usage_start_time, usage_end_time, sequencing_group, stage, wdl_task_name, cromwell_sub_workflow_name, cromwell_workflow_id,

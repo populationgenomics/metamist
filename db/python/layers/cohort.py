@@ -238,6 +238,10 @@ class CohortLayer(BaseLayer):
 
             _, samples = await self.sampt.query(sample_filter)
             sample_ids = [s.id for s in samples]
+            if not samples:
+                raise ValueError(
+                    'Cohort creation criteria resulted in no samples matching sample_type criteria.'
+                )
 
         sg_filter = get_sg_filter(
             projects=projects,

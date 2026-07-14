@@ -719,6 +719,7 @@ def transfer_analyses(
                 existing_data, s.get('externalId'), sg.get('type')
             )
             existing_sgid = existing_sg.get('id') if existing_sg else None
+            copied_analysis_files = set()
             for analysis in sg['analyses']:
                 # Newer analyses store the path in the structured `outputs` field;
                 # older ones use the plain `output` string. Prefer the former.
@@ -727,6 +728,15 @@ def transfer_analyses(
                     if isinstance(analysis.get('outputs'), dict)
                     else None
                 ) or analysis['output']
+
+                if analysis_path in copied_analysis_files:
+                    # Avoid copying the same file multiple times if it was linked to multiple analyses
+                    logger.info(
+                        f'Skipping copy of analysis output file at {analysis_path} since it was already copied from another analysis'
+                    )
+                    continue
+                copied_analysis_files.add(analysis_path)
+
                 existing_analysis: dict = {}
                 if existing_sgid:
                     existing_analysis = get_existing_analysis(
