@@ -227,7 +227,7 @@ const BIOBANK_SAMPLE_DISTRIBUTION_QUERY = [
                     participant_id,
                     'European' as ancestry,
                 from participant
-                where meta_screening_ancestry_group = ['<div>None of the above</div>']
+                where meta_screening_ancestry_group IN (['<div>None of the above</div>'], ['None of the above'])
             )
             select
                 s.participant_id,
@@ -337,6 +337,15 @@ function BioBankSampleDistributionChart({ project }: { project: string }) {
 }
 
 function SampleMetricsSection({ project }: { project: string }) {
+    const commonMetricProps = {
+        project,
+        height: METRIC_HEIGHT,
+        flexBasis: 300,
+        flexGrow: 1,
+        cardVariant: 'outlined' as const,
+        showActions: false,
+    }
+
     return (
         <Card sx={{ padding: 2 }}>
             <Typography fontWeight={'bold'} fontSize={16} marginBottom={2}>
@@ -345,12 +354,7 @@ function SampleMetricsSection({ project }: { project: string }) {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <ReportRow gap={0.5}>
                     <ReportItemMetric
-                        project={project}
-                        height={METRIC_HEIGHT}
-                        flexBasis={300}
-                        flexGrow={1}
-                        cardVariant="outlined"
-                        showActions={false}
+                        {...commonMetricProps}
                         title="Total samples"
                         description={
                             <>
@@ -364,12 +368,7 @@ function SampleMetricsSection({ project }: { project: string }) {
                     `}
                     />
                     <ReportItemMetric
-                        project={project}
-                        height={METRIC_HEIGHT}
-                        flexBasis={300}
-                        flexGrow={1}
-                        cardVariant="outlined"
-                        showActions={false}
+                        {...commonMetricProps}
                         title="Total aliquots"
                         description="Sum of all buffy coat, PBMC, plasma and whole blood aliquots registered in Metamist."
                         query={`
@@ -381,12 +380,7 @@ function SampleMetricsSection({ project }: { project: string }) {
                 </ReportRow>
                 <ReportRow gap={0.5}>
                     <ReportItemMetric
-                        project={project}
-                        height={METRIC_HEIGHT}
-                        flexBasis={300}
-                        flexGrow={1}
-                        cardVariant="outlined"
-                        showActions={false}
+                        {...commonMetricProps}
                         title="Biobanking Victoria"
                         description={
                             <>
@@ -400,12 +394,7 @@ function SampleMetricsSection({ project }: { project: string }) {
                     `}
                     />
                     <ReportItemMetric
-                        project={project}
-                        height={METRIC_HEIGHT}
-                        flexBasis={300}
-                        flexGrow={1}
-                        cardVariant="outlined"
-                        showActions={false}
+                        {...commonMetricProps}
                         title="Westmead Biobank"
                         description={
                             <>
@@ -421,12 +410,7 @@ function SampleMetricsSection({ project }: { project: string }) {
                 </ReportRow>
                 <ReportRow gap={0.5}>
                     <ReportItemMetric
-                        project={project}
-                        height={METRIC_HEIGHT}
-                        flexBasis={300}
-                        flexGrow={1}
-                        cardVariant="outlined"
-                        showActions={false}
+                        {...commonMetricProps}
                         title="OSS"
                         description={
                             <>
@@ -441,12 +425,7 @@ function SampleMetricsSection({ project }: { project: string }) {
                     `}
                     />
                     <ReportItemMetric
-                        project={project}
-                        height={METRIC_HEIGHT}
-                        flexBasis={300}
-                        flexGrow={1}
-                        cardVariant="outlined"
-                        showActions={false}
+                        {...commonMetricProps}
                         title="Walk-ins"
                         description={
                             <>
@@ -461,12 +440,7 @@ function SampleMetricsSection({ project }: { project: string }) {
                     `}
                     />
                     <ReportItemMetric
-                        project={project}
-                        height={METRIC_HEIGHT}
-                        flexBasis={300}
-                        flexGrow={1}
-                        cardVariant="outlined"
-                        showActions={false}
+                        {...commonMetricProps}
                         title="Assisted walk-in"
                         description={
                             <>
@@ -481,12 +455,7 @@ function SampleMetricsSection({ project }: { project: string }) {
                         `}
                     />
                     <ReportItemMetric
-                        project={project}
-                        height={METRIC_HEIGHT}
-                        flexBasis={300}
-                        flexGrow={1}
-                        cardVariant="outlined"
-                        showActions={false}
+                        {...commonMetricProps}
                         title="Pre-organised event"
                         description={
                             <>
