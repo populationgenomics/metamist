@@ -1,4 +1,3 @@
-import json
 from collections import defaultdict
 from typing import Any
 
@@ -109,6 +108,6 @@ class ParticipantPhenotypeTable(DbBase):
             pid = row['participant_id']
             key = row['description']
             value = row['value']
-            formed_key_value_pairs[pid][key] = json.loads(value)
+            formed_key_value_pairs[pid][key] = value
 
         return formed_key_value_pairs
