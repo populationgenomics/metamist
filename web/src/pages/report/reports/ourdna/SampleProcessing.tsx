@@ -1,11 +1,24 @@
-import { Box, FormControl, InputLabel, MenuItem, Select, SelectChangeEvent } from '@mui/material'
+import {
+    Box,
+    Card,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    Select,
+    SelectChangeEvent,
+    Typography,
+} from '@mui/material'
 import * as Plot from '@observablehq/plot'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Report from '../../components/Report'
-import { ReportItemPlot, ReportItemTable } from '../../components/ReportItem'
+import { ReportItemMetric, ReportItemPlot, ReportItemTable } from '../../components/ReportItem'
 import ReportRow from '../../components/ReportRow'
+import { formatQuery } from '../../data/formatQuery'
+import { useProjectDbQuery } from '../../data/projectDatabase'
 
 const ROW_HEIGHT = 450
+const METRIC_HEIGHT = 220
+const DEFAULT_ANCESTRY_HEIGHT = 60
 
 const PROCESS_DURATION_QUERY = `
     with times as (
@@ -195,6 +208,273 @@ function ProcessingTimesByAncestry(props: { project: string }) {
     )
 }
 
+// As of now European cohort is identified by the screening_ancestry_group
+// as ancestry_participant_ancestry does not contain sufficient information
+// See https://cpg-populationanalysis.atlassian.net/browse/SET-1178
+const BIOBANK_SAMPLE_DISTRIBUTION_QUERY = [
+    {
+        name: 'blood_samples',
+        query: `
+            with p_ancestries as (
+                select
+                    participant_id,
+                    unnest(p.meta_ancestry_participant_ancestry) AS ancestry,
+                from participant p
+
+                UNION ALL
+
+                select
+                    participant_id,
+                    'European' as ancestry,
+                from participant
+                where meta_screening_ancestry_group IN (['<div>None of the above</div>'], ['None of the above'])
+            )
+            select
+                s.participant_id,
+                s.meta_processing_site as processing_site,
+                ancestry,
+                sample_id
+            from sample s
+            join p_ancestries on s.participant_id = p_ancestries.participant_id
+            where ancestry in ('Filipino', 'Vietnamese', 'Samoan', 'Fijian', 'Tongan', 'Lebanese', 'Jordanian', 'Palestinian', 'Syrian', 'European') and
+            s.meta_processing_site in ('bbv', 'westmead') and type = 'blood'
+        `,
+    },
+    {
+        name: 'result',
+        query: `
+            select
+                ancestry,
+                processing_site,
+                round(count(sample_id) * 100.0/ sum(count(sample_id)) over (partition by ancestry),1) as percentage
+            from blood_samples group by 1, 2
+        `,
+    },
+]
+
+const ANCESTRY_COUNT_QUERY = [
+    BIOBANK_SAMPLE_DISTRIBUTION_QUERY[0],
+    {
+        name: 'ancestries',
+        query: `SELECT count(distinct ancestry) as count FROM blood_samples`,
+    },
+]
+const ANCESTRY_COUNT_QUERY_FORMATTED = formatQuery(ANCESTRY_COUNT_QUERY)
+
+function BioBankSampleDistributionChart({ project }: { project: string }) {
+    const countResult = useProjectDbQuery(project, ANCESTRY_COUNT_QUERY_FORMATTED)
+    const height = useMemo(() => {
+        if (countResult?.status !== 'success') return DEFAULT_ANCESTRY_HEIGHT + 125
+        const count = countResult.data.toArray()[0]?.count
+        return (count || 1) * DEFAULT_ANCESTRY_HEIGHT + 125
+    }, [countResult])
+
+    return (
+        <ReportItemPlot
+            height={height}
+            flexGrow={1}
+            title="Community cohorts and biobank sample distribution"
+            description="The above data is based on self-identified ancestry
+            (Screening_ancestry_group for European cohort and Ancestry_partcipant_ancestry for all other cohorts).
+            For samples team internal use only. Not for reporting purposes."
+            project={project}
+            query={BIOBANK_SAMPLE_DISTRIBUTION_QUERY}
+            plot={(data) => ({
+                marginLeft: 100,
+                marginBottom: 50,
+                x: { percent: true, axis: null },
+                y: { label: null },
+                color: {
+                    legend: true,
+                    domain: ['bbv', 'westmead'],
+                    range: ['#a6c8e8', '#f4b8b8'],
+                },
+                marks: [
+                    Plot.barX(
+                        data,
+                        Plot.stackX(
+                            { offset: 'normalize', order: ['bbv', 'westmead'] },
+                            {
+                                y: 'ancestry',
+                                fill: 'processing_site',
+                                x: 'percentage',
+                                tip: true,
+                            }
+                        )
+                    ),
+                    Plot.text([{ x: 0.5 }], {
+                        x: 'x',
+                        text: () => '|',
+                        frameAnchor: 'top',
+                        dy: -1,
+                        fontSize: 12,
+                    }),
+                    Plot.text([{ x: 0.5 }], {
+                        x: 'x',
+                        text: () => '50%',
+                        frameAnchor: 'top',
+                        dy: -12,
+                        fontSize: 11,
+                    }),
+                    Plot.text([{ x: 0.5 }], {
+                        x: 'x',
+                        text: () => '|',
+                        frameAnchor: 'bottom',
+                        dy: -1,
+                        fontSize: 12,
+                    }),
+                    Plot.text([{ x: 0.5 }], {
+                        x: 'x',
+                        text: () => '50%',
+                        frameAnchor: 'bottom',
+                        dy: 14,
+                        fontSize: 11,
+                    }),
+                ],
+            })}
+        />
+    )
+}
+
+function SampleMetricsSection({ project }: { project: string }) {
+    const commonMetricProps = {
+        project,
+        height: METRIC_HEIGHT,
+        flexBasis: 300,
+        flexGrow: 1,
+        cardVariant: 'outlined' as const,
+        showActions: false,
+    }
+
+    return (
+        <Card sx={{ padding: 2 }}>
+            <Typography fontWeight={'bold'} fontSize={16} marginBottom={2}>
+                Sample Metrics
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <ReportRow gap={0.5}>
+                    <ReportItemMetric
+                        {...commonMetricProps}
+                        title="Total samples"
+                        description={
+                            <>
+                                The number of participants that have <b>blood</b> samples registered
+                                in Metamist.
+                            </>
+                        }
+                        query={`
+                        select count(distinct participant_id) as count
+                        from sample where type = 'blood'
+                    `}
+                    />
+                    <ReportItemMetric
+                        {...commonMetricProps}
+                        title="Total aliquots"
+                        description="Sum of all buffy coat, PBMC, plasma and whole blood aliquots registered in Metamist."
+                        query={`
+                        select sum(meta_aliquot_count) as total_aliquots
+                        from sample
+                        where type in ('buffy-coat', 'pbmc', 'plasma', 'whole-blood')
+                    `}
+                    />
+                </ReportRow>
+                <ReportRow gap={0.5}>
+                    <ReportItemMetric
+                        {...commonMetricProps}
+                        title="Biobanking Victoria"
+                        description={
+                            <>
+                                The number of participants with <b>blood</b> samples registered in
+                                Metamist and processing site <b>bbv</b>.
+                            </>
+                        }
+                        query={`
+                        select count(distinct participant_id) as count
+                        from sample where type = 'blood' and meta_processing_site = 'bbv'
+                    `}
+                    />
+                    <ReportItemMetric
+                        {...commonMetricProps}
+                        title="Westmead Biobank"
+                        description={
+                            <>
+                                The number of participants with <b>blood</b> samples registered in
+                                Metamist and processing site <b>westmead</b>.
+                            </>
+                        }
+                        query={`
+                        select count(distinct participant_id) as count
+                        from sample where type = 'blood' and meta_processing_site = 'westmead'
+                    `}
+                    />
+                </ReportRow>
+                <ReportRow gap={0.5}>
+                    <ReportItemMetric
+                        {...commonMetricProps}
+                        title="OSS"
+                        description={
+                            <>
+                                The number of participants with <b>blood</b> samples registered in
+                                Metamist and collection event type <b>one-stop-shop</b>.
+                            </>
+                        }
+                        query={`
+                        select count(distinct participant_id) as count
+                        from sample
+                        where type = 'blood' and meta_collection_event_type = 'one-stop-shop'
+                    `}
+                    />
+                    <ReportItemMetric
+                        {...commonMetricProps}
+                        title="Walk-ins"
+                        description={
+                            <>
+                                The number of participants with <b>blood</b> samples registered in
+                                Metamist and collection event type <b>walk-in</b>.
+                            </>
+                        }
+                        query={`
+                        select count(distinct participant_id) as count
+                        from sample
+                        where type = 'blood' and meta_collection_event_type = 'walk-in'
+                    `}
+                    />
+                    <ReportItemMetric
+                        {...commonMetricProps}
+                        title="Assisted walk-in"
+                        description={
+                            <>
+                                The number of participants with <b>blood</b> samples registered in
+                                Metamist and collection event type <b>assisted-walk-in</b>.
+                            </>
+                        }
+                        query={`
+                            select count(distinct participant_id) as count
+                            from sample
+                            where type = 'blood' and meta_collection_event_type = 'assisted-walk-in'
+                        `}
+                    />
+                    <ReportItemMetric
+                        {...commonMetricProps}
+                        title="Pre-organised event"
+                        description={
+                            <>
+                                The number of participants with <b>blood</b> samples registered in
+                                Metamist and collection event type <b>pre-organised-event</b>.
+                            </>
+                        }
+                        query={`
+                        select count(distinct participant_id) as count
+                        from sample
+                        where type = 'blood' and meta_collection_event_type = 'pre-organised-event'
+                    `}
+                    />
+                </ReportRow>
+            </Box>
+        </Card>
+    )
+}
+
 export default function ProcessingTimes({ project }: { project: string }) {
     const [viabilityColour, setViabilityColour] = useState('biobank')
 
@@ -204,6 +484,7 @@ export default function ProcessingTimes({ project }: { project: string }) {
 
     return (
         <Report>
+            <SampleMetricsSection project={project} />
             <ReportRow>
                 <ReportItemPlot
                     height={ROW_HEIGHT + 100}
@@ -449,28 +730,71 @@ export default function ProcessingTimes({ project }: { project: string }) {
                     project={project}
                     query={[
                         {
-                            name: 'result',
+                            name: 'categorised',
                             query: `
-                                select
-                                    count(distinct participant_id) as count,
-                                    type
-                                from sample s
-                                group by 2
+                            select
+                                type,
+                                CASE
+                                    WHEN type not in ('buffy-coat', 'guthrie-card', 'pbmc', 'plasma', 'whole-blood') THEN 'not_applicable'
+                                    WHEN meta_aliquot_count > 0 THEN '>=1 aliquot'
+                                    WHEN meta_aliquot_count = 0 THEN '0 aliquots'
+                                    ELSE 'no data'
+                                END as status,
+                                count(distinct participant_id) as count
+                            from sample group by 1, 2
                             `,
                         },
                     ]}
                     plot={(data) => ({
                         marginLeft: 100,
+                        color: { scheme: 'Dark2' },
                         marks: [
-                            Plot.barX(data, {
-                                y: 'type',
-                                x: 'count',
-                                fill: 'type',
-                                tip: true,
-                            }),
+                            Plot.barX(
+                                data,
+                                Plot.filter(
+                                    (d: { status: string }) => d.status === 'not_applicable',
+                                    {
+                                        y: 'type',
+                                        x: 'count',
+                                        fill: 'type',
+                                        fillOpacity: 1,
+                                    }
+                                )
+                            ),
+                            Plot.barX(
+                                data,
+                                Plot.filter(
+                                    (d: { status: string }) => d.status !== 'not_applicable',
+                                    Plot.stackX(
+                                        { order: ['>=1 aliquot', '0 aliquots', 'no data'] },
+                                        {
+                                            y: 'type',
+                                            x: 'count',
+                                            z: 'status',
+                                            fill: 'type',
+                                            fillOpacity: (d: { status: string }) => {
+                                                switch (d.status) {
+                                                    case '>=1 aliquot':
+                                                        return 1.0
+                                                    case '0 aliquots':
+                                                        return 0.6
+                                                    default:
+                                                        return 0.3
+                                                }
+                                            },
+                                            tip: true,
+                                            title: (d: { status: string; count: number }) =>
+                                                `${d.status}: ${d.count}`,
+                                        }
+                                    )
+                                )
+                            ),
                         ],
                     })}
                 />
+            </ReportRow>
+            <ReportRow>
+                <BioBankSampleDistributionChart project={project} />
             </ReportRow>
             <ReportRow>
                 <Box>
