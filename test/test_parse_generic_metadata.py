@@ -46,7 +46,7 @@ def _get_basic_participant_to_upsert():
             SampleUpsertInternal(
                 external_ids={PRIMARY_EXTERNAL_ORG: 'sample_id001'},
                 meta={},
-                type='blood',
+                type='unknown',
                 sequencing_groups=[
                     SequencingGroupUpsertInternal(
                         type='genome',
@@ -1110,6 +1110,119 @@ class TestParseGenericMetadata(DbIsolatedTest):
             str(ctx.exception),
         )
 
+    @run_as_sync
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_rows_with_sample_type(self, mock_graphql_query):
+        """Test importing a single row with a sample type column"""
+        mock_graphql_query.side_effect = self.run_graphql_query_async
+
+        rows = [
+            'Individual ID\tSample ID\tFilenames\tType\tSample Type',
+            'Demeter\tsample_id001\tsample_id001.filename-R1.fastq.gz,sample_id001.filename-R2.fastq.gz\tWGS\tblood',
+            'Demeter\tsample_id001\tsample_id001.exome.filename-R1.fastq.gz,sample_id001.exome.filename-R2.fastq.gz\tWES\tBlood',
+            'Apollo\tsample_id002\tsample_id002.filename-R1.fastq.gz\tWGS\tSaliva',
+            'Apollo\tsample_id002\tsample_id002.filename-R2.fastq.gz\tWGS\tsaliva',
+            'Athena\tsample_id003\tsample_id003.filename-R1.fastq.gz\tWGS\tBlood',
+            'Athena\tsample_id003\tsample_id003.filename-R2.fastq.gz\tWGS\tblood',
+            'Apollo\tsample_id004\tsample_id004.filename-R1.fastq.gz\tWGS\tunknown',
+            'Apollo\tsample_id004\tsample_id004.filename-R2.fastq.gz\tWGS\tunknown',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=[],
+            participant_primary_eid_column='Individual ID',
+            sample_primary_eid_column='Sample ID',
+            sample_type_column='Sample Type',
+            reads_column='Filenames',
+            seq_type_column='Type',
+            participant_meta_map={},
+            sample_meta_map={},
+            assay_meta_map={},
+            qc_meta_map={},
+            # doesn't matter, we're going to mock the call anyway
+            project=self.project_name,
+        )
+
+        parser.skip_checking_gcs_objects = True
+        parser.filename_map = {
+            'sample_id001.filename-R1.fastq.gz': '/path/to/sample_id001.filename-R1.fastq.gz',
+            'sample_id001.filename-R2.fastq.gz': '/path/to/sample_id001.filename-R2.fastq.gz',
+            'sample_id001.exome.filename-R1.fastq.gz': '/path/to/sample_id001.exome.filename-R1.fastq.gz',
+            'sample_id001.exome.filename-R2.fastq.gz': '/path/to/sample_id001.exome.filename-R2.fastq.gz',
+            'sample_id002.filename-R1.fastq.gz': '/path/to/sample_id002.filename-R1.fastq.gz',
+            'sample_id002.filename-R2.fastq.gz': '/path/to/sample_id002.filename-R2.fastq.gz',
+            'sample_id003.filename-R1.fastq.gz': '/path/to/sample_id003.filename-R1.fastq.gz',
+            'sample_id003.filename-R2.fastq.gz': '/path/to/sample_id003.filename-R2.fastq.gz',
+            'sample_id004.filename-R1.fastq.gz': '/path/to/sample_id004.filename-R1.fastq.gz',
+            'sample_id004.filename-R2.fastq.gz': '/path/to/sample_id004.filename-R2.fastq.gz',
+        }
+
+        # Call generic parser
+        file_contents = '\n'.join(rows)
+        summary, prows = await parser.parse_manifest(
+            StringIO(file_contents), delimiter='\t', dry_run=True
+        )
+
+        participants: list[ParsedParticipant] = prows
+
+        self.assertEqual(3, summary.participants.insert)
+        self.assertEqual(0, summary.participants.update)
+        self.assertEqual(4, summary.samples.insert)
+        self.assertEqual(0, summary.samples.update)
+        self.assertEqual(5, summary.assays.insert)
+        self.assertEqual(0, summary.assays.update)
+        self.assertEqual(0, summary.analyses.insert)
+
+        expected_assay_dict = {
+            'reads': [
+                {
+                    'basename': 'sample_id001.filename-R1.fastq.gz',
+                    'checksum': None,
+                    'class': 'File',
+                    'location': '/path/to/sample_id001.filename-R1.fastq.gz',
+                    'size': None,
+                    'datetime_added': None,
+                },
+                {
+                    'basename': 'sample_id001.filename-R2.fastq.gz',
+                    'checksum': None,
+                    'class': 'File',
+                    'location': '/path/to/sample_id001.filename-R2.fastq.gz',
+                    'size': None,
+                    'datetime_added': None,
+                },
+            ],
+            'reads_type': 'fastq',
+            'sequencing_platform': 'illumina',
+            'sequencing_technology': 'short-read',
+            'sequencing_type': 'genome',
+        }
+        assay = participants[0].samples[0].sequencing_groups[0].assays[0]
+        self.maxDiff = None
+        self.assertDictEqual(expected_assay_dict, assay.meta)
+
+        # Check that both of Demeter's assays are there
+        self.assertEqual(participants[0].primary_external_id, 'Demeter')
+        self.assertEqual(len(participants[0].samples), 1)
+        self.assertEqual(len(participants[0].samples[0].sequencing_groups), 2)
+
+    @run_as_sync
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_parser_with_default_sample_type(self, mock_graphql_query):
+        """Test importing a single row without a sample type column but with the default sample type set"""
+        pass
+
+    @run_as_sync
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_parser_with_missing_sample_type(self, mock_graphql_query):
+        """Test importing a single row without a sample type column and no default sample type set"""
+        pass
+
+    @run_as_sync
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_rows_with_bad_sample_type(self, mock_graphql_query):
+        """Test importing a single row with a bad sample type"""
+        pass
 
 class FastqPairMatcher(unittest.TestCase):
     """Test Fastq pair matching logic explictly"""
