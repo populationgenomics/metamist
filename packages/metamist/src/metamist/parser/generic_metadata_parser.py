@@ -114,7 +114,7 @@ class GenericMetadataParser(GenericParser):
         # Default values
         default_reference_assembly_location: str | None = None,
         ora_reference_assembly_location: str | None = None,
-        default_sample_type: str | None = None,
+        default_sample_type: str | None = 'unknown',
         default_sequencing=DefaultSequencing(
             seq_type='genome', technology='short-read', platform='illumina'
         ),
@@ -277,16 +277,26 @@ class GenericMetadataParser(GenericParser):
         """Get internal cpg id from a row using get_sample_id and an api call"""
         return row.get(self.cpg_id_column, None)
 
+    def get_sample_type_from_row(self, row: SingleRow) -> str | None:
+        """Get sample type from row"""
+        if self.sample_type_column and self.sample_type_column in row:
+            value = row[self.sample_type_column]
+            if value:
+                return str(value).lower()
+        return self.default_sample_type
+
     def get_sample_type(self, row: GroupedRow) -> str:
         """Get sample type from row or default"""
-        value = (
-            row.get(self.sample_type_column, None)
-            or self.default_sample_type
-        )
-        value = value.lower()
-        if value:
-            return value
-        return None
+        if isinstance(row, dict):
+            return self.get_sample_type_from_row(row)
+        types = [
+            self.get_sample_type_from_row(r) for r in row
+        ]
+        if len(set(types)) > 1:
+            raise ValueError(
+                f'Conflicting sample types for sample {self.get_primary_sample_id(row[0])}: {types}'
+            )
+        return types[0] if types else self.default_sample_type
 
     def get_sequencing_types(self, row: GroupedRow) -> list[str]:
         """
