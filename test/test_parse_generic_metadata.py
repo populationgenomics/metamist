@@ -3,7 +3,6 @@ from datetime import datetime
 from io import StringIO
 from unittest.mock import patch
 
-from metamist.apis import EnumsApi
 from metamist.graphql import configure_sync_client, validate
 from metamist.parser.generic_metadata_parser import (
     DefaultSequencing,
@@ -1296,6 +1295,7 @@ class TestParseGenericMetadata(DbIsolatedTest):
             await parser.parse_manifest(
                 StringIO(file_contents), delimiter='\t', dry_run=True
             )
+
 
 class FastqPairMatcher(unittest.TestCase):
     """Test Fastq pair matching logic explictly"""

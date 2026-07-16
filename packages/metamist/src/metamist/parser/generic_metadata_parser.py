@@ -287,9 +287,7 @@ class GenericMetadataParser(GenericParser):
 
     def get_sample_type(self, row: GroupedRow) -> str:
         """Get sample type from row or default"""
-        types = [
-            self.get_sample_type_from_row(r) for r in row
-        ]
+        types = [self.get_sample_type_from_row(r) for r in row]
         if len(set(types)) > 1:
             raise ValueError(
                 f'Conflicting sample types for sample {self.get_primary_sample_id(row[0])}: {types}'
