@@ -30,7 +30,7 @@ KeyMap = {
         'agha_study_id',
     ],
     SAMPLE_ID_COL_NAME: ['sample_id', 'sample', 'sample id'],
-    SAMPLE_TYPE_COL_NAME: ['sample_type', 'sample type', 'tissue', 'tissue_type', 'tissue type'],
+    SAMPLE_TYPE_COL_NAME: ['sample_type', 'sample type', 'sampletype'],
     READS_COL_NAME: ['filename', 'filenames', 'files', 'file'],
     SEQ_TYPE_COL_NAME: ['type', 'types', 'sequencing type', 'sequencing_type'],
     SEQ_FACILITY_COL_NAME: ['facility', 'sequencing facility', 'sequencing_facility'],
