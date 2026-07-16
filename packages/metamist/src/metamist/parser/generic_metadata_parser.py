@@ -287,8 +287,6 @@ class GenericMetadataParser(GenericParser):
 
     def get_sample_type(self, row: GroupedRow) -> str:
         """Get sample type from row or default"""
-        if isinstance(row, dict):
-            return self.get_sample_type_from_row(row)
         types = [
             self.get_sample_type_from_row(r) for r in row
         ]
