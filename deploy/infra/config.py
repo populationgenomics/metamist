@@ -1,3 +1,4 @@
+import os
 from typing import Any
 
 import pulumi_gcp as gcp
@@ -73,6 +74,8 @@ class InfraConfig(BaseModel):
     # Migrations configuration
     migrations: MigrationsConfig
 
+    metamist_private_sha: str
+
     @property
     def registry_url(self) -> str:
         return f'{self.region}-docker.pkg.dev/{self.project}'
@@ -109,4 +112,5 @@ def load_config() -> InfraConfig:
         common=common,
         server=server,
         migrations=migrations,
+        metamist_private_sha=os.environ.get('METAMIST_PRIVATE_SHA', 'unknown'),
     )

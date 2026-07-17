@@ -60,6 +60,9 @@ def create_server_resources(
         ingress='INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER',
         location=config.region,
         default_uri_disabled=True,
+        labels={
+            'metamist-private-sha': config.metamist_private_sha,
+        },
         template=gcp.cloudrunv2.ServiceTemplateArgs(
             service_account=service_account.email,
             timeout='300s',
