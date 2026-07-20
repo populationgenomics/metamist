@@ -55,7 +55,7 @@ and we want to achieve the following:
 python parse_generic_metadata.py \
     --project $dataset \
     --sample-name-column "Sample ID" \
-    --sample-type-column "unknown" \
+    --default-sample-type "unknown" \
     --reads-column "Fastqs" \
     --sample-meta-field-map "sample-collection-date" "collection_date" \
     --assay-meta-field "depth" \
