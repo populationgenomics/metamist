@@ -504,7 +504,9 @@ class GenericParser(CloudHelper):
         self.default_sequencing = default_sequencing
         self.default_read_end_type: str | None = default_read_end_type
         self.default_read_length: str | int | None = default_read_length
-        self.default_sample_type: str | None = default_sample_type.lower() if default_sample_type else default_sample_type
+        self.default_sample_type: str | None = (
+            default_sample_type.lower() if default_sample_type else default_sample_type
+        )
         self.default_analysis_type: str | None = default_analysis_type
         self.default_analysis_status: str | None = default_analysis_status
 
