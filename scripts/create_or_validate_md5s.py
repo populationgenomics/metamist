@@ -1,15 +1,15 @@
-import os
 from shlex import quote
 
 import click
 from google.cloud import storage
 
+from cpg_utils import to_path
 from cpg_utils.hail_batch import config_retrieve, copy_common_env, get_batch
 
 
 def get_blobs_in_directory(
     gs_dir: str, billing_project: str, storage_client: storage.Client
-):
+) -> set[str]:
     """Get all blobs in a directory as a set of full gs:// URIs"""
     bucket_name, *components = gs_dir[5:].split('/')
     bucket = storage_client.bucket(bucket_name, user_project=billing_project)
@@ -25,11 +25,12 @@ def create_md5(job, filepath: str, billing_project: str, driver_image: str):
     copy_common_env(job)
     job.image(driver_image)
     md5_filepath = f'{filepath}.md5'
+    filename = to_path(filepath).name
     job.command(
         f"""\
     set -euxo pipefail
-    gsutil -u {quote(billing_project)} cat {quote(filepath)} | md5sum | cut -d " " -f1  > /tmp/uploaded.md5
-    gsutil -u {quote(billing_project)} cp /tmp/uploaded.md5 {quote(md5_filepath)}
+    gcloud storage --billing-project={quote(billing_project)} cat {quote(filepath)} | md5sum | sed "s|  -$|  {quote(filename)}|" > /tmp/uploaded.md5
+    gcloud storage --billing-project={quote(billing_project)} cp /tmp/uploaded.md5 {quote(md5_filepath)}
     """
     )
 
@@ -47,8 +48,8 @@ def validate_md5(job, filepath: str, billing_project: str, driver_image: str):
     job.command(
         f"""\
     set -euxo pipefail
-    calculated_md5=$(gsutil -u {quote(billing_project)} cat {quote(filepath)} | md5sum | cut -d " " -f1)
-    stored_md5=$(gsutil -u {quote(billing_project)} cat {quote(md5_filepath)} | cut -d " " -f1)
+    calculated_md5=$(gcloud storage --billing-project={quote(billing_project)} cat {quote(filepath)} | md5sum | cut -d " " -f1)
+    stored_md5=$(gcloud storage --billing-project={quote(billing_project)} cat {quote(md5_filepath)} | cut -d " " -f1)
 
     if [ "$calculated_md5" = "$stored_md5" ]; then
         echo "MD5 checksum validation successful."
@@ -91,7 +92,7 @@ def create_and_validate_md5s_for_files_in_directory(
         if mode == 'create':
             if not md5_exists or force_recreate_existing:
                 print('Creating md5 for', filepath)
-                job = b.new_job(f'Create {os.path.basename(filepath)}.md5')  # noqa: PTH119
+                job = b.new_job(f'Create {to_path(filepath).name}.md5')
                 create_md5(job, filepath, billing_project, driver_image)
             else:
                 print(f'{filepath}.md5 already exists, skipping')
@@ -100,7 +101,7 @@ def create_and_validate_md5s_for_files_in_directory(
         if mode == 'validate':
             if md5_exists:
                 print('Validating md5 for', filepath)
-                job = b.new_job(f'Validate md5 checksum: {os.path.basename(filepath)}')  # noqa: PTH119
+                job = b.new_job(f'Validate md5 checksum: {to_path(filepath).name}')
                 validate_md5(job, filepath, billing_project, driver_image)
             else:
                 print(f'{filepath}.md5 not found, skipping validation')
@@ -128,7 +129,7 @@ def create_and_validate_md5s_for_files_in_directory(
 @click.argument('gs_dir')
 def main(
     billing_project: str | None,
-    skip_filetypes: tuple[str, str],
+    skip_filetypes: tuple[str, ...],
     mode: str,
     force_recreate_existing: bool,
     gs_dir: str,
