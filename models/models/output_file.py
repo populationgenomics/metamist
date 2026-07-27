@@ -16,6 +16,11 @@ RecursiveDict: TypeAlias = dict[str, 'str | RecursiveDict']
 
 GCS_CLIENT = None
 
+# Extensions for outputs that are stored on GCS as folders of blobs rather than a
+# single object (Hail MatrixTable/Table and VDS). These have no single blob to
+# checksum or size, so we verify existence only and mark them valid.
+DIRECTORY_FORMAT_EXTENSIONS = frozenset({'.mt', '.ht', '.vds'})
+
 
 def get_gcs_client():
     """Return a GCS client"""
@@ -106,6 +111,33 @@ class OutputFileInternal(SMBase):
             return []
 
     @staticmethod
+    def directory_exists(
+        bucket: str,
+        blob_name: str,
+        client: Client,
+        blobs: list[Blob] | None = None,
+    ) -> bool:
+        """
+        Check whether a directory-like path (a folder of blobs on GCS, e.g. a
+        MatrixTable or VDS) exists, i.e. has at least one child blob under it.
+
+        If a pre-fetched list of blobs is supplied, it is checked in-memory;
+        otherwise a bounded listing (max_results=1) is used to avoid enumerating
+        the potentially thousands of shards inside the folder.
+        """
+        prefix = blob_name.rstrip('/') + '/'
+
+        if blobs is not None:
+            return any(blob.name.startswith(prefix) for blob in blobs)
+
+        try:
+            found = client.list_blobs(bucket, prefix=prefix, max_results=1)
+            return any(True for _ in found)
+        except NotFound as e:
+            print(f'Could not find bucket {bucket}: {e}')
+            return False
+
+    @staticmethod
     def extract_bucket_params(
         path: str,
     ) -> dict:
@@ -124,7 +156,10 @@ class OutputFileInternal(SMBase):
         file_stem = None
         if match:
             bucket = match.group(1)
-            path_after_bucket = match.group(2) or ''
+            # Strip any trailing slash so directory-like paths (e.g. a VDS passed as
+            # 'gs://bucket/foo.vds/') resolve to the same basename/extension as the
+            # slash-less form and don't yield an empty basename.
+            path_after_bucket = (match.group(2) or '').rstrip('/')
             dirname = f'gs://{bucket}{os.path.dirname(path_after_bucket)}'  # noqa: PTH120
             basename = os.path.basename(path_after_bucket)  # noqa: PTH119
             file_extension = os.path.splitext(basename)[1] if basename else ''  # noqa: PTH122
@@ -174,19 +209,29 @@ class OutputFileInternal(SMBase):
             if not params:
                 return None
             if path.startswith('gs://') and client:
-                if not blobs and not isinstance(blobs, list):
-                    blobs = OutputFileInternal.list_blobs(
+                if params['file_extension'] in DIRECTORY_FORMAT_EXTENSIONS:
+                    # Directory-like outputs (.mt/.ht/.vds) are stored on GCS as folders
+                    # of blobs, so there is no single blob to checksum or size. We verify
+                    # the folder exists (has at least one child blob) and mark it valid,
+                    # leaving the checksum null and the size 0.
+                    valid = OutputFileInternal.directory_exists(
                         bucket=params['bucket'],
-                        prefix=params['blob_name'],
-                        delimiter=params['delimiter'],
+                        blob_name=params['blob_name'],
                         client=client,
-                        versions=False,
+                        blobs=blobs,
                     )
+                else:
+                    if not blobs and not isinstance(blobs, list):
+                        blobs = OutputFileInternal.list_blobs(
+                            bucket=params['bucket'],
+                            prefix=params['blob_name'],
+                            delimiter=params['delimiter'],
+                            client=client,
+                            versions=False,
+                        )
 
-                for blob in blobs:
-                    if blob.name == params['blob_name']:  # noqa: SIM102
-                        # .mt files present as folders on gcs so calculating checksums is not avail.
-                        if params['file_extension'] != '.mt':
+                    for blob in blobs:
+                        if blob.name == params['blob_name']:
                             file_checksum = blob.crc32c  # pylint: disable=E1101
                             valid = True
                             size = blob.size  # pylint: disable=E1101

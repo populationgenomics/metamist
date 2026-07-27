@@ -309,6 +309,103 @@ class TestOutputFiles(DbIsolatedTest):
         )
 
     @run_as_sync
+    async def test_directory_output_with_secondary_files(self):
+        """
+        Directory-like outputs (.mt/.ht/.vds) are stored on GCS as folders of blobs.
+        They should become valid output_file rows (with a null checksum and size 0)
+        and support a secondary_files block, rather than being dropped to a bare string.
+        """
+        outputs = {
+            'mt': {
+                'basename': 'gs://fakegcs/file1.mt',
+                'secondary_files': {
+                    'txt': {'basename': 'gs://fakegcs/file1.txt'},
+                },
+            },
+        }
+
+        output_file_data = {
+            'mt': {
+                'path': 'gs://fakegcs/file1.mt',
+                'basename': 'file1.mt',
+                'dirname': 'gs://fakegcs/',
+                'nameroot': 'file1',
+                'nameext': '.mt',
+                'file_checksum': None,
+                'size': 0,
+                'meta': None,
+                'valid': True,
+                'secondary_files': {
+                    'txt': {
+                        'path': 'gs://fakegcs/file1.txt',
+                        'basename': 'file1.txt',
+                        'dirname': 'gs://fakegcs/',
+                        'nameroot': 'file1',
+                        'nameext': '.txt',
+                        'file_checksum': 'DG+fhg==',
+                        'size': 19,
+                        'meta': None,
+                        'valid': True,
+                        'secondary_files': {},
+                    },
+                },
+            }
+        }
+
+        analysis_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.genome_sequencing_group_id],
+                meta={'sequencing_type': 'genome'},
+                outputs=outputs,
+            )
+        )
+
+        analysis = await self.al.get_analysis_by_id(analysis_id)
+        assert analysis
+        assert isinstance(analysis.outputs, dict)
+
+        # The MT folder is recorded as a structured output, not dropped to a string.
+        self.assertIn('mt', analysis.outputs)
+        self.assertIn('secondary_files', analysis.outputs['mt'])
+        self.assertIn('txt', analysis.outputs['mt']['secondary_files'])
+
+        self.check_outputs_fields(analysis.outputs['mt'], output_file_data['mt'])
+        self.check_outputs_fields(
+            analysis.outputs['mt']['secondary_files']['txt'],
+            output_file_data['mt']['secondary_files']['txt'],  # type: ignore [index]
+        )
+
+    @run_as_sync
+    async def test_directory_output_with_trailing_slash(self):
+        """
+        A directory-like path passed with a trailing slash should resolve to the
+        same basename/extension as the slash-less form and still be valid.
+        """
+        outputs = {'vds': {'basename': 'gs://fakegcs/file1.mt/'}}
+
+        analysis_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.genome_sequencing_group_id],
+                meta={'sequencing_type': 'genome'},
+                outputs=outputs,
+            )
+        )
+
+        analysis = await self.al.get_analysis_by_id(analysis_id)
+        assert analysis
+        assert isinstance(analysis.outputs, dict)
+        self.assertIn('vds', analysis.outputs)
+        self.assertEqual(analysis.outputs['vds']['basename'], 'file1.mt')
+        self.assertEqual(analysis.outputs['vds']['nameext'], '.mt')
+        self.assertTrue(analysis.outputs['vds']['valid'])
+        self.assertEqual(analysis.outputs['vds']['size'], 0)
+        self.assertIsNone(analysis.outputs['vds']['file_checksum'])
+
+    @run_as_sync
     async def test_outputs_contains_protocol(self):
         """Tests validation of the outputs field so that file paths contain a protocol prefix"""
 
