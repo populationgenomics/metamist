@@ -131,6 +131,9 @@ jobs:
           token: ${{ secrets.METAMIST_PRIVATE_PAT }}
           persist-credentials: false
 
+      - name: Get config repo SHA
+        run: |
+          echo "METAMIST_PRIVATE_SHA=$(git -C metamist-private rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Copy Pulumi configs
         env:
@@ -146,5 +149,6 @@ jobs:
           cloud-url: ${{ vars.PULUMI_STATE_BUCKET }}
           parallel: 20 # Otherwise requests might time out.
         env:
+          METAMIST_PRIVATE_SHA: ${{ env.METAMIST_PRIVATE_SHA }}
           # skip checkpointing to speed-up the workflow, and avoid lots of saved state jsons
           PULUMI_SKIP_CHECKPOINTS: true

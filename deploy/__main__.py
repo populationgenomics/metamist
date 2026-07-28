@@ -16,3 +16,4 @@ migrations = create_migration_resources(config, common.image_repository)
 # Export key resource identifiers
 pulumi.export('load balancer ip', server.ip_address.address)
 pulumi.export('migration service name', migrations.service.name)
+pulumi.export('metamist private sha', config.metamist_private_sha)
