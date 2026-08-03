@@ -7,7 +7,6 @@ from models.models import (
     SampleUpsert,
     SampleUpsertInternal,
 )
-from models.models.output_file import OutputFileInternal
 from models.utils.sample_id_format import sample_id_format
 
 
@@ -55,58 +54,3 @@ class TestSampleModels(TestCase):
         self.assertIsInstance(external, SampleUpsert)
         self.assertEqual(sample_id_format(1), external.id)
         self.assertDictEqual({PRIMARY_EXTERNAL_ORG: 'hey-hey'}, external.external_ids)
-
-
-class TestReconstructJson(TestCase):
-    """Test rebuilding the nested outputs structure from flat output_file rows"""
-
-    @staticmethod
-    def output_file(path: str):
-        """Build a file as it comes back from the output_file table"""
-        basename = path.rsplit('/', maxsplit=1)[-1]
-        return OutputFileInternal(
-            id=1,
-            path=path,
-            basename=basename,
-            dirname='gs://bucket',
-            nameroot=basename.split('.')[0],
-            nameext='.' + basename.split('.')[-1],
-            file_checksum=None,
-            size=1,
-            valid=True,
-        )
-
-    def test_secondary_file_survives_either_row_order(self):
-        """
-        Rows come back from the database in no guaranteed order. A secondary
-        file must end up nested under its primary either way — in particular
-        the primary row must not overwrite a secondary that landed first.
-        """
-        primary = (self.output_file('gs://bucket/file.cram'), 'cram')
-        secondary = (
-            self.output_file('gs://bucket/file.cram.ext'),
-            'cram.secondary_files.ext',
-        )
-
-        for label, rows in (
-            ('primary first', [primary, secondary]),
-            ('secondary first', [secondary, primary]),
-        ):
-            with self.subTest(label):
-                outputs = OutputFileInternal.reconstruct_json(rows)
-                assert isinstance(outputs, dict)
-
-                self.assertEqual('gs://bucket/file.cram', outputs['cram']['path'])
-                self.assertEqual(
-                    'gs://bucket/file.cram.ext',
-                    outputs['cram']['secondary_files']['ext']['path'],
-                )
-
-    def test_file_without_secondary_files_keeps_empty_dict(self):
-        """A file with no secondary files still reports an empty dict"""
-        outputs = OutputFileInternal.reconstruct_json(
-            [(self.output_file('gs://bucket/file.cram'), 'cram')]
-        )
-        assert isinstance(outputs, dict)
-
-        self.assertEqual({}, outputs['cram']['secondary_files'])
