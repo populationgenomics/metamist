@@ -249,7 +249,14 @@ class OutputFileInternal(SMBase):
                 current[final_key] = content
             elif final_key in current:
                 if isinstance(current[final_key], dict):
+                    # A secondary file may already have been nested here by an
+                    # earlier row, since rows arrive in no particular order.
+                    # Nesting is derived from json_structure, so this row's own
+                    # secondary_files is always empty and must not clobber it.
+                    nested_secondary_files = current[final_key].get('secondary_files')
                     current[final_key].update(content)
+                    if nested_secondary_files:
+                        current[final_key]['secondary_files'] = nested_secondary_files
                 else:
                     current[final_key] = content
             else:

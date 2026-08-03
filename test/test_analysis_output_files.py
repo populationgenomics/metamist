@@ -309,6 +309,47 @@ class TestOutputFiles(DbIsolatedTest):
         )
 
     @run_as_sync
+    async def test_secondary_file_shared_between_two_analyses(self):
+        """
+        The same file can be a secondary file on more than one analysis. By the
+        time the second analysis is registered the shared file already exists in
+        output_file, so it has a lower id than that analysis' freshly created
+        primary and comes back from the database first. Both analyses should
+        still report it.
+        """
+        shared_file = 'gs://fakegcs/file1.txt'
+        registered: list[tuple[str, int]] = []
+
+        for primary in ('gs://fakegcs/file2.cram', 'gs://fakegcs/file3.cram'):
+            analysis_id = await self.al.create_analysis(
+                AnalysisInternal(
+                    type='cram',
+                    status=AnalysisStatus.COMPLETED,
+                    sequencing_group_ids=[self.genome_sequencing_group_id],
+                    meta={'sequencing_type': 'genome'},
+                    outputs={
+                        'cram': {
+                            'basename': primary,
+                            'secondary_files': {'shared': {'basename': shared_file}},
+                        }
+                    },
+                )
+            )
+            registered.append((primary, analysis_id))
+
+        for primary, analysis_id in registered:
+            analysis = await self.al.get_analysis_by_id(analysis_id)
+            assert analysis
+            assert isinstance(analysis.outputs, dict)
+
+            self.assertEqual(primary, analysis.outputs['cram']['path'])
+            self.assertIn('shared', analysis.outputs['cram']['secondary_files'])
+            self.assertEqual(
+                shared_file,
+                analysis.outputs['cram']['secondary_files']['shared']['path'],
+            )
+
+    @run_as_sync
     async def test_outputs_contains_protocol(self):
         """Tests validation of the outputs field so that file paths contain a protocol prefix"""
 
