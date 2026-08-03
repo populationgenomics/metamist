@@ -16,10 +16,19 @@ RecursiveDict: TypeAlias = dict[str, 'str | RecursiveDict']
 
 GCS_CLIENT = None
 
-# Extensions for outputs that are stored on GCS as folders of blobs rather than a
-# single object (Hail MatrixTable/Table and VDS). These have no single blob to
-# checksum or size, so we verify existence only and mark them valid.
-DIRECTORY_FORMAT_EXTENSIONS = frozenset({'.mt', '.ht', '.vds'})
+# Outputs that are stored on GCS as folders of blobs rather than a single object
+# (Hail MatrixTable/Table and VDS). These have no single blob to checksum or size,
+# so we verify existence only. Hail writes a sentinel as the final step of the
+# write, which is what we look for — a folder without one is the wreckage of a run
+# that died partway through, not a usable output. A VDS is a pair of nested
+# MatrixTables, so it carries no sentinel of its own.
+# Mirrors cpg_utils.existence_checks.
+DIRECTORY_FORMAT_SENTINELS = {
+    '.mt': '_SUCCESS',
+    '.ht': '_SUCCESS',
+    '.vds': 'variant_data/_SUCCESS',
+}
+DIRECTORY_FORMAT_EXTENSIONS = frozenset(DIRECTORY_FORMAT_SENTINELS)
 
 
 def get_gcs_client():
@@ -114,25 +123,31 @@ class OutputFileInternal(SMBase):
     def directory_exists(
         bucket: str,
         blob_name: str,
+        file_extension: str,
         client: Client,
         blobs: list[Blob] | None = None,
     ) -> bool:
         """
         Check whether a directory-like path (a folder of blobs on GCS, e.g. a
-        MatrixTable or VDS) exists, i.e. has at least one child blob under it.
+        MatrixTable or VDS) holds a completely written output, by looking for the
+        sentinel Hail writes last.
 
         If a pre-fetched list of blobs is supplied, it is checked in-memory;
-        otherwise a bounded listing (max_results=1) is used to avoid enumerating
-        the potentially thousands of shards inside the folder.
+        otherwise the sentinel is looked up on its own, which avoids enumerating
+        the potentially thousands of shards inside the folder. Listing rather than
+        fetching the sentinel keeps this working for users who hold list but not
+        get permission on the bucket.
         """
-        prefix = blob_name.rstrip('/') + '/'
+        sentinel = (
+            f'{blob_name.rstrip("/")}/{DIRECTORY_FORMAT_SENTINELS[file_extension]}'
+        )
 
         if blobs is not None:
-            return any(blob.name.startswith(prefix) for blob in blobs)
+            return any(blob.name == sentinel for blob in blobs)
 
         try:
-            found = client.list_blobs(bucket, prefix=prefix, max_results=1)
-            return any(True for _ in found)
+            found = client.list_blobs(bucket, prefix=sentinel, max_results=1)
+            return any(blob.name == sentinel for blob in found)
         except NotFound as e:
             print(f'Could not find bucket {bucket}: {e}')
             return False
@@ -212,11 +227,12 @@ class OutputFileInternal(SMBase):
                 if params['file_extension'] in DIRECTORY_FORMAT_EXTENSIONS:
                     # Directory-like outputs (.mt/.ht/.vds) are stored on GCS as folders
                     # of blobs, so there is no single blob to checksum or size. We verify
-                    # the folder exists (has at least one child blob) and mark it valid,
-                    # leaving the checksum null and the size 0.
+                    # Hail finished writing the folder and mark it valid, leaving the
+                    # checksum null and the size 0.
                     valid = OutputFileInternal.directory_exists(
                         bucket=params['bucket'],
                         blob_name=params['blob_name'],
+                        file_extension=params['file_extension'],
                         client=client,
                         blobs=blobs,
                     )

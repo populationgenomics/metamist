@@ -406,6 +406,57 @@ class TestOutputFiles(DbIsolatedTest):
         self.assertIsNone(analysis.outputs['vds']['file_checksum'])
 
     @run_as_sync
+    async def test_vds_checks_nested_sentinel(self):
+        """
+        A VDS is a pair of nested MatrixTables and has no sentinel of its own, so
+        it is validated against variant_data/_SUCCESS.
+        """
+        analysis_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[self.genome_sequencing_group_id],
+                meta={'sequencing_type': 'genome'},
+                outputs={'vds': {'basename': 'gs://fakegcs/file1.vds'}},
+            )
+        )
+
+        analysis = await self.al.get_analysis_by_id(analysis_id)
+        assert analysis
+        assert isinstance(analysis.outputs, dict)
+        self.assertEqual('.vds', analysis.outputs['vds']['nameext'])
+        self.assertTrue(analysis.outputs['vds']['valid'])
+
+    @run_as_sync
+    async def test_directory_output_without_sentinel_is_invalid(self):
+        """
+        Hail writes the sentinel last, so a folder that has blobs but no sentinel
+        is a write that died partway through and must not be recorded as valid.
+
+        incomplete.vds carries a reference_data sentinel but no variant_data one,
+        which pins that a VDS is judged on the nested path it actually needs
+        rather than on any sentinel found underneath it.
+        """
+        for path in ('gs://fakegcs/incomplete.mt', 'gs://fakegcs/incomplete.vds'):
+            with self.subTest(path):
+                analysis_id = await self.al.create_analysis(
+                    AnalysisInternal(
+                        type='cram',
+                        status=AnalysisStatus.COMPLETED,
+                        sequencing_group_ids=[self.genome_sequencing_group_id],
+                        meta={'sequencing_type': 'genome'},
+                        outputs={'mt': {'basename': path}},
+                    )
+                )
+
+                analysis = await self.al.get_analysis_by_id(analysis_id)
+                assert analysis
+
+                # An invalid file gets no output_file row, so it falls back to a
+                # bare string output rather than a structured one.
+                self.assertEqual(path, analysis.output)
+
+    @run_as_sync
     async def test_outputs_contains_protocol(self):
         """Tests validation of the outputs field so that file paths contain a protocol prefix"""
 
