@@ -1021,8 +1021,9 @@ class GraphQLSample:
     ) -> GraphQLParticipant | None:
         if root.participant_id is None:
             return None
-        loader_participants_for_ids = info.context.loaders.load_participants_for_ids
-        participant = await loader_participants_for_ids.load(root.participant_id)
+        participant = await info.context.loaders.load_participants_for_ids.load(
+            root.participant_id
+        )
         return GraphQLParticipant.from_internal(participant)
 
     @strawberry.field
