@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from starlette.responses import FileResponse
 
 from api import routes
-from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
+from api.graphql.schema import MetamistGraphQLRouter
 from api.settings import (
     PROFILE_REQUESTS,
     PROFILE_REQUESTS_OUTPUT,
@@ -211,7 +211,7 @@ if static_dir_exists:
     # only allow static files if the static files are available
     app.mount('/', SPAStaticFiles(directory=STATIC_DIR, html=True), name='static')
 
-app.openapi = get_openapi_schema_func(app, _VERSION)  # type: ignore[assignment]
+app.openapi = get_openapi_schema_func(app, _VERSION)
 
 
 if __name__ == '__main__':

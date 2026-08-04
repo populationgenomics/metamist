@@ -23,7 +23,7 @@ def sequencing_group_id_transform_to_raw(identifier: int | str, strict=True) -> 
         - validating checksum
     """
     expected_type = str if strict else (str, int)
-    if not isinstance(identifier, expected_type):  # type: ignore
+    if not isinstance(identifier, expected_type):
         raise TypeError(
             f'Expected sequencing-group identifier type to be {expected_type!r}, '
             f'received {type(identifier)!r}'

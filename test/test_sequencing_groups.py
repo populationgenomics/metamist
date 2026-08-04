@@ -498,9 +498,9 @@ class TestSequencingGroup:
         current_date = date(2026, 1, 1)
         current_query = t"""
             INSERT INTO sequencing_group
-                (sample_id, type, technology, archived, sys_period)
+                (sample_id, type, technology, platform, archived, sys_period)
             VALUES
-                ({test_sample}, 'genome', 'short-read', false, tstzrange({current_date.isoformat()}, null))
+                ({test_sample}, 'genome', 'short-read', 'illumina', false, tstzrange({current_date.isoformat()}, null))
         """
         conn = connection_with_project.pg_connection
         async with conn.transaction():
@@ -573,14 +573,14 @@ class TestSequencingGroup:
         sg_layer = SequencingGroupLayer(connection_with_project)
 
         test_sg_data = [
-            {'type': 'genome', 'technology': 'short-read'},
-            {'type': 'genome', 'technology': 'long-read'},
+            {'type': 'genome', 'technology': 'short-read', 'platform': 'illumina'},
+            {'type': 'genome', 'technology': 'long-read', 'platform': 'illumina'},
         ]
 
         # Firstly create two sequencing groups to attach analyses to
         insert_sgs = sql.SQL("""
-            INSERT INTO sequencing_group (sample_id, type, technology, archived)
-            VALUES ({test_sample}, %(type)s, %(technology)s, false)
+            INSERT INTO sequencing_group (sample_id, type, technology, platform, archived)
+            VALUES ({test_sample}, %(type)s, %(technology)s, %(platform)s, false)
             RETURNING id""").format(test_sample=test_sample)
 
         async with connection_with_project.pg_connection.cursor() as cur:

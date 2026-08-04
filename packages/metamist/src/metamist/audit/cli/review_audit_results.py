@@ -52,6 +52,8 @@ def review_rows(
     audit_logs.info_nl(f"Annotating rows with comment: '{comment}'")
     reviewed_rows: list[AuditReportEntry] = []
     for row in rows:
+        # types for AuditReportEntry are wrong, so need to assert here
+        assert row.filepath
         file_path = to_path(row.filepath)
         if not file_path.exists():
             audit_logs.warning(f'File {file_path} does not exist, skipping review.')

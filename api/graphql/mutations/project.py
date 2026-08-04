@@ -45,7 +45,7 @@ class ProjectMutations:
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             cl = CommentLayer(connection)
             result = await cl.add_comment_to_entity(
                 entity=CommentEntityType.project, entity_id=id, content=content
@@ -65,7 +65,7 @@ class ProjectMutations:
         """
         from api.graphql.schema import GraphQLProject  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             ptable = ProjectPermissionsTable(connection)
 
             pid = await ptable.create_project(
@@ -97,7 +97,7 @@ class ProjectMutations:
         """Update a project by project name"""
         from api.graphql.schema import GraphQLProject  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             (p,) = connection.get_and_check_access_to_projects_for_names(
                 [project], {ProjectMemberRole.project_admin}
             )
@@ -129,7 +129,7 @@ class ProjectMutations:
         """
         from api.graphql.schema import GraphQLProject  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             (target_project,) = connection.get_and_check_access_to_projects_for_names(
                 [project], {ProjectMemberRole.project_member_admin}
             )

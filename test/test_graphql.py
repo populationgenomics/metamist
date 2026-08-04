@@ -121,7 +121,7 @@ class TestGraphQL:
         """
         client = configure_sync_client(
             schema=api.graphql.schema.schema.as_str(),
-            auth_token='FAKE',  # type: ignore
+            auth_token='FAKE',
         )
         validate(TEST_QUERY, client=client)
 

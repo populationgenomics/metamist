@@ -336,7 +336,7 @@ class AnalysisTable(DbBase):
             for a_id, files in analysis_files.items()
         }
 
-        return analysis_output_files  # type: ignore [return-value]
+        return analysis_output_files
 
     async def get_latest_complete_analysis_for_type(
         self,

@@ -232,7 +232,7 @@ class OutputFileInternal(SMBase):
             # We ensure the necessary keys exist in the current dictionary before adding the content.
             for key in path[:-1]:
                 if key.isdigit():
-                    key = int(key)  # type: ignore [assignment]  # noqa: PLW2901
+                    key = int(key)  # noqa: PLW2901
                     if key not in current:
                         current[key] = {}
                     current = current[key]
@@ -244,7 +244,7 @@ class OutputFileInternal(SMBase):
             # We add the content to the final key in the current dictionary.
             final_key = path[-1]
             if final_key.isdigit():
-                final_key = int(final_key)  # type: ignore [assignment]
+                final_key = int(final_key)
                 current[final_key] = content
             elif final_key in current:
                 if isinstance(current[final_key], dict):
@@ -262,7 +262,7 @@ class OutputFileInternal(SMBase):
             if isinstance(file, tuple):
                 file_obj, json_structure = file
                 file_obj = file_obj.model_dump()
-                fields = OutputFileInternal.model_fields.keys()  # type:ignore[attr-defined]
+                fields = OutputFileInternal.model_fields.keys()
 
                 # Populate the file_root dictionary with the fields from the file_obj.
                 for field in fields:

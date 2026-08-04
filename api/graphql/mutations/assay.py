@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from api.graphql.schema import GraphQLAssay, GraphQLComment
 
 
-@strawberry.input  # type: ignore [misc]
+@strawberry.input
 class AssayUpsertInput:
     """Assay upsert input"""
 
@@ -42,7 +42,7 @@ class AssayMutations:
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             cl = CommentLayer(connection)
             result = await cl.add_comment_to_entity(
                 entity=CommentEntityType.assay, entity_id=id, content=content
@@ -56,7 +56,7 @@ class AssayMutations:
         """Create new assay, attached to a sample"""
         from api.graphql.schema import GraphQLAssay  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             alayer = AssayLayer(connection)
             upserted = await alayer.upsert_assay(
                 AssayUpsert.from_dict(strawberry.asdict(assay)).to_internal()
@@ -75,7 +75,7 @@ class AssayMutations:
 
         if not assay.id:
             raise ValueError('Assay must have an ID to update')
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             alayer = AssayLayer(connection)
             upserted = await alayer.upsert_assay(
                 AssayUpsert.from_dict(strawberry.asdict(assay)).to_internal()

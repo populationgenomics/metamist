@@ -455,7 +455,7 @@ class SeqrLayer(BaseLayer):
         fn_path = os.path.join(SEQR_MAP_LOCATION, filename)  # noqa: PTH118
 
         # Only need to write this once, as the POST request will ignore extra samples not in each index synced
-        with AnyPath(fn_path).open('w+') as f:  # type: ignore
+        with AnyPath(fn_path).open('w+') as f:
             f.write('\n'.join(rows_to_write))
 
         alayer = AnalysisLayer(connection=self.connection)

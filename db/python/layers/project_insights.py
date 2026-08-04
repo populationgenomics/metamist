@@ -353,14 +353,20 @@ class ProjectInsightsDb(DbBase):
             project,
             sequencing_group_details.sequencing_group_id,
         )
-        sgs_in_latest_annotate_dataset = analysis_sequencing_groups.get(
-            latest_annotate_dataset_id, []
+        sgs_in_latest_annotate_dataset = (
+            analysis_sequencing_groups.get(latest_annotate_dataset_id, [])
+            if latest_annotate_dataset_id
+            else []
         )
-        sgs_in_latest_snv_es_index = analysis_sequencing_groups.get(
-            latest_snv_es_index_id, []
+        sgs_in_latest_snv_es_index = (
+            analysis_sequencing_groups.get(latest_snv_es_index_id, [])
+            if latest_snv_es_index_id
+            else []
         )
-        sgs_in_latest_sv_es_index = analysis_sequencing_groups.get(
-            latest_sv_es_index_id, []
+        sgs_in_latest_sv_es_index = (
+            analysis_sequencing_groups.get(latest_sv_es_index_id, [])
+            if latest_sv_es_index_id
+            else []
         )
         sg_cram = self.get_cram_record(sequencing_group_cram)
 
@@ -902,7 +908,7 @@ class ProjectInsightsDb(DbBase):
                     ProjectSeqTypeStageKey(
                         project.id,
                         sequencing_type,
-                        SV_INDEX_SEQ_TYPE_STAGE_MAP.get(sequencing_type),
+                        SV_INDEX_SEQ_TYPE_STAGE_MAP.get(sequencing_type) or 'unknown',
                     )
                 )
             )
@@ -926,6 +932,9 @@ class ProjectInsightsDb(DbBase):
         )
         project_ids: list[ProjectId] = [project.id for project in projects]
 
+        # Limit to 6 args, asyncio.gather types in typeshed only have overloads
+        # up to 6 args, so we lose typing if we do more. Performance trade off is
+        # fine, will have minimal effect
         (
             total_families_by_project_id_and_seq_fields,
             total_participants_by_project_id_and_seq_fields,
@@ -933,7 +942,6 @@ class ProjectInsightsDb(DbBase):
             total_sequencing_groups_by_project_id_and_seq_fields,
             crams_by_project_id_and_seq_fields,
             latest_annotate_dataset_by_project_id_and_seq_type,
-            latest_es_indices_by_project_id_and_seq_type_and_stage,  # keyed by (project_id, sequencing_type, stage)
         ) = await asyncio.gather(
             self._total_families_by_project_id_and_seq_fields(
                 project_ids, sequencing_types
@@ -951,10 +959,14 @@ class ProjectInsightsDb(DbBase):
             self._latest_annotate_dataset_by_project_id_and_seq_type(
                 project_ids, sequencing_types
             ),
-            self._latest_es_indices_by_project_id_and_seq_type_and_stage(
+        )
+
+        # keyed by (project_id, sequencing_type, stage)
+        latest_es_indices_by_project_id_and_seq_type_and_stage = (
+            await self._latest_es_indices_by_project_id_and_seq_type_and_stage(
                 project_ids,
                 sequencing_types,
-            ),
+            )
         )
 
         # Get the sequencing groups for each of the analyses in the grouped analyses rows
@@ -1073,14 +1085,17 @@ class ProjectInsightsDb(DbBase):
             if not (
                 details_rows
                 := sequencing_group_details_by_project_id_and_seq_fields.get(
-                    (project.id, seq_type, seq_platform, seq_tech)
+                    ProjectSeqTypeTechnologyPlatformKey(
+                        project.id, seq_type, seq_platform, seq_tech
+                    )
                 )
+                or []
             ):
                 continue
 
             sequencing_groups_crams: dict[SequencingGroupInternalId, AnalysisRow] = (
                 crams_by_project_id_and_seq_fields.get(
-                    (project.id, seq_type, seq_tech), {}
+                    ProjectSeqTypeTechnologyKey(project.id, seq_type, seq_tech), {}
                 )
             )
             (
@@ -1099,6 +1114,9 @@ class ProjectInsightsDb(DbBase):
                 if not details_row:
                     continue
                 sg_id = details_row.sequencing_group_id
+                sequencing_group_cram = sequencing_groups_crams.get(sg_id)
+                # This has to exist for the next method call to work, so assert for it
+                assert sequencing_group_cram
                 response.append(
                     self.get_insights_details_internal_row(
                         project=project,
@@ -1106,7 +1124,7 @@ class ProjectInsightsDb(DbBase):
                         sequencing_platform=seq_platform,
                         sequencing_technology=seq_tech,
                         sequencing_group_details=details_row,
-                        sequencing_group_cram=sequencing_groups_crams.get(sg_id),
+                        sequencing_group_cram=sequencing_group_cram,
                         analysis_sequencing_groups=analysis_sequencing_groups,
                         latest_annotate_dataset_id=(
                             latest_annotate_dataset_row.id

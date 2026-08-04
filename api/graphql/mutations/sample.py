@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment, GraphQLSample
 
 
-@strawberry.input  # type: ignore [misc]
+@strawberry.input
 class SampleUpsertInput:
     """Sample upsert input"""
 
@@ -51,7 +51,7 @@ class SampleMutations:
         """Add a comment to a sample"""
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             cl = CommentLayer(connection)
             result = await cl.add_comment_to_entity(
                 entity=CommentEntityType.sample,
@@ -72,7 +72,7 @@ class SampleMutations:
         """Creates a new sample, and returns the internal sample ID"""
         from api.graphql.schema import GraphQLSample  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             (target_project,) = connection.get_and_check_access_to_projects_for_names(
                 [project], FullWriteAccessRoles
             )
@@ -99,7 +99,7 @@ class SampleMutations:
         """
         from api.graphql.schema import GraphQLSample  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             (target_project,) = connection.get_and_check_access_to_projects_for_names(
                 [project], FullWriteAccessRoles
             )
@@ -131,7 +131,7 @@ class SampleMutations:
         """Update sample with id"""
         from api.graphql.schema import GraphQLSample  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             slayer = SampleLayer(connection)
             upserted = await slayer.upsert_sample(
                 SampleUpsert.from_dict(strawberry.asdict(sample)).to_internal()
