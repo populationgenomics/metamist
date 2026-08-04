@@ -54,6 +54,7 @@ dev = [
     "pulumi-docker>=4.11.0",
     "pygithub>=2.8.1",
     "pyright>=1.1.409",
+    "pyinstrument>=5.1.3",
 ]
 
 [tool.uv]
