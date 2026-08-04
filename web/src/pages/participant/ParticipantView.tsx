@@ -20,7 +20,7 @@ interface IParticipantViewParticipant {
     pedEntry?: PedigreeEntry
     samples: {
         id: string
-        type: string
+        type?: string | null
         meta: { [key: string]: unknown }
         sequencingGroups: {
             id: string

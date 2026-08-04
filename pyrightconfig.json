@@ -30,7 +30,7 @@
     // Scripts will also be removed from this repo soon
     "./scripts",
     "htmlcov",
-    
+
   ],
 
   "typeCheckingMode": "standard",
