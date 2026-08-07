@@ -1,4 +1,3 @@
-# mypy: disable-error-code="attr-defined,arg-type,index,call-overload"
 import asyncio
 import itertools
 from datetime import datetime
