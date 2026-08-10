@@ -16,13 +16,10 @@ RecursiveDict: TypeAlias = dict[str, 'str | RecursiveDict']
 
 GCS_CLIENT = None
 
-# Outputs that are stored on GCS as folders of blobs rather than a single object
-# (Hail MatrixTable/Table and VDS). These have no single blob to checksum or size,
-# so we verify existence only. Hail writes a sentinel as the final step of the
-# write, which is what we look for — a folder without one is the wreckage of a run
-# that died partway through, not a usable output. A VDS is a pair of nested
-# MatrixTables, so it carries no sentinel of its own.
-# Mirrors cpg_utils.existence_checks.
+# .mt/.ht/.vds outputs are folders on GCS, not single files, so we can't checksum or
+# size them. We just check the folder finished writing by looking for the sentinel
+# file Hail writes last (a VDS keeps its one under variant_data/). We look by listing,
+# not a get, because metamist can only list these buckets.
 DIRECTORY_FORMAT_SENTINELS = {
     '.mt': '_SUCCESS',
     '.ht': '_SUCCESS',
@@ -128,15 +125,11 @@ class OutputFileInternal(SMBase):
         blobs: list[Blob] | None = None,
     ) -> bool:
         """
-        Check whether a directory-like path (a folder of blobs on GCS, e.g. a
-        MatrixTable or VDS) holds a completely written output, by looking for the
-        sentinel Hail writes last.
+        Check a directory-like output (.mt/.ht/.vds folder) finished writing by
+        looking for the sentinel file Hail writes last.
 
-        If a pre-fetched list of blobs is supplied, it is checked in-memory;
-        otherwise the sentinel is looked up on its own, which avoids enumerating
-        the potentially thousands of shards inside the folder. Listing rather than
-        fetching the sentinel keeps this working for users who hold list but not
-        get permission on the bucket.
+        We list for the sentinel instead of getting it directly, because metamist
+        can only list these buckets. Pre-fetched blobs are checked in memory.
         """
         sentinel = (
             f'{blob_name.rstrip("/")}/{DIRECTORY_FORMAT_SENTINELS[file_extension]}'
