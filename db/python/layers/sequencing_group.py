@@ -173,6 +173,7 @@ class SequencingGroupLayer(BaseLayer):
                 technology=ensure_nonnone(seqgroup.technology),
                 platform=ensure_nonnone(seqgroup.platform),
                 meta={**seqgroup.meta, **meta} if seqgroup.meta else meta,
+                external_ids=seqgroup.external_ids,
                 assay_ids=assays,
             )
 
@@ -243,11 +244,6 @@ class SequencingGroupLayer(BaseLayer):
                     to_update.append(sg)
                     continue
 
-                # if we need to insert any assays, then the group will have to change
-                if any(not assay.id for assay in sg.assays):
-                    to_replace.append(sg)
-                    continue
-
                 assert sg.id is not None
                 existing_sequences = set(sequence_to_group.get(int(sg.id), []))
                 new_assay_ids = set(sq.id for sq in sg.assays)
@@ -267,6 +263,7 @@ class SequencingGroupLayer(BaseLayer):
                 technology=ensure_nonnone(sg.technology),
                 platform=ensure_nonnone(sg.platform),
                 meta=sg.meta,
+                external_ids=sg.external_ids,
                 assay_ids=assay_ids,
             )
 
@@ -276,9 +273,10 @@ class SequencingGroupLayer(BaseLayer):
             )
 
         for sg in to_replace:
-            await self.recreate_sequencing_group_with_new_assays(
+            # Recreate the sequencing group with the new assays in the DB
+            sg.id = await self.recreate_sequencing_group_with_new_assays(
                 sequencing_group_id=int(ensure_nonnone(sg.id)),
-                assays=[s.id for s in sg.assays] if sg.assays else [],
+                assays=[ensure_nonnone(a.id) for a in sg.assays] if sg.assays else [],
                 meta=sg.meta or {},
             )
 

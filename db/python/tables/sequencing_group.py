@@ -1,4 +1,5 @@
 from collections import defaultdict
+from collections.abc import Mapping
 from datetime import date
 from string.templatelib import Template
 
@@ -357,6 +358,7 @@ class SequencingGroupTable(DbBase):
         technology: str,
         platform: str,
         assay_ids: list[int],
+        external_ids: Mapping[str, str | None] | None = None,
         meta: dict | None = None,
     ) -> int:
         """Create sequence group"""
@@ -401,6 +403,13 @@ class SequencingGroupTable(DbBase):
         RETURNING id;
         """
 
+        external_id_query = """
+        INSERT INTO sequencing_group_external_id
+            (project, sequencing_group_id, external_id, name, audit_log_id)
+        VALUES
+            (%(project)s, %(sequencing_group_id)s, %(external_id)s, %(name)s, %(audit_log_id)s)
+        """
+
         _sg_assay_linker = """
         INSERT INTO sequencing_group_assay
             (sequencing_group_id, assay_id, audit_log_id)
@@ -417,14 +426,29 @@ class SequencingGroupTable(DbBase):
             if not new_sg_id:
                 raise InternalError('A new sequencing_group row was not created')
 
+            if external_ids:
+                eid_values = [
+                    {
+                        'project': self.connection.project_id,
+                        'sequencing_group_id': new_sg_id['id'],
+                        'name': name.lower(),
+                        'external_id': eid,
+                        'audit_log_id': audit_log_id,
+                    }
+                    for name, eid in external_ids.items()
+                    if eid is not None
+                ]
+                async with conn.cursor() as cur:
+                    await cur.executemany(external_id_query, eid_values)
+
             if assay_ids:
                 assay_id_insert_values = [
                     {
                         'seqgroup': new_sg_id['id'],
-                        'assayid': s,
+                        'assayid': a_id,
                         'audit_log_id': await self.audit_log_id(),
                     }
-                    for s in assay_ids
+                    for a_id in assay_ids
                 ]
                 async with conn.cursor() as cur:
                     await cur.executemany(_sg_assay_linker, assay_id_insert_values)
