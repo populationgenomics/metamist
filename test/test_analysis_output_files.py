@@ -344,11 +344,11 @@ class TestOutputFiles(DbIsolatedTest):
             assert analysis
             assert isinstance(analysis.outputs, dict)
 
-            self.assertEqual(primary, analysis.outputs['cram']['path'])
+            self.assertEqual(analysis.outputs['cram']['path'], primary)
             self.assertIn('shared', analysis.outputs['cram']['secondary_files'])
             self.assertEqual(
-                shared_file,
                 analysis.outputs['cram']['secondary_files']['shared']['path'],
+                shared_file,
             )
 
     @run_as_sync
@@ -487,10 +487,10 @@ class TestReconstructJson(TestCase):
                 outputs = OutputFileInternal.reconstruct_json(rows)
                 assert isinstance(outputs, dict)
 
-                self.assertEqual('gs://bucket/file.cram', outputs['cram']['path'])
+                self.assertEqual(outputs['cram']['path'], 'gs://bucket/file.cram')
                 self.assertEqual(
-                    'gs://bucket/file.cram.ext',
                     outputs['cram']['secondary_files']['ext']['path'],
+                    'gs://bucket/file.cram.ext',
                 )
 
     def test_file_without_secondary_files_keeps_empty_dict(self):
@@ -500,4 +500,4 @@ class TestReconstructJson(TestCase):
         )
         assert isinstance(outputs, dict)
 
-        self.assertEqual({}, outputs['cram']['secondary_files'])
+        self.assertEqual(outputs['cram']['secondary_files'], {})
