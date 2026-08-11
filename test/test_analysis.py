@@ -565,9 +565,10 @@ class TestAnalysis:
         assert len(sg_without_type) == 1
         assert sg_without_type[0] == self.exome_sequencing_group_id
 
-
     @pytest.mark.project_roles(['writer'])
-    async def test_get_analysis_audit_logs_with_null_auth_project(self, connection_with_project : Connection):
+    async def test_get_analysis_audit_logs_with_null_auth_project(
+        self, connection_with_project: Connection
+    ):
         """
         Test inserting an analysis audit entry with a null auth project
         """
@@ -599,14 +600,15 @@ class TestAnalysis:
                 ],
             )
         )
-        sg_id = sample.sequencing_groups[0].id
+        assert sample.sequencing_groups is not None
+        assert sample.sequencing_groups[0].id is not None
 
         analysis_id = await self.al.create_analysis(
             AnalysisInternal(
                 type='cram',
                 status=AnalysisStatus.COMPLETED,
                 meta={},
-                sequencing_group_ids=[sg_id],
+                sequencing_group_ids=[sample.sequencing_groups[0].id],
             )
         )
 
@@ -619,12 +621,14 @@ class TestAnalysis:
             comment=None,
             project=None,
         )
-        await connection_with_project.pg_connection.execute(t'UPDATE analysis SET audit_log_id = {null_audit_log_id} WHERE id = {analysis_id}')
+        await connection_with_project.pg_connection.execute(
+            t'UPDATE analysis SET audit_log_id = {null_audit_log_id} WHERE id = {analysis_id}'
+        )
 
         logs_by_analysis = await self.al.get_audit_logs_by_analysis_ids([analysis_id])
 
         matches = [
             log for log in logs_by_analysis[analysis_id] if log.ar_guid == ar_guid
         ]
-        assert 1 == len(matches)
+        assert len(matches) == 1
         assert matches[0].auth_project is None
