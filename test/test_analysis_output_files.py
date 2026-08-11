@@ -424,7 +424,7 @@ class TestOutputFiles(DbIsolatedTest):
         analysis = await self.al.get_analysis_by_id(analysis_id)
         assert analysis
         assert isinstance(analysis.outputs, dict)
-        self.assertEqual('.vds', analysis.outputs['vds']['nameext'])
+        self.assertEqual(analysis.outputs['vds']['nameext'], '.vds')
         self.assertTrue(analysis.outputs['vds']['valid'])
 
     @run_as_sync
@@ -454,7 +454,7 @@ class TestOutputFiles(DbIsolatedTest):
 
                 # An invalid file gets no output_file row, so it falls back to a
                 # bare string output rather than a structured one.
-                self.assertEqual(path, analysis.output)
+                self.assertEqual(analysis.output, path)
 
     @run_as_sync
     async def test_outputs_contains_protocol(self):
