@@ -35,7 +35,6 @@ TABLES_ORDERED_BY_FK_DEPS = [
     'assay',
     'sequencing_group_assay',
     'analysis_sequencing_group',
-    'analysis_sample',
     'assay_external_id',
     'participant_external_id',
     'sample_external_id',
