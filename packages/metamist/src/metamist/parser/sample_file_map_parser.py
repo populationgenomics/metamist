@@ -9,6 +9,7 @@ from metamist.parser.generic_parser import DefaultSequencing, SingleRow
 
 PARTICIPANT_COL_NAME = 'individual_id'
 SAMPLE_ID_COL_NAME = 'sample_id'
+SAMPLE_TYPE_COL_NAME = 'sample_type'
 READS_COL_NAME = 'filenames'
 SEQ_TYPE_COL_NAME = 'type'
 CHECKSUM_COL_NAME = 'checksum'
@@ -29,6 +30,7 @@ KeyMap = {
         'agha_study_id',
     ],
     SAMPLE_ID_COL_NAME: ['sample_id', 'sample', 'sample id'],
+    SAMPLE_TYPE_COL_NAME: ['sample_type', 'sample type', 'sampletype'],
     READS_COL_NAME: ['filename', 'filenames', 'files', 'file'],
     SEQ_TYPE_COL_NAME: ['type', 'types', 'sequencing type', 'sequencing_type'],
     SEQ_FACILITY_COL_NAME: ['facility', 'sequencing facility', 'sequencing_facility'],
@@ -69,7 +71,8 @@ The SampleFileMapParser is used for parsing files with format:
 - ['Individual ID']
 - 'Sample ID'
 - 'Filenames'
-- ['Type']
+- ['Sequencing Type']
+- ['Sample Type']
 - 'Checksum'
 - ['Sequencing Facility'] - needed for exome & rna samples
 - ['Library Type'] - needed for exome & rna samples
@@ -87,11 +90,11 @@ Example with optional columns
 Note: Individual ID column must contain values in every row
 Note: Any missing values in Type will default to the default_sequencing_type ('genome')
 e.g.
-    Individual ID	Sample ID	    Filenames	                                                                    Type
-    Demeter	        sample_id001	sample_id001.filename-R1.fastq.gz,sample_id001.filename-R2.fastq.gz	            WGS
-    Demeter	        sample_id001	sample_id001.exome.filename-R1.fastq.gz,sample_id001.exome.filename-R2.fastq.gz	WES
-    Apollo	        sample_id002	sample_id002.filename-R1.fastq.gz	                                            WGS
-    Apollo	        sample_id002	sample_id002.filename-R2.fastq.gz	                                            WGS
+    Individual ID	Sample ID	    Filenames	                                                                    Sequencing Type  Sample Type
+    Demeter	        sample_id001	sample_id001.filename-R1.fastq.gz,sample_id001.filename-R2.fastq.gz	            WGS              blood
+    Demeter	        sample_id001	sample_id001.exome.filename-R1.fastq.gz,sample_id001.exome.filename-R2.fastq.gz	WES              saliva
+    Apollo	        sample_id002	sample_id002.filename-R1.fastq.gz	                                            WGS              skin
+    Apollo	        sample_id002	sample_id002.filename-R2.fastq.gz	                                            WGS              muscle
     Athena	        sample_id003	sample_id003.filename-R1.fastq.gz
     Athena	        sample_id003	sample_id003.filename-R2.fastq.gz
     Apollo	        sample_id004	sample_id004.filename-R1.fastq.gz
@@ -99,9 +102,9 @@ e.g.
 
 Example with optional columns for RNA samples
 e.g.
-    Individual ID	Sample ID	    Filenames	                                                            Type        Facility  Library    End Type  Read Length
-    Hera            sample_id001	sample_id001_TSStrtRNA_R1.fastq.gz,sample_id001_TSStrtRNA_R2.fastq.gz	totalrna    VCGS      TSStrtRNA  paired    151
-    Hestia          sample_id002	sample_id002_TSStrmRNA_R1.fastq.gz,sample_id002_TSStrmRNA_R2.fastq.gz	polyarna    VCGS      TSStrmRNA  paired    151
+    Individual ID	Sample ID	    Filenames	                                                            Sequencing Type  Sample Type     Facility  Library    End Type  Read Length
+    Hera            sample_id001	sample_id001_TSStrtRNA_R1.fastq.gz,sample_id001_TSStrtRNA_R2.fastq.gz	totalrna         blood           VCGS      TSStrtRNA  paired    151
+    Hestia          sample_id002	sample_id002_TSStrmRNA_R1.fastq.gz,sample_id002_TSStrmRNA_R2.fastq.gz	polyarna         muscle          VCGS      TSStrmRNA  paired    151
 
 
 This format is useful for ingesting filenames for the seqr loading pipeline
@@ -119,7 +122,7 @@ class SampleFileMapParser(GenericMetadataParser):
         self,
         search_locations: list[str],
         project: str,
-        default_sample_type='blood',
+        default_sample_type='unknown',
         default_sequencing=DefaultSequencing(
             seq_type='genome', technology='short-read', platform='illumina'
         ),
@@ -136,6 +139,7 @@ class SampleFileMapParser(GenericMetadataParser):
             project=project,
             participant_primary_eid_column=PARTICIPANT_COL_NAME,
             sample_primary_eid_column=SAMPLE_ID_COL_NAME,
+            sample_type_column=SAMPLE_TYPE_COL_NAME,
             reads_column=READS_COL_NAME,
             checksum_column=CHECKSUM_COL_NAME,
             seq_type_column=SEQ_TYPE_COL_NAME,
@@ -176,7 +180,7 @@ class SampleFileMapParser(GenericMetadataParser):
     '--project',
     help='The metamist project to import manifest into',
 )
-@click.option('--default-sample-type', default='blood')
+@click.option('--default-sample-type', default='unknown')
 @click.option('--default-sequencing-type', default='wgs')
 @click.option('--default-sequencing-technology', default='short-read')
 @click.option('--default-sequencing-facility', default=None)
@@ -224,7 +228,7 @@ async def main(  # noqa: PLR0913
     manifests,
     search_path: list[str],
     project,
-    default_sample_type='blood',
+    default_sample_type='unknown',
     default_sequencing_type='genome',
     default_sequencing_technology='short-read',
     default_sequencing_platform='illumina',

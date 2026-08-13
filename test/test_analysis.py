@@ -9,6 +9,7 @@ from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter
+from db.python.tables.audit_log import AuditLogTable
 from models.enums import AnalysisStatus
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -466,3 +467,70 @@ class TestAnalysis(DbIsolatedTest):
         self.assertEqual(1, len(analyses))
         self.assertEqual(analysis_id, analyses[0].id)
         self.assertFalse(analyses[0].active)
+
+    @run_as_sync
+    async def test_get_analysis_audit_logs_with_null_auth_project(self):
+        """
+        Test inserting an analysis audit entry with a null auth project
+        """
+        slayer = SampleLayer(self.connection)
+        sample = await slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'test-audit'},
+                type='blood',
+                active=True,
+                meta={},
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={},
+                        sample_id=None,
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta={
+                                    'sequencing_type': 'genome',
+                                    'sequencing_technology': 'short-read',
+                                    'sequencing_platform': 'illumina',
+                                },
+                            )
+                        ],
+                    ),
+                ],
+            )
+        )
+        sg_id = sample.sequencing_groups[0].id
+
+        al = AnalysisLayer(self.connection)
+        analysis_id = await al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[sg_id],
+                meta={},
+            )
+        )
+
+        audit_log_table = AuditLogTable(self.connection)
+        ar_guid = 'null-auth-project'
+        null_audit_log_id = await audit_log_table.create_audit_log(
+            author=self.connection.author,
+            on_behalf_of=None,
+            ar_guid=ar_guid,
+            comment=None,
+            project=None,
+        )
+        await self.connection.connection.execute(
+            'UPDATE analysis SET audit_log_id = :aid WHERE id = :id',
+            {'aid': null_audit_log_id, 'id': analysis_id},
+        )
+
+        logs_by_analysis = await al.get_audit_logs_by_analysis_ids([analysis_id])
+
+        matches = [
+            log for log in logs_by_analysis[analysis_id] if log.ar_guid == ar_guid
+        ]
+        self.assertEqual(1, len(matches))
+        self.assertIsNone(matches[0].auth_project)
