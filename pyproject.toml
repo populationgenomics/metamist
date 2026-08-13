@@ -1,6 +1,6 @@
 [project]
 name = "metamist-root"
-version = "7.14.2"
+version = "7.14.3"
 requires-python = "==3.11.*"
 dependencies = [
     "backoff>=2.2.1",
