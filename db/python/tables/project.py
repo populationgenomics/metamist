@@ -267,57 +267,71 @@ DELETE FROM comment WHERE id IN (
     WHERE s.project = :project
 );
 -- Deletion from `comment` cascades to the various `*_comment` tables
+
 DELETE FROM project_member WHERE project_id = :project;
-DELETE FROM participant_phenotypes where participant_id IN (
-    SELECT id FROM participant WHERE project = :project
-);
-DELETE FROM family_participant WHERE family_id IN (
-    SELECT id FROM family where project = :project
-);
-DELETE FROM family_external_id WHERE project = :project;
-DELETE FROM family WHERE project = :project;
-DELETE FROM sequencing_group_external_id WHERE project = :project;
-DELETE FROM sample_external_id WHERE project = :project;
-DELETE FROM participant_external_id WHERE project = :project;
-DELETE FROM assay_external_id WHERE project = :project;
-DELETE FROM sequencing_group_assay WHERE sequencing_group_id IN (
-    SELECT sg.id FROM sequencing_group sg
-    INNER JOIN sample ON sample.id = sg.sample_id
-    WHERE sample.project = :project
-);
-DELETE FROM analysis_sequencing_group WHERE sequencing_group_id in (
-    SELECT sg.id FROM sequencing_group sg
-    INNER JOIN sample ON sample.id = sg.sample_id
-    WHERE sample.project = :project
-);
-DELETE FROM analysis_sample WHERE sample_id in (
-    SELECT s.id FROM sample s
-    WHERE s.project = :project
-);
+
+-- Deletion from `output_file` cascades to `analysis_outputs`
 DELETE FROM output_file WHERE id IN (
     SELECT file_id FROM analysis_outputs ao
     INNER JOIN analysis a ON ao.analysis_id = a.id
     WHERE a.project = :project
 );
--- Deletion from `output_file` cascades to `analysis_outputs`
-DELETE FROM analysis_sequencing_group WHERE analysis_id in (
+
+-- Analysis join tables: clear rows linking to this project's analyses OR to
+-- this project's entities (analyses can be cross-project).
+DELETE FROM analysis_sequencing_group WHERE analysis_id IN (
     SELECT id FROM analysis WHERE project = :project
+) OR sequencing_group_id IN (
+    SELECT sg.id FROM sequencing_group sg
+    INNER JOIN sample ON sample.id = sg.sample_id
+    WHERE sample.project = :project
 );
-DELETE FROM analysis_sample WHERE analysis_id in (
+DELETE FROM analysis_cohort WHERE analysis_id IN (
     SELECT id FROM analysis WHERE project = :project
-);
-DELETE FROM analysis_cohort WHERE cohort_id IN (
+) OR cohort_id IN (
     SELECT id FROM cohort WHERE project = :project
 );
+
+-- Cohorts: delete from join table first, then cohort (references cohort_template), then
+-- the templates themselves.
 DELETE FROM cohort_sequencing_group WHERE cohort_id IN (
     SELECT id FROM cohort WHERE project = :project
+) OR sequencing_group_id IN (
+    SELECT sg.id FROM sequencing_group sg
+    INNER JOIN sample ON sample.id = sg.sample_id
+    WHERE sample.project = :project
 );
-DELETE FROM cohort_template WHERE project = :project;
 DELETE FROM cohort WHERE project = :project;
-DELETE FROM assay WHERE sample_id in (SELECT id FROM sample WHERE project = :project);
+DELETE FROM cohort_template WHERE project = :project;
+
+-- Assay <-> sequencing_group link, delete from here before either side is removed.
+DELETE FROM sequencing_group_assay WHERE sequencing_group_id IN (
+    SELECT sg.id FROM sequencing_group sg
+    INNER JOIN sample ON sample.id = sg.sample_id
+    WHERE sample.project = :project
+);
+
+-- Clear all external id tables
+DELETE FROM sequencing_group_external_id WHERE project = :project;
+DELETE FROM assay_external_id WHERE project = :project;
+DELETE FROM sample_external_id WHERE project = :project;
+DELETE FROM participant_external_id WHERE project = :project;
+DELETE FROM family_external_id WHERE project = :project;
+
+-- Delete from family + participant link tables before families/participants are removed.
+DELETE FROM family_participant WHERE family_id IN (
+    SELECT id FROM family WHERE project = :project
+);
+DELETE FROM participant_phenotypes WHERE participant_id IN (
+    SELECT id FROM participant WHERE project = :project
+);
+
+-- Entity tables, delete from dependent tables before parents.
 DELETE FROM sequencing_group WHERE sample_id IN (
     SELECT id FROM sample WHERE project = :project
 );
+DELETE FROM assay WHERE sample_id IN (SELECT id FROM sample WHERE project = :project);
+DELETE FROM family WHERE project = :project;
 DELETE FROM sample WHERE project = :project;
 DELETE FROM participant WHERE project = :project;
 DELETE FROM analysis WHERE project = :project;
