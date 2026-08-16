@@ -303,7 +303,18 @@ class OutputFileInternal(SMBase):
                 current[final_key] = content
             elif final_key in current:
                 if isinstance(current[final_key], dict):
+                    # Rows for a file and its secondary files share this slot:
+                    #   'cram'                     -> the file
+                    #   'cram.secondary_files.ext' -> one of its secondary files
+                    # Either can arrive first. If a secondary file did, this
+                    # slot already holds {'secondary_files': {'ext': ...}}, and
+                    # merging the file's row in would reset that to {} - every
+                    # file row carries an empty secondary_files, as output_file
+                    # has no such column.
+                    nested_secondary_files = current[final_key].get('secondary_files')
                     current[final_key].update(content)
+                    if nested_secondary_files:
+                        current[final_key]['secondary_files'] = nested_secondary_files
                 else:
                     current[final_key] = content
             else:

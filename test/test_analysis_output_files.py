@@ -1,5 +1,6 @@
 import os
 from typing import Any
+from unittest import TestCase
 
 from testcontainers.core.container import DockerContainer
 
@@ -16,6 +17,7 @@ from models.models import (
     SequencingGroupUpsertInternal,
 )
 from models.models.analysis import AnalysisInternal
+from models.models.output_file import OutputFileInternal
 from test.testbase import DbIsolatedTest, run_as_sync
 
 
@@ -309,6 +311,47 @@ class TestOutputFiles(DbIsolatedTest):
         )
 
     @run_as_sync
+    async def test_secondary_file_shared_between_two_analyses(self):
+        """
+        The same file can be a secondary file on more than one analysis. By the
+        time the second analysis is registered the shared file already exists in
+        output_file, so it has a lower id than that analysis' freshly created
+        primary and comes back from the database first. Both analyses should
+        still report it.
+        """
+        shared_file = 'gs://fakegcs/file1.txt'
+        registered: list[tuple[str, int]] = []
+
+        for primary in ('gs://fakegcs/file2.cram', 'gs://fakegcs/file3.cram'):
+            analysis_id = await self.al.create_analysis(
+                AnalysisInternal(
+                    type='cram',
+                    status=AnalysisStatus.COMPLETED,
+                    sequencing_group_ids=[self.genome_sequencing_group_id],
+                    meta={'sequencing_type': 'genome'},
+                    outputs={
+                        'cram': {
+                            'basename': primary,
+                            'secondary_files': {'shared': {'basename': shared_file}},
+                        }
+                    },
+                )
+            )
+            registered.append((primary, analysis_id))
+
+        for primary, analysis_id in registered:
+            analysis = await self.al.get_analysis_by_id(analysis_id)
+            assert analysis
+            assert isinstance(analysis.outputs, dict)
+
+            self.assertEqual(analysis.outputs['cram']['path'], primary)
+            self.assertIn('shared', analysis.outputs['cram']['secondary_files'])
+            self.assertEqual(
+                analysis.outputs['cram']['secondary_files']['shared']['path'],
+                shared_file,
+            )
+
+    @run_as_sync
     async def test_directory_output_with_secondary_files(self):
         """
         Directory-like outputs (.mt/.ht/.vds) are stored on GCS as folders of blobs.
@@ -551,3 +594,58 @@ class TestOutputFiles(DbIsolatedTest):
 
         self.assertEqual(await self.row_count('analysis_outputs'), 0)
         self.assertEqual(await self.row_count('output_file'), 0)
+
+
+class TestReconstructJson(TestCase):
+    """Test rebuilding the nested outputs structure from flat output_file rows"""
+
+    @staticmethod
+    def output_file(path: str):
+        """Build a file as it comes back from the output_file table"""
+        basename = path.rsplit('/', maxsplit=1)[-1]
+        return OutputFileInternal(
+            id=1,
+            path=path,
+            basename=basename,
+            dirname='gs://bucket',
+            nameroot=basename.split('.')[0],
+            nameext='.' + basename.split('.')[-1],
+            file_checksum=None,
+            size=1,
+            valid=True,
+        )
+
+    def test_secondary_file_survives_either_row_order(self):
+        """
+        Rows come back from the database in no guaranteed order. A secondary
+        file must end up nested under its primary either way — in particular
+        the primary row must not overwrite a secondary that landed first.
+        """
+        primary = (self.output_file('gs://bucket/file.cram'), 'cram')
+        secondary = (
+            self.output_file('gs://bucket/file.cram.ext'),
+            'cram.secondary_files.ext',
+        )
+
+        for label, rows in (
+            ('primary first', [primary, secondary]),
+            ('secondary first', [secondary, primary]),
+        ):
+            with self.subTest(label):
+                outputs = OutputFileInternal.reconstruct_json(rows)
+                assert isinstance(outputs, dict)
+
+                self.assertEqual(outputs['cram']['path'], 'gs://bucket/file.cram')
+                self.assertEqual(
+                    outputs['cram']['secondary_files']['ext']['path'],
+                    'gs://bucket/file.cram.ext',
+                )
+
+    def test_file_without_secondary_files_keeps_empty_dict(self):
+        """A file with no secondary files still reports an empty dict"""
+        outputs = OutputFileInternal.reconstruct_json(
+            [(self.output_file('gs://bucket/file.cram'), 'cram')]
+        )
+        assert isinstance(outputs, dict)
+
+        self.assertEqual(outputs['cram']['secondary_files'], {})
