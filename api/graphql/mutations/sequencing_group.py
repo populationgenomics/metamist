@@ -9,6 +9,7 @@ from api.graphql.loaders import GraphQLContext
 from api.graphql.mutations.assay import AssayUpsertInput
 from db.python.layers.comment import CommentLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
+from db.python.utils import InternalError
 from models.models.comment import CommentEntityType
 from models.models.project import FullWriteAccessRoles
 from models.models.sequencing_group import SequencingGroupUpsertInternal
@@ -100,7 +101,10 @@ class SequencingGroupMutations:
                     ]
                 )
             )[0]
-            full_updated_sg = await slayer.get_sequencing_group_by_id(updated_sg.id)  # type: ignore [arg-type]
+            if updated_sg.id is None:
+                raise InternalError('Updated sequencing group has no ID')
+
+            full_updated_sg = await slayer.get_sequencing_group_by_id(updated_sg.id)
             return GraphQLSequencingGroup.from_internal(full_updated_sg)
 
     @strawberry.mutation

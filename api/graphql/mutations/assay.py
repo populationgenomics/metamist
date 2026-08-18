@@ -8,6 +8,7 @@ from strawberry.types import Info
 from api.graphql.loaders import GraphQLContext
 from db.python.layers.assay import AssayLayer
 from db.python.layers.comment import CommentLayer
+from db.python.utils import InternalError
 from models.models.assay import AssayUpsert
 from models.models.comment import CommentEntityType
 
@@ -61,7 +62,9 @@ class AssayMutations:
             upserted = await alayer.upsert_assay(
                 AssayUpsert.from_dict(strawberry.asdict(assay)).to_internal()
             )
-            created_assay = await alayer.get_assay_by_id(upserted.id)  # type: ignore [arg-type]
+            if upserted.id is None:
+                raise InternalError('Created assay has no ID')
+            created_assay = await alayer.get_assay_by_id(upserted.id)
             return GraphQLAssay.from_internal(created_assay)
 
     @strawberry.mutation
@@ -80,6 +83,8 @@ class AssayMutations:
             upserted = await alayer.upsert_assay(
                 AssayUpsert.from_dict(strawberry.asdict(assay)).to_internal()
             )
-            updated_assay = await alayer.get_assay_by_id(upserted.id)  # type: ignore [arg-type]
+            if upserted.id is None:
+                raise InternalError('Updated assay has no ID')
+            updated_assay = await alayer.get_assay_by_id(upserted.id)
 
             return GraphQLAssay.from_internal(updated_assay)

@@ -10,6 +10,7 @@ from api.graphql.mutations.assay import AssayUpsertInput
 from api.graphql.mutations.sequencing_group import SequencingGroupUpsertInput
 from db.python.layers.comment import CommentLayer
 from db.python.layers.sample import SampleLayer
+from db.python.utils import InternalError
 from models.models.comment import CommentEntityType
 from models.models.project import FullWriteAccessRoles
 from models.models.sample import SampleUpsert
@@ -82,7 +83,9 @@ class SampleMutations:
             internal_sid = await slayer.upsert_sample(
                 sample_upsert.to_internal(), project=target_project.id
             )
-            created_sample = await slayer.get_sample_by_id(internal_sid.id)  # type: ignore [arg-type]
+            if internal_sid.id is None:
+                raise InternalError('Created sample has no ID')
+            created_sample = await slayer.get_sample_by_id(internal_sid.id)
 
             return GraphQLSample.from_internal(created_sample)
 
@@ -112,9 +115,12 @@ class SampleMutations:
             upserted = await slayer.upsert_samples(
                 internal_samples, project=target_project.id
             )
-            upserted_samples = await slayer.get_samples_by(
-                sample_ids=[s.id for s in upserted]  # type: ignore [arg-type]
-            )
+            upserted_ids = [s.id for s in upserted if s.id is not None]
+
+            if len(upserted_ids) != len(upserted):
+                raise InternalError('One or more upserts failed to return IDs')
+
+            upserted_samples = await slayer.get_samples_by(sample_ids=upserted_ids)
 
             return [GraphQLSample.from_internal(s) for s in upserted_samples]
 
