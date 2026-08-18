@@ -12,6 +12,7 @@ from db.python.layers.participant import ParticipantLayer
 from db.python.layers.sample import SampleLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
 from db.python.tables.analysis import AnalysisFilter
+from db.python.tables.audit_log import AuditLogTable
 from models.enums import AnalysisStatus
 from models.models import (
     PRIMARY_EXTERNAL_ORG,
@@ -563,3 +564,71 @@ class TestAnalysis:
         )
         assert len(sg_without_type) == 1
         assert sg_without_type[0] == self.exome_sequencing_group_id
+
+    @pytest.mark.project_roles(['writer'])
+    async def test_get_analysis_audit_logs_with_null_auth_project(
+        self, connection_with_project: Connection
+    ):
+        """
+        Test inserting an analysis audit entry with a null auth project
+        """
+        slayer = SampleLayer(connection_with_project)
+        sample = await slayer.upsert_sample(
+            SampleUpsertInternal(
+                external_ids={PRIMARY_EXTERNAL_ORG: 'test-audit'},
+                type='blood',
+                active=True,
+                meta={},
+                sequencing_groups=[
+                    SequencingGroupUpsertInternal(
+                        type='genome',
+                        technology='short-read',
+                        platform='illumina',
+                        meta={},
+                        sample_id=None,
+                        assays=[
+                            AssayUpsertInternal(
+                                type='sequencing',
+                                meta={
+                                    'sequencing_type': 'genome',
+                                    'sequencing_technology': 'short-read',
+                                    'sequencing_platform': 'illumina',
+                                },
+                            )
+                        ],
+                    ),
+                ],
+            )
+        )
+        assert sample.sequencing_groups is not None
+        assert sample.sequencing_groups[0].id is not None
+
+        analysis_id = await self.al.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                meta={},
+                sequencing_group_ids=[sample.sequencing_groups[0].id],
+            )
+        )
+
+        audit_log_table = AuditLogTable(connection_with_project)
+        ar_guid = 'null-auth-project'
+        null_audit_log_id = await audit_log_table.create_audit_log(
+            author=self.connection.author,
+            on_behalf_of=None,
+            ar_guid=ar_guid,
+            comment=None,
+            project=None,
+        )
+        await connection_with_project.pg_connection.execute(
+            t'UPDATE analysis SET audit_log_id = {null_audit_log_id} WHERE id = {analysis_id}'
+        )
+
+        logs_by_analysis = await self.al.get_audit_logs_by_analysis_ids([analysis_id])
+
+        matches = [
+            log for log in logs_by_analysis[analysis_id] if log.ar_guid == ar_guid
+        ]
+        assert len(matches) == 1
+        assert matches[0].auth_project is None
