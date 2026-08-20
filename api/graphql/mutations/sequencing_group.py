@@ -9,6 +9,7 @@ from api.graphql.loaders import GraphQLContext
 from api.graphql.mutations.assay import AssayUpsertInput
 from db.python.layers.comment import CommentLayer
 from db.python.layers.sequencing_group import SequencingGroupLayer
+from db.python.utils import InternalError
 from models.models.comment import CommentEntityType
 from models.models.project import FullWriteAccessRoles
 from models.models.sequencing_group import SequencingGroupUpsertInternal
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
     from api.graphql.schema import GraphQLComment, GraphQLSequencingGroup
 
 
-@strawberry.input  # type: ignore [misc]
+@strawberry.input
 class SequencingGroupUpsertInput:
     """Sequencing group upsert input"""
 
@@ -57,7 +58,7 @@ class SequencingGroupMutations:
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             cl = CommentLayer(connection)
             result = await cl.add_comment_to_entity(
                 entity=CommentEntityType.sequencing_group,
@@ -76,7 +77,7 @@ class SequencingGroupMutations:
         """Update the meta fields of a sequencing group"""
         from api.graphql.schema import GraphQLSequencingGroup  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             # Having to do the permission check here is a bit of a hack, we ideally want to
             # do it in the layer but this will involve potentially refactoring various other
             # parts of the codebase. Should be looked at during a future refactor overhaul.
@@ -100,7 +101,10 @@ class SequencingGroupMutations:
                     ]
                 )
             )[0]
-            full_updated_sg = await slayer.get_sequencing_group_by_id(updated_sg.id)  # type: ignore [arg-type]
+            if updated_sg.id is None:
+                raise InternalError('Updated sequencing group has no ID')
+
+            full_updated_sg = await slayer.get_sequencing_group_by_id(updated_sg.id)
             return GraphQLSequencingGroup.from_internal(full_updated_sg)
 
     @strawberry.mutation
@@ -112,7 +116,7 @@ class SequencingGroupMutations:
         """Archive a list of sequencing groups"""
         from api.graphql.schema import GraphQLSequencingGroup  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             slayer = SequencingGroupLayer(connection)
             raw_ids = [
                 sequencing_group_id_transform_to_raw(sgid)

@@ -27,9 +27,9 @@ class FamilyParticipantTable(DbBase):
         self,
         family_id: int,
         participant_id: int,
-        paternal_id: int,
-        maternal_id: int,
-        affected: int,
+        paternal_id: int | None,
+        maternal_id: int | None,
+        affected: int | None,
         notes: str | None = None,
     ) -> tuple[int, int]:
         """

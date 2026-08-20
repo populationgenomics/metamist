@@ -13,7 +13,7 @@ import functions_framework
 import google.cloud.bigquery as bq
 from google.cloud import pubsub_v1, secretmanager
 
-from metamist.parser.generic_parser import GenericParser  # type: ignore
+from metamist.parser.generic_parser import GenericParser
 
 
 # strip whitespace, newlines and '/' for template matching

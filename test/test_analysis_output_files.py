@@ -318,11 +318,11 @@ class TestOutputFiles:
         check_outputs_fields(analysis.outputs['cram'], output_file_data['cram'])
         check_outputs_fields(
             analysis.outputs['cram']['secondary_files']['meta'],
-            output_file_data['cram']['secondary_files']['meta'],  # type: ignore [index]
+            output_file_data['cram']['secondary_files']['meta'],
         )
         check_outputs_fields(
             analysis.outputs['cram']['secondary_files']['ext'],
-            output_file_data['cram']['secondary_files']['ext'],  # type: ignore [index]
+            output_file_data['cram']['secondary_files']['ext'],
         )
 
     @pytest.mark.asyncio

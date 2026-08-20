@@ -8,6 +8,7 @@ from strawberry.types import Info
 from api.graphql.loaders import GraphQLContext
 from db.python.layers.assay import AssayLayer
 from db.python.layers.comment import CommentLayer
+from db.python.utils import InternalError
 from models.models.assay import AssayUpsert
 from models.models.comment import CommentEntityType
 
@@ -16,7 +17,7 @@ if TYPE_CHECKING:
     from api.graphql.schema import GraphQLAssay, GraphQLComment
 
 
-@strawberry.input  # type: ignore [misc]
+@strawberry.input
 class AssayUpsertInput:
     """Assay upsert input"""
 
@@ -42,7 +43,7 @@ class AssayMutations:
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             cl = CommentLayer(connection)
             result = await cl.add_comment_to_entity(
                 entity=CommentEntityType.assay, entity_id=id, content=content
@@ -56,12 +57,14 @@ class AssayMutations:
         """Create new assay, attached to a sample"""
         from api.graphql.schema import GraphQLAssay  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             alayer = AssayLayer(connection)
             upserted = await alayer.upsert_assay(
                 AssayUpsert.from_dict(strawberry.asdict(assay)).to_internal()
             )
-            created_assay = await alayer.get_assay_by_id(upserted.id)  # type: ignore [arg-type]
+            if upserted.id is None:
+                raise InternalError('Created assay has no ID')
+            created_assay = await alayer.get_assay_by_id(upserted.id)
             return GraphQLAssay.from_internal(created_assay)
 
     @strawberry.mutation
@@ -75,11 +78,13 @@ class AssayMutations:
 
         if not assay.id:
             raise ValueError('Assay must have an ID to update')
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             alayer = AssayLayer(connection)
             upserted = await alayer.upsert_assay(
                 AssayUpsert.from_dict(strawberry.asdict(assay)).to_internal()
             )
-            updated_assay = await alayer.get_assay_by_id(upserted.id)  # type: ignore [arg-type]
+            if upserted.id is None:
+                raise InternalError('Updated assay has no ID')
+            updated_assay = await alayer.get_assay_by_id(upserted.id)
 
             return GraphQLAssay.from_internal(updated_assay)

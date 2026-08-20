@@ -93,7 +93,7 @@ class CohortMutations:
             GraphQLCohort,
         )
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             (target_project,) = connection.get_and_check_access_to_projects_for_names(
                 [project], {ProjectMemberRole.writer, ProjectMemberRole.contributor}
             )
@@ -171,7 +171,7 @@ class CohortMutations:
         """
         from api.graphql.schema import GraphQLCohortTemplate  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             (target_project,) = connection.get_and_check_access_to_projects_for_names(
                 [project], {ProjectMemberRole.writer, ProjectMemberRole.contributor}
             )
@@ -228,7 +228,7 @@ class CohortMutations:
 
         from api.graphql.schema import GraphQLCohort  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             clayer = CohortLayer(connection)
             cohort_id_raw = cohort_id_transform_to_raw(id)
 

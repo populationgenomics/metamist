@@ -1,5 +1,6 @@
 """Core business entities for the audit module."""
 
+import datetime
 from dataclasses import dataclass, field
 
 from .value_objects import ExternalIds, FileMetadata
@@ -81,7 +82,7 @@ class Analysis:
     output_file: FileMetadata | None = None
     original_file: FileMetadata | None = None
     sequencing_group_id: str | None = None
-    timestamp_completed: str | None = None
+    timestamp_completed: datetime.datetime | None = None
 
     def to_gql_dict(self) -> dict:
         """Convert the analysis to a GQL dictionary representation."""

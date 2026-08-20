@@ -45,7 +45,7 @@ def cohort_template_id_transform_to_raw(cohort_template_id: int | str) -> int:
         - validating checksum
     """
     expected_type = str
-    if not isinstance(cohort_template_id, expected_type):  # type: ignore
+    if not isinstance(cohort_template_id, expected_type):
         raise TypeError(
             f'Expected identifier type to be {expected_type!r}, received {type(cohort_template_id)!r}'
         )

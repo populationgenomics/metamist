@@ -13,7 +13,7 @@ from google.oauth2 import id_token
 from api.settings import get_default_user
 from api.utils.gcp import email_from_id_token
 from db.python.connect import Connection, SMConnections
-from db.python.gcp_connect import BqConnection, PubSubConnection
+from db.python.gcp_connect import BqConnection
 from models.models.project import Project, ProjectId, ProjectMemberRole
 
 
@@ -217,13 +217,6 @@ async def dependable_get_bq_connection(author: str = Depends(authenticate)):
     return await BqConnection.get_connection_no_project(author)
 
 
-async def dependable_get_pubsub_connection(
-    author: str = Depends(authenticate), topic: str | None = None
-):
-    """FastAPI handler for getting connection withOUT project"""
-    return await PubSubConnection.get_connection_no_project(author, topic)
-
-
 def validate_iap_jwt_and_get_email(iap_jwt: str, audience: str):
     """
     Validate an IAP JWT and return email
@@ -257,4 +250,3 @@ def get_project_db_connection(allowed_roles: set[ProjectMemberRole]):
 get_projectless_db_connection = Depends(dependable_get_connection)
 get_projectless_db_connection_getter = Depends(dependable_get_connection_getter)
 get_projectless_bq_connection = Depends(dependable_get_bq_connection)
-get_projectless_pubsub_connection = Depends(dependable_get_pubsub_connection)

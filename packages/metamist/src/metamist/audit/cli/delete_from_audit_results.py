@@ -85,6 +85,8 @@ def delete_files_from_report(
                 'Use `review_audit_results.py` to add comments justifying the deletion, then try again.'
             )
 
+        # types for row are bad, so need to assert here
+        assert row.filepath
         file_path = to_path(row.filepath)
         if not file_path.exists():
             audit_logs.warning(f'File {file_path} does not exist, skipping deletion.')
@@ -92,7 +94,7 @@ def delete_files_from_report(
 
         to_delete.append(row)
 
-    total_bytes = sum(int(row.filesize) for row in to_delete)
+    total_bytes = sum(int(row.filesize or 0) for row in to_delete)
     if dry_run:
         audit_logs.info_nl(
             f'Dry run: would have deleted {len(to_delete)} files ({total_bytes / (1024**3):.2f} GiB)'
@@ -100,7 +102,7 @@ def delete_files_from_report(
     else:
         gcs.delete_blobs(
             gcs.upload_bucket,
-            [to_path(row.filepath).blob for row in to_delete],
+            [to_path(row.filepath).blob for row in to_delete],  # type: ignore - types say that blob doesn't exist but this seems to work :/ ?
         )
         audit_logs.info_nl(
             f'Deleted: {len(to_delete)} files ({total_bytes / (1024**3):.2f} GiB)'
