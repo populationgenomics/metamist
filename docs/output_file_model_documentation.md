@@ -184,10 +184,13 @@ Every OutputFile is automatically validated against Google Cloud Storage when cr
 | ✅ File exists and accessible | Full OutputFile object with `valid: true` | Normal operation |
 | ❌ File not found or inaccessible | Simple string (no OutputFile created) | Planned outputs, missing files, permission issues |
 
+<!-- markdownlint-disable MD028 -->
 > [!NOTE]
 > See [Handling Invalid Files](#handling-invalid-files) for details on how the system processes files that fail validation.
+
 > [!CAUTION]
 > **Matrix Table (.mt) files** are currently not supported. Because they are directories in GCS, they cannot be validated by the system. Consequently, they are treated as invalid files: no `OutputFile` record is created, and the path is stored as a simple string.
+<!-- markdownlint-enable MD028 -->
 
 ### Parent-Child Relationships
 
@@ -556,16 +559,30 @@ Some file types require special handling or have limitations.
 > [!WARNING]
 > **Not Currently Supported**: Matrix Table (`.mt`) files used by Hail are stored as directories in GCS, not individual files. The current validation system cannot handle directory-based file formats and will fail validation for `.mt` files. Consequently, they are treated as invalid files: no `OutputFile` record is created, and the path is stored as a simple string.
 
-**Workaround**: Store the `.mt` directory path as a string in the analysis `meta` field rather than in `outputs`:
+**Expected Behavior**: When you include a `.mt` path in `outputs`, it will automatically be stored as a simple string (since validation fails):
 
 ```json
 {
   "type": "hail-analysis",
   "outputs": {
+    "matrix_table": "gs://bucket/results/data.mt",
     "summary": {"basename": "gs://bucket/summary.txt"}
-  },
-  "meta": {
-    "matrix_table": "gs://bucket/results/data.mt"
+  }
+}
+```
+
+The response will contain:
+
+```json
+{
+  "outputs": {
+    "matrix_table": "gs://bucket/results/data.mt",
+    "summary": {
+      "id": 465,
+      "path": "gs://bucket/summary.txt",
+      "valid": true,
+      ...
+    }
   }
 }
 ```
