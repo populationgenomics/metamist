@@ -1,33 +1,33 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Button } from 'semantic-ui-react'
 import { PaddedPage } from '../../shared/components/Layout/PaddedPage'
-import { EnumsApi, ProjectApi, ProjectInsightsApi, ProjectInsightsDetails } from '../../sm-api'
+import {
+    EnumsApi,
+    Project,
+    ProjectApi,
+    ProjectInsightsApi,
+    ProjectInsightsDetails,
+} from '../../sm-api'
 import DetailsTable from './DetailsTable'
 import filterData from './FilterData'
 import ProjectAndSeqTypeSelector from './ProjectAndSeqTypeSelector'
+import { useInsightsUrlState } from './useInsightsUrlState'
 
 const Details: React.FC = () => {
-    // Projects come from the project API and the sequencing types from the enums API
-    const [projectNames, setProjectNames] = React.useState<string[]>([])
-    const [seqTypes, setSeqTypes] = React.useState<string[]>([])
-    const [selectedProjects, setSelectedProjects] = useState<string[]>([])
-    const [selectedSeqTypes, setSelectedSeqTypes] = useState<string[]>([])
+    const [projects, setProjects] = useState<Project[]>([])
+    const [seqTypes, setSeqTypes] = useState<string[]>([])
 
-    // State containing all the records fetched from the ProjectInsightsDetails API
+    const { selectedProjects, setSelectedProjects, selectedSeqTypes, setSelectedSeqTypes } =
+        useInsightsUrlState(
+            projects.map((p) => p.name),
+            seqTypes
+        )
+
     const [allData, setAllData] = useState<ProjectInsightsDetails[]>([])
-    // Filtered data based on the selected projects, sequencing types, and column filters
     const { filteredData, getUniqueOptionsForColumn, updateFilter, getSelectedOptionsForColumn } =
         filterData(allData)
 
-    const handleProjectChange = useCallback((selectedProjects: string[]) => {
-        setSelectedProjects(selectedProjects)
-    }, [])
-    const handleSeqTypeChange = useCallback((selectedSeqTypes: string[]) => {
-        setSelectedSeqTypes(selectedSeqTypes)
-    }, [])
-
     const fetchSelectedData = useCallback(async () => {
-        // Fetch the detailed data for the selected projects and sequencing types
         try {
             const detailsResp = await new ProjectInsightsApi().getProjectInsightsDetails({
                 project_names: selectedProjects,
@@ -41,14 +41,13 @@ const Details: React.FC = () => {
 
     useEffect(() => {
         const fetchInitialData = async () => {
-            // Fetch the sequencing types and projects for user selection
             try {
                 const [seqTypesResp, projectsResp] = await Promise.all([
                     new EnumsApi().getSequencingTypes(),
-                    new ProjectApi().getMyProjects({}),
+                    new ProjectApi().getAllProjects(),
                 ])
                 setSeqTypes(seqTypesResp.data)
-                setProjectNames(projectsResp.data)
+                setProjects(projectsResp.data)
             } catch (error) {
                 console.error('Error fetching initial data:', error)
             }
@@ -59,12 +58,12 @@ const Details: React.FC = () => {
     return (
         <PaddedPage>
             <ProjectAndSeqTypeSelector
-                projects={projectNames}
+                projects={projects}
                 seqTypes={seqTypes}
                 selectedProjects={selectedProjects}
                 selectedSeqTypes={selectedSeqTypes}
-                onProjectChange={handleProjectChange}
-                onSeqTypeChange={handleSeqTypeChange}
+                onProjectChange={setSelectedProjects}
+                onSeqTypeChange={setSelectedSeqTypes}
             />
             <Button
                 primary
@@ -78,7 +77,7 @@ const Details: React.FC = () => {
                 handleSelectionChange={updateFilter}
                 getUniqueOptionsForColumn={getUniqueOptionsForColumn}
                 getSelectedOptionsForColumn={getSelectedOptionsForColumn}
-            ></DetailsTable>
+            />
         </PaddedPage>
     )
 }

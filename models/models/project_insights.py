@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
 
@@ -129,6 +129,9 @@ class ProjectInsightsSummaryInternal:
     latest_annotate_dataset: AnalysisStatsInternal | None = None
     latest_snv_es_index: AnalysisStatsInternal | None = None
     latest_sv_es_index: AnalysisStatsInternal | None = None
+    family_ids: list[int] = field(default_factory=list)
+    participant_ids: list[int] = field(default_factory=list)
+    sample_ids: list[int] = field(default_factory=list)
 
     def to_external(self):
         """Convert to transport model"""
@@ -151,6 +154,9 @@ class ProjectInsightsSummaryInternal:
             latest_sv_es_index=self.latest_sv_es_index.to_external()
             if self.latest_sv_es_index
             else None,
+            family_ids=self.family_ids,
+            participant_ids=self.participant_ids,
+            sample_ids=self.sample_ids,
         )
 
 
@@ -169,3 +175,6 @@ class ProjectInsightsSummary(SMBase):
     latest_annotate_dataset: AnalysisStats | None
     latest_snv_es_index: AnalysisStats | None
     latest_sv_es_index: AnalysisStats | None
+    family_ids: list[int]
+    participant_ids: list[int]
+    sample_ids: list[int]
