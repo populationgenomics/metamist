@@ -1,0 +1,55 @@
+Population code	Population elastic ID	Population name	Population description	Population latitude	Population longitude	Superpopulation code	Superpopulation name	Superpopulation display colour	Superpopulation display order	Data collections
+	BalochiHGDP	Balochi	Balochi in Pakistan (HGDP)	30.500000	66.500000		Central South Asia (HGDP)	#d8ffdf	8	Human Genome Diversity Project
+	BantuKenyaHGDP	Bantu Kenya	Bantu in Kenya (HGDP)	-3.000000	37.000000		Africa (HGDP)	#f2c2ff	6	Human Genome Diversity Project
+	BantuSouthAfricaHGDP	Bantu South Africa	Bantu in South Africa (HGDP)	-25.600000	24.250000		Africa (HGDP)	#f2c2ff	6	Human Genome Diversity Project
+	BergamoItalianHGDP	Bergamo Italian	Bergamo Italian in Bergamo, Italy (HGDP)	46.000000	10.000000		Europe (HGDP)	#284600	10	Human Genome Diversity Project
+	ColombianHGDP	Colombian	Colombian in Colombia (HGDP)	3.000000	-68.000000		America (HGDP)	#ff9081	7	Human Genome Diversity Project
+	DaurHGDP	Daur	Daur in China (HGDP)	48.500000	124.000000		East Asia (HGDP)	#b35200	9	Human Genome Diversity Project
+	AdygeiHGDP	Adygei	Adygei in Caucasus, Russia (HGDP)	44.000000	39.000000		Europe (HGDP)	#284600	10	Human Genome Diversity Project
+	BasqueHGDP	Basque	Basque in France (HGDP)	43.000000	0.000000		Europe (HGDP)	#284600	10	Human Genome Diversity Project
+	BedouinHGDP	Bedouin	Bedouin in Negev, Israel (HGDP)	31.000000	35.000000		Middle East (HGDP)	#4e2100	11	Human Genome Diversity Project
+	BurushoHGDP	Burusho	Burusho in Pakistan (HGDP)	36.500000	74.000000		Central South Asia (HGDP)	#d8ffdf	8	Human Genome Diversity Project
+	KalashHGDP	Kalash	Kalash in Pakistan (HGDP)	36.000000	71.500000		Central South Asia (HGDP)	#d8ffdf	8	Human Genome Diversity Project
+	OroqenHGDP	Oroqen	Oroqen in China (HGDP)	50.400000	126.500000		East Asia (HGDP)	#b35200	9	Human Genome Diversity Project
+	PapuanSepikHGDP	Papuan Sepik	Papuan Sepik in New Guinea (HGDP)	-4.000000	143.000000		Oceania (HGDP)	#001991	12	Human Genome Diversity Project
+	SanHGDP	San	San in Namibia (HGDP)	-21.000000	20.000000		Africa (HGDP)	#f2c2ff	6	HGDP Transcriptome,Human Genome Diversity Project
+	SardinianHGDP	Sardinian	Sardinian in Italy (HGDP)	40.000000	9.000000		Europe (HGDP)	#284600	10	Human Genome Diversity Project
+	SindhiHGDP	Sindhi	Sindhi in Pakistan (HGDP)	25.500000	69.000000		Central South Asia (HGDP)	#d8ffdf	8	Human Genome Diversity Project
+	SuruiHGDP	Surui	Surui in Brazil (HGDP)	-11.000000	-62.000000		America (HGDP)	#ff9081	7	Human Genome Diversity Project
+	TuHGDP	Tu	Tu in China (HGDP)	36.000000	101.000000		East Asia (HGDP)	#b35200	9	Human Genome Diversity Project
+	TujiaHGDP	Tujia	Tujia in China (HGDP)	29.000000	109.000000		East Asia (HGDP)	#b35200	9	Human Genome Diversity Project
+	TuscanHGDP	Tuscan	Tuscan in Italy (HGDP)	43.000000	11.000000		Europe (HGDP)	#284600	10	Human Genome Diversity Project
+	XiboHGDP	Xibo	Xibo in China (HGDP)	43.500000	81.500000		East Asia (HGDP)	#b35200	9	Human Genome Diversity Project
+	YakutHGDP	Yakut	Yakut in Siberia (HGDP)	63.000000	129.500000		East Asia (HGDP)	#b35200	9	HGDP Transcriptome,Human Genome Diversity Project
+	LahuHGDP	Lahu	Lahu in China (HGDP)	22.000000	100.000000		East Asia (HGDP)	#b35200	9	Human Genome Diversity Project
+	MakraniHGDP	Makrani	Makrani in Pakistan (HGDP)	26.000000	64.000000		Central South Asia (HGDP)	#d8ffdf	8	Human Genome Diversity Project
+	NaxiHGDP	Naxi	Naxi in China (HGDP)	26.000000	100.000000		East Asia (HGDP)	#b35200	9	Human Genome Diversity Project
+	BougainvilleHGDP	Bougainville	Bougainville in Bougainville (HGDP)	-6.000000	155.000000		Oceania (HGDP)	#001991	12	Human Genome Diversity Project
+	FrenchHGDP	French	French in France (HGDP)	46.000000	2.000000		Europe (HGDP)	#284600	10	Human Genome Diversity Project
+	MiaoHGDP	Miao	Miao in China (HGDP)	28.000000	109.000000		East Asia (HGDP)	#b35200	9	Human Genome Diversity Project
+	HanHGDP	Han	Han in China (HGDP)	32.300000	114.000000		East Asia (HGDP)	#b35200	9	Human Genome Diversity Project
+	MozabiteHGDP	Mozabite	Mozabite in Mzab, Algeria (HGDP)	32.000000	3.000000		Middle East (HGDP)	#4e2100	11	HGDP Transcriptome,Human Genome Diversity Project
+	NorthernHanHGDP	Northern Han	Northern Han in China (HGDP)	32.300000	114.000000		East Asia (HGDP)	#b35200	9	Human Genome Diversity Project
+	PapuanHighlandsHGDP	Papuan Highlands	Papuan Highlands in New Guinea (HGDP)	-4.000000	143.000000		Oceania (HGDP)	#001991	12	Human Genome Diversity Project
+	PathanHGDP	Pathan	Pathan in Pakistan (HGDP)	33.500000	70.500000		Central South Asia (HGDP)	#d8ffdf	8	HGDP Transcriptome,Human Genome Diversity Project
+	JapaneseHGDP	Japanese	Japanese in Japan (HGDP)	38.000000	138.000000		East Asia (HGDP)	#b35200	9	Human Genome Diversity Project
+	KaritianaHGDP	Karitiana	Karitiana in Brazil (HGDP)	-10.000000	-63.000000		America (HGDP)	#ff9081	7	Human Genome Diversity Project
+	MayaHGDP	Maya	Maya in Mexico (HGDP)	19.000000	-91.000000		America (HGDP)	#ff9081	7	HGDP Transcriptome,Human Genome Diversity Project
+	MbutiHGDP	Mbuti	Mbuti in Democratic Republic of Congo (HGDP)	1.000000	29.000000		Africa (HGDP)	#f2c2ff	6	HGDP Transcriptome,Human Genome Diversity Project
+	PalestinianHGDP	Palestinian	Palestinian in Central, Israel (HGDP)	32.000000	35.000000		Middle East (HGDP)	#4e2100	11	Human Genome Diversity Project
+	PimaHGDP	Pima	Pima in Mexico (HGDP)	29.000000	-108.000000		America (HGDP)	#ff9081	7	Human Genome Diversity Project
+	SheHGDP	She	She in China (HGDP)	27.000000	119.000000		East Asia (HGDP)	#b35200	9	Human Genome Diversity Project
+	YorubaHGDP	Yoruba	Yoruba in Nigeria (HGDP)	8.000000	5.000000		Africa (HGDP)	#f2c2ff	6	Human Genome Diversity Project
+	UygurHGDP	Uygur	Uygur in China (HGDP)	44.000000	81.000000		Central South Asia (HGDP)	#d8ffdf	8	Human Genome Diversity Project
+	BiakaHGDP	Biaka	Biaka in Central African Republic (HGDP)	4.000000	17.000000		Africa (HGDP)	#f2c2ff	6	Human Genome Diversity Project
+	HazaraHGDP	Hazara	Hazara in Pakistan (HGDP)	33.500000	70.000000		Central South Asia (HGDP)	#d8ffdf	8	Human Genome Diversity Project
+	BrahuiHGDP	Brahui	Brahui in Pakistan (HGDP)	30.500000	66.500000		Central South Asia (HGDP)	#d8ffdf	8	Human Genome Diversity Project
+	CambodianHGDP	Cambodian	Cambodian in Cambodia (HGDP)	12.000000	105.000000		East Asia (HGDP)	#b35200	9	HGDP Transcriptome,Human Genome Diversity Project
+	DaiHGDP	Dai	Dai in China (HGDP)	21.000000	100.000000		East Asia (HGDP)	#b35200	9	Human Genome Diversity Project
+	DruzeHGDP	Druze	Druze in Carmel, Israel (HGDP)	32.000000	35.000000		Middle East (HGDP)	#4e2100	11	Human Genome Diversity Project
+	HezhenHGDP	Hezhen	Hezhen in China (HGDP)	47.500000	133.500000		East Asia (HGDP)	#b35200	9	Human Genome Diversity Project
+	MandenkaHGDP	Mandenka	Mandenka in Senegal (HGDP)	12.000000	-12.000000		Africa (HGDP)	#f2c2ff	6	Human Genome Diversity Project
+	MongolianHGDP	Mongolian	Mongolian in China (HGDP)	48.500000	119.000000		East Asia (HGDP)	#b35200	9	Human Genome Diversity Project
+	OrcadianHGDP	Orcadian	Orcadian in Orkney (HGDP)	59.000000	-3.000000		Europe (HGDP)	#284600	10	Human Genome Diversity Project
+	RussianHGDP	Russian	Russian in Russia (HGDP)	61.000000	40.000000		Europe (HGDP)	#284600	10	Human Genome Diversity Project
+	YiHGDP	Yi	Yi in China (HGDP)	28.000000	103.000000		East Asia (HGDP)	#b35200	9	Human Genome Diversity Project
