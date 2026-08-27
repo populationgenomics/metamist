@@ -20,7 +20,7 @@ from models.models import (
     SequencingGroupUpsertInternal,
 )
 from models.models.analysis import AnalysisInternal
-from models.models.output_file import RecursiveDict
+from models.models.output_file import OutputFileInternal, RecursiveDict
 
 
 def custom_get_gcs_client():
@@ -327,6 +327,214 @@ class TestOutputFiles:
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
+    async def test_secondary_file_shared_between_two_analyses(
+        self, connection_with_project: Connection, fake_sequencing_group: int
+    ):
+        """
+        The same file can be a secondary file on more than one analysis. By the
+        time the second analysis is registered the shared file already exists in
+        output_file, so it has a lower id than that analysis' freshly created
+        primary and comes back from the database first. Both analyses should
+        still report it.
+        """
+        analysis_layer = AnalysisLayer(connection_with_project)
+        shared_file = 'gs://fakegcs/file1.txt'
+        registered: list[tuple[str, int]] = []
+
+        for primary in ('gs://fakegcs/file2.cram', 'gs://fakegcs/file3.cram'):
+            analysis_id = await analysis_layer.create_analysis(
+                AnalysisInternal(
+                    type='cram',
+                    status=AnalysisStatus.COMPLETED,
+                    sequencing_group_ids=[fake_sequencing_group],
+                    meta={'sequencing_type': 'genome'},
+                    outputs={
+                        'cram': {
+                            'basename': primary,
+                            'secondary_files': {'shared': {'basename': shared_file}},
+                        }
+                    },
+                )
+            )
+            registered.append((primary, analysis_id))
+
+        for primary, analysis_id in registered:
+            analysis = await analysis_layer.get_analysis_by_id(analysis_id)
+            assert analysis
+            assert isinstance(analysis.outputs, dict)
+
+            assert analysis.outputs['cram']['path'] == primary
+            assert 'shared' in analysis.outputs['cram']['secondary_files']
+            assert (
+                analysis.outputs['cram']['secondary_files']['shared']['path']
+                == shared_file
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_directory_output_with_secondary_files(
+        self, connection_with_project: Connection, fake_sequencing_group: int
+    ):
+        """
+        Directory-like outputs (.mt/.ht/.vds) are stored on GCS as folders of blobs.
+        They should become valid output_file rows (with a null checksum and size 0)
+        and support a secondary_files block, rather than being dropped to a bare string.
+        """
+        analysis_layer = AnalysisLayer(connection_with_project)
+        outputs = {
+            'mt': {
+                'basename': 'gs://fakegcs/file1.mt',
+                'secondary_files': {
+                    'txt': {'basename': 'gs://fakegcs/file1.txt'},
+                },
+            },
+        }
+
+        output_file_data = {
+            'mt': {
+                'path': 'gs://fakegcs/file1.mt',
+                'basename': 'file1.mt',
+                'dirname': 'gs://fakegcs/',
+                'nameroot': 'file1',
+                'nameext': '.mt',
+                'file_checksum': None,
+                'size': 0,
+                'meta': None,
+                'valid': True,
+                'secondary_files': {
+                    'txt': {
+                        'path': 'gs://fakegcs/file1.txt',
+                        'basename': 'file1.txt',
+                        'dirname': 'gs://fakegcs/',
+                        'nameroot': 'file1',
+                        'nameext': '.txt',
+                        'file_checksum': 'DG+fhg==',
+                        'size': 19,
+                        'meta': None,
+                        'valid': True,
+                        'secondary_files': {},
+                    },
+                },
+            }
+        }
+
+        analysis_id = await analysis_layer.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[fake_sequencing_group],
+                meta={'sequencing_type': 'genome'},
+                outputs=outputs,
+            )
+        )
+
+        analysis = await analysis_layer.get_analysis_by_id(analysis_id)
+        assert analysis
+        assert isinstance(analysis.outputs, dict)
+
+        # The MT folder is recorded as a structured output, not dropped to a string.
+        assert 'mt' in analysis.outputs
+        assert 'secondary_files' in analysis.outputs['mt']
+        assert 'txt' in analysis.outputs['mt']['secondary_files']
+
+        check_outputs_fields(analysis.outputs['mt'], output_file_data['mt'])
+        check_outputs_fields(
+            analysis.outputs['mt']['secondary_files']['txt'],
+            output_file_data['mt']['secondary_files']['txt'],
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_directory_output_with_trailing_slash(
+        self, connection_with_project: Connection, fake_sequencing_group: int
+    ):
+        """
+        A directory-like path passed with a trailing slash should resolve to the
+        same basename/extension as the slash-less form and still be valid.
+        """
+        analysis_layer = AnalysisLayer(connection_with_project)
+        outputs = {'vds': {'basename': 'gs://fakegcs/file1.mt/'}}
+
+        analysis_id = await analysis_layer.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[fake_sequencing_group],
+                meta={'sequencing_type': 'genome'},
+                outputs=outputs,
+            )
+        )
+
+        analysis = await analysis_layer.get_analysis_by_id(analysis_id)
+        assert analysis
+        assert isinstance(analysis.outputs, dict)
+        assert 'vds' in analysis.outputs
+        assert analysis.outputs['vds']['basename'] == 'file1.mt'
+        assert analysis.outputs['vds']['nameext'] == '.mt'
+        assert analysis.outputs['vds']['valid']
+        assert analysis.outputs['vds']['size'] == 0
+        assert analysis.outputs['vds']['file_checksum'] is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_vds_checks_nested_sentinel(
+        self, connection_with_project: Connection, fake_sequencing_group: int
+    ):
+        """
+        A VDS is a pair of nested MatrixTables and has no sentinel of its own, so
+        it is validated against variant_data/_SUCCESS.
+        """
+        analysis_layer = AnalysisLayer(connection_with_project)
+        analysis_id = await analysis_layer.create_analysis(
+            AnalysisInternal(
+                type='cram',
+                status=AnalysisStatus.COMPLETED,
+                sequencing_group_ids=[fake_sequencing_group],
+                meta={'sequencing_type': 'genome'},
+                outputs={'vds': {'basename': 'gs://fakegcs/file1.vds'}},
+            )
+        )
+
+        analysis = await analysis_layer.get_analysis_by_id(analysis_id)
+        assert analysis
+        assert isinstance(analysis.outputs, dict)
+        assert analysis.outputs['vds']['nameext'] == '.vds'
+        assert analysis.outputs['vds']['valid']
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_directory_output_without_sentinel_is_invalid(
+        self, connection_with_project: Connection, fake_sequencing_group: int
+    ):
+        """
+        Hail writes the sentinel last, so a folder that has blobs but no sentinel
+        is a write that died partway through and must not be recorded as valid.
+
+        incomplete.vds carries a reference_data sentinel but no variant_data one,
+        which pins that a VDS is judged on the nested path it actually needs
+        rather than on any sentinel found underneath it.
+        """
+        analysis_layer = AnalysisLayer(connection_with_project)
+        for path in ('gs://fakegcs/incomplete.mt', 'gs://fakegcs/incomplete.vds'):
+            analysis_id = await analysis_layer.create_analysis(
+                AnalysisInternal(
+                    type='cram',
+                    status=AnalysisStatus.COMPLETED,
+                    sequencing_group_ids=[fake_sequencing_group],
+                    meta={'sequencing_type': 'genome'},
+                    outputs={'mt': {'basename': path}},
+                )
+            )
+
+            analysis = await analysis_layer.get_analysis_by_id(analysis_id)
+            assert analysis
+
+            # An invalid file gets no output_file row, so it falls back to a
+            # bare string output rather than a structured one.
+            assert analysis.output == path
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
     async def test_outputs_contains_protocol(
         self, connection_with_project: Connection, fake_sequencing_group: int
     ):
@@ -508,3 +716,54 @@ class TestOutputFiles:
             del row['sys_period']
 
         assert len(baseline_outputs) != len(outputs_after_new_file)
+
+
+class TestReconstructJson:
+    """Test rebuilding the nested outputs structure from flat output_file rows"""
+
+    @staticmethod
+    def output_file(path: str):
+        """Build a file as it comes back from the output_file table"""
+        basename = path.rsplit('/', maxsplit=1)[-1]
+        return OutputFileInternal(
+            id=1,
+            path=path,
+            basename=basename,
+            dirname='gs://bucket',
+            nameroot=basename.split('.')[0],
+            nameext='.' + basename.split('.')[-1],
+            file_checksum=None,
+            size=1,
+            valid=True,
+        )
+
+    def test_secondary_file_survives_either_row_order(self):
+        """
+        Rows come back from the database in no guaranteed order. A secondary
+        file must end up nested under its primary either way — in particular
+        the primary row must not overwrite a secondary that landed first.
+        """
+        primary = (self.output_file('gs://bucket/file.cram'), 'cram')
+        secondary = (
+            self.output_file('gs://bucket/file.cram.ext'),
+            'cram.secondary_files.ext',
+        )
+
+        for rows in ([primary, secondary], [secondary, primary]):
+            outputs = OutputFileInternal.reconstruct_json(rows)
+            assert isinstance(outputs, dict)
+
+            assert outputs['cram']['path'] == 'gs://bucket/file.cram'
+            assert (
+                outputs['cram']['secondary_files']['ext']['path']
+                == 'gs://bucket/file.cram.ext'
+            )
+
+    def test_file_without_secondary_files_keeps_empty_dict(self):
+        """A file with no secondary files still reports an empty dict"""
+        outputs = OutputFileInternal.reconstruct_json(
+            [(self.output_file('gs://bucket/file.cram'), 'cram')]
+        )
+        assert isinstance(outputs, dict)
+
+        assert outputs['cram']['secondary_files'] == {}

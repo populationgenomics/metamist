@@ -1141,6 +1141,200 @@ class TestParseGenericMetadata:
                 StringIO(file_contents), delimiter='\t', dry_run=True
             )
 
+    @pytest.mark.asyncio
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_rows_with_sample_type(
+        self, mock_graphql_query, connection_with_project, graphql_query
+    ):
+        """Test importing a single row with a sample type column"""
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
+
+        rows = [
+            'Individual ID\tSample ID\tFilenames\tType\tSample Type',
+            'Demeter\tsample_id001\tsample_id001.filename-R1.fastq.gz,sample_id001.filename-R2.fastq.gz\tWGS\tblood',
+            'Demeter\tsample_id001\tsample_id001.exome.filename-R1.fastq.gz,sample_id001.exome.filename-R2.fastq.gz\tWES\tblood',
+            'Apollo\tsample_id002\tsample_id002.filename-R1.fastq.gz\tWGS\tSaliva',
+            'Apollo\tsample_id002\tsample_id002.filename-R2.fastq.gz\tWGS\tsaliva',
+            'Athena\tsample_id003\tsample_id003.filename-R1.fastq.gz\tWGS\tBlood',
+            'Athena\tsample_id003\tsample_id003.filename-R2.fastq.gz\tWGS\tblood',
+            'Apollo\tsample_id004\tsample_id004.filename-R1.fastq.gz\tWGS\tunknown',
+            'Apollo\tsample_id004\tsample_id004.filename-R2.fastq.gz\tWGS\tunknown',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=[],
+            participant_primary_eid_column='Individual ID',
+            sample_primary_eid_column='Sample ID',
+            sample_type_column='Sample Type',
+            reads_column='Filenames',
+            seq_type_column='Type',
+            participant_meta_map={},
+            sample_meta_map={},
+            assay_meta_map={},
+            qc_meta_map={},
+            # doesn't matter, we're going to mock the call anyway
+            project=connection_with_project.project.name,
+        )
+
+        parser.skip_checking_gcs_objects = True
+        parser.filename_map = {
+            'sample_id001.filename-R1.fastq.gz': '/path/to/sample_id001.filename-R1.fastq.gz',
+            'sample_id001.filename-R2.fastq.gz': '/path/to/sample_id001.filename-R2.fastq.gz',
+            'sample_id001.exome.filename-R1.fastq.gz': '/path/to/sample_id001.exome.filename-R1.fastq.gz',
+            'sample_id001.exome.filename-R2.fastq.gz': '/path/to/sample_id001.exome.filename-R2.fastq.gz',
+            'sample_id002.filename-R1.fastq.gz': '/path/to/sample_id002.filename-R1.fastq.gz',
+            'sample_id002.filename-R2.fastq.gz': '/path/to/sample_id002.filename-R2.fastq.gz',
+            'sample_id003.filename-R1.fastq.gz': '/path/to/sample_id003.filename-R1.fastq.gz',
+            'sample_id003.filename-R2.fastq.gz': '/path/to/sample_id003.filename-R2.fastq.gz',
+            'sample_id004.filename-R1.fastq.gz': '/path/to/sample_id004.filename-R1.fastq.gz',
+            'sample_id004.filename-R2.fastq.gz': '/path/to/sample_id004.filename-R2.fastq.gz',
+        }
+
+        # Call generic parser
+        file_contents = '\n'.join(rows)
+        _, prows = await parser.parse_manifest(
+            StringIO(file_contents), delimiter='\t', dry_run=True
+        )
+
+        participants: list[ParsedParticipant] = prows
+
+        # Check that the participant sample types are set correctly
+        assert participants[0].samples[0].sample_type == 'blood'
+        assert participants[1].samples[0].sample_type == 'saliva'
+        assert participants[1].samples[1].sample_type == 'unknown'
+        assert participants[2].samples[0].sample_type == 'blood'
+
+    @pytest.mark.asyncio
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_parser_with_default_sample_type(
+        self, mock_graphql_query, connection_with_project, graphql_query
+    ):
+        """Test importing a single row without a sample type column but with the default sample type set"""
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
+
+        rows = [
+            'Individual ID\tSample ID\tFilenames\tType',
+            'Demeter\tsample_id001\tsample_id001.filename-R1.fastq.gz,sample_id001.filename-R2.fastq.gz\tWGS',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=[],
+            participant_primary_eid_column='Individual ID',
+            sample_primary_eid_column='Sample ID',
+            default_sample_type='unknown',
+            reads_column='Filenames',
+            seq_type_column='Type',
+            participant_meta_map={},
+            sample_meta_map={},
+            assay_meta_map={},
+            qc_meta_map={},
+            # doesn't matter, we're going to mock the call anyway
+            project=connection_with_project.project.name,
+        )
+
+        parser.skip_checking_gcs_objects = True
+        parser.filename_map = {
+            'sample_id001.filename-R1.fastq.gz': '/path/to/sample_id001.filename-R1.fastq.gz',
+            'sample_id001.filename-R2.fastq.gz': '/path/to/sample_id001.filename-R2.fastq.gz',
+        }
+
+        # Call generic parser
+        file_contents = '\n'.join(rows)
+        _, prows = await parser.parse_manifest(
+            StringIO(file_contents), delimiter='\t', dry_run=True
+        )
+
+        participants: list[ParsedParticipant] = prows
+
+        # Check that the participant sample types are set correctly
+        assert participants[0].samples[0].sample_type == 'unknown'
+
+    @pytest.mark.asyncio
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_parser_with_missing_sample_type(
+        self, mock_graphql_query, connection_with_project, graphql_query
+    ):
+        """Test importing a single row without a sample type column and no default sample type set"""
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
+
+        rows = [
+            'Individual ID\tSample ID\tFilenames\tType',
+            'Demeter\tsample_id001\tsample_id001.filename-R1.fastq.gz,sample_id001.filename-R2.fastq.gz\tWGS',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=[],
+            participant_primary_eid_column='Individual ID',
+            sample_primary_eid_column='Sample ID',
+            default_sample_type=None,
+            sample_type_column=None,
+            reads_column='Filenames',
+            seq_type_column='Type',
+            participant_meta_map={},
+            sample_meta_map={},
+            assay_meta_map={},
+            qc_meta_map={},
+            # doesn't matter, we're going to mock the call anyway
+            project=connection_with_project.project.name,
+        )
+
+        parser.skip_checking_gcs_objects = True
+        parser.filename_map = {
+            'sample_id001.filename-R1.fastq.gz': '/path/to/sample_id001.filename-R1.fastq.gz',
+            'sample_id001.filename-R2.fastq.gz': '/path/to/sample_id001.filename-R2.fastq.gz',
+        }
+
+        # Call generic parser, should break as sample type will be None and no default is set
+        file_contents = '\n'.join(rows)
+        with pytest.raises(ValueError):
+            await parser.parse_manifest(
+                StringIO(file_contents), delimiter='\t', dry_run=True
+            )
+
+    @pytest.mark.asyncio
+    @patch('metamist.parser.generic_parser.query_async')
+    async def test_rows_with_too_many_sample_types(
+        self, mock_graphql_query, connection_with_project, graphql_query
+    ):
+        """Test importing rows for a sample with multiple conflicting sample types"""
+        mock_graphql_query.side_effect = make_graphql_query_mock(graphql_query)
+
+        rows = [
+            'Individual ID\tSample ID\tFilenames\tType\tSample Type',
+            'Demeter\tsample_id001\tsample_id001.filename-R1.fastq.gz,sample_id001.filename-R2.fastq.gz\tWGS\tblood',
+            'Demeter\tsample_id001\tsample_id001.filename2-R1.fastq.gz,sample_id001.filename2-R2.fastq.gz\tWGS\tsaliva',
+        ]
+
+        parser = GenericMetadataParser(
+            search_locations=[],
+            participant_primary_eid_column='Individual ID',
+            sample_primary_eid_column='Sample ID',
+            sample_type_column='Sample Type',
+            reads_column='Filenames',
+            seq_type_column='Type',
+            participant_meta_map={},
+            sample_meta_map={},
+            assay_meta_map={},
+            qc_meta_map={},
+            # doesn't matter, we're going to mock the call anyway
+            project=connection_with_project.project.name,
+        )
+
+        parser.skip_checking_gcs_objects = True
+        parser.filename_map = {
+            'sample_id001.filename-R1.fastq.gz': '/path/to/sample_id001.filename-R1.fastq.gz',
+            'sample_id001.filename-R2.fastq.gz': '/path/to/sample_id001.filename-R2.fastq.gz',
+            'sample_id001.filename2-R1.fastq.gz': '/path/to/sample_id001.filename2-R1.fastq.gz',
+            'sample_id001.filename2-R2.fastq.gz': '/path/to/sample_id001.filename2-R2.fastq.gz',
+        }
+
+        # Call parse_manifest, should break as multiple sample types are defined for the same sample
+        file_contents = '\n'.join(rows)
+        with pytest.raises(ValueError):
+            await parser.parse_manifest(
+                StringIO(file_contents), delimiter='\t', dry_run=True
+            )
+
 
 class TestFastqPairMatcher:
     """Test Fastq pair matching logic explictly"""

@@ -263,6 +263,8 @@ class ParsedSample:
             )
         self.external_sids = external_sids
 
+        if not sample_type:
+            raise ValueError(f'Sample type is required for sample {self.external_sids}')
         self.sample_type = sample_type
         self.meta = meta
 
@@ -474,7 +476,7 @@ class GenericParser(CloudHelper):
         path_prefix: str | None,
         search_paths: list[str],
         project: str,
-        default_sample_type: str | None = None,
+        default_sample_type: str | None = 'unknown',
         default_sequencing: DefaultSequencing = DefaultSequencing(),
         default_read_end_type: str | None = None,
         default_read_length: str | int | None = None,
@@ -502,7 +504,9 @@ class GenericParser(CloudHelper):
         self.default_sequencing = default_sequencing
         self.default_read_end_type: str | None = default_read_end_type
         self.default_read_length: str | int | None = default_read_length
-        self.default_sample_type: str | None = default_sample_type
+        self.default_sample_type: str | None = (
+            default_sample_type.lower() if default_sample_type else default_sample_type
+        )
         self.default_analysis_type: str | None = default_analysis_type
         self.default_analysis_status: str | None = default_analysis_status
 
@@ -788,12 +792,13 @@ class GenericParser(CloudHelper):
                 sg_details = {
                     'Participant': participant if participant else '',
                     'Sample': sample,
+                    'Sample Type': sg.sample.sample_type,
                     'Sequencing Type': sg.sequencing_type,
                     'Assays': sum(1 for a in sg.assays if not a.internal_id),
                 }
                 details.append(sg_details)
 
-        headers = ['Participant', 'Sample', 'Sequencing Type', 'Assays']
+        headers = ['Participant', 'Sample', 'Sample Type', 'Sequencing Type', 'Assays']
         table = list(list(detail.values()) for detail in details)  # noqa: C400
 
         print(tabulate(table, headers=headers, tablefmt='grid'))
@@ -1215,6 +1220,7 @@ class GenericParser(CloudHelper):
                     'sequencing_library',
                     'read_end_type',
                     'read_length',
+                    'chx',
                 )
             elif assay.meta.get('sequencing_technology') == 'long-read':
                 # lift all assay meta into the sequencing group meta for long-read
