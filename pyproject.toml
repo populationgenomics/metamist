@@ -28,7 +28,7 @@ dependencies = [
     "google-cloud-logging==2.7.0",
     "google-cloud-pubsub==2.18.3",
     "google-cloud-storage==1.43.0",
-    "pyarrow~=18.1",
+    "pyarrow~=23.0",
     "slack-sdk==3.20.2",
     "strawberry-graphql[fastapi]==0.268.1",
     "uvicorn~=0.34.2",
