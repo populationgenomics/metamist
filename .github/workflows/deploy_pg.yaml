@@ -75,9 +75,14 @@ jobs:
       - name: Bump version for development
         if: vars.SM_ENVIRONMENT == 'development'
         run: |
+          # PyPI rejects local version identifiers (the "+<sha>" segment), so we
+          # publish a PEP 440 dev release using the run number as the (unique,
+          # monotonically increasing) dev segment: e.g. 8.0.0.dev123
+          # This dev version won't be installed unless explicitly specified by the user
+          # @TODO remove this before final merge
           uv run bump-my-version bump patch \
             --no-commit --allow-dirty \
-            --new-version $(cat deploy/python/version.txt).dev0+$(echo $(git rev-parse HEAD) | cut -c1-7)
+            --new-version $(cat deploy/python/version.txt).dev${{ github.run_number }}
 
       - name: "build deployable API"
         run: |
@@ -112,13 +117,13 @@ jobs:
               -- python -c "import metamist;"
           done
 
-      # @TODO re-enable this when ready
-      # - name: Publish package
-      #   if: github.ref == 'refs/heads/main'
-      #   uses: pypa/gh-action-pypi-publish@release/v1
-      #   with:
-      #     packages-dir: packages/metamist/dist
-      #     skip-existing: true
+      # @TODO switch the back to prod deploy before final release
+      - name: Publish dev package to PyPI
+        if: vars.SM_ENVIRONMENT == 'development'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/metamist/dist
+          skip-existing: true
 
 
       # The config needed to deploy is stored in the metamist-private repository
