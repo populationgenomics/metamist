@@ -10,8 +10,18 @@ pre_commit_hooks = [
 parse = '(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)(?:[-_\.]?(?P<dev>dev\d*))?(?:\+(?P<local>[a-z0-9]+))?'
 serialize = [
     "{major}.{minor}.{patch}.{dev}+{local}",
+    "{major}.{minor}.{patch}.{dev}",
+    "{major}.{minor}.{patch}+{local}",
     "{major}.{minor}.{patch}"
 ]
+
+# Local version identifiers (the "+<sha>" segment) will be rejected by PyPI
+# if we try and publish a developmental release, so we need to make the local
+# part have an optional fallback when serializing a developmental release version
+# without the local part. Otherwise bumpmyversion will append +0 on the end of the
+# version which will be rejected by PyPI
+[tool.bumpversion.parts.local]
+optional_value = ""
 
 [[tool.bumpversion.files]]
 filename = "api/server.py"
