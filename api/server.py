@@ -1,27 +1,21 @@
-import datetime
 import os
 import time
-import traceback
-from contextlib import asynccontextmanager
+from typing import Annotated
 
-from fastapi import APIRouter, FastAPI, HTTPException, Request
+import httpx
+from fastapi import FastAPI, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import ValidationError
-from starlette.responses import FileResponse
+from fastapi.params import Depends
+from starlette.background import BackgroundTask
+from starlette.responses import RedirectResponse, StreamingResponse
 
-from api import routes
-from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
+from cpg_utils.cloud import get_google_identity_token
+
 from api.settings import (
-    PROFILE_REQUESTS,
-    PROFILE_REQUESTS_OUTPUT,
-    SKIP_DATABASE_CONNECTION,
     SM_ENVIRONMENT,
 )
-from api.utils.exceptions import determine_code_from_error
-from api.utils.openapi import get_openapi_schema_func
-from db.python.connect import SMConnections
+from api.utils.db import authenticate
 from db.python.utils import get_logger
 
 
@@ -31,66 +25,8 @@ _VERSION = '7.14.3'
 
 logger = get_logger()
 
-STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'public')  # noqa: PTH118, PTH120
 
-static_dir_exists = os.path.exists(STATIC_DIR)  # noqa: PTH110
-
-
-@asynccontextmanager
-async def app_lifespan(_: FastAPI):
-    """
-    Context manager for the app lifecycle. This is useful for running
-    code before and after the app is started. This is used by the
-    `run` command.
-    """
-    try:
-        if not SKIP_DATABASE_CONNECTION:
-            await SMConnections.connect()
-        yield
-    finally:
-        if not SKIP_DATABASE_CONNECTION:
-            await SMConnections.disconnect()
-
-
-app = FastAPI(lifespan=app_lifespan)
-
-
-if PROFILE_REQUESTS:
-    from pyinstrument import Profiler
-    from pyinstrument.renderers.speedscope import SpeedscopeRenderer
-
-    @app.middleware('http')
-    async def profile_request(request: Request, call_next):
-        """optional profiling for http requests"""
-        profiler = Profiler(async_mode='enabled')
-        profiler.start()
-        resp = await call_next(request)
-        profiler.stop()
-
-        if 'text' in PROFILE_REQUESTS_OUTPUT:
-            text_output = profiler.output_text()
-            print(text_output)
-
-        timestamp = (
-            datetime.datetime.now().replace(microsecond=0).isoformat().replace(':', '-')
-        )
-
-        if 'json' in PROFILE_REQUESTS_OUTPUT:
-            os.makedirs('profiles', exist_ok=True)  # noqa: PTH103
-            json = profiler.output(renderer=SpeedscopeRenderer())
-
-            with open(f'profiles/{timestamp}.json', 'w') as file:  # noqa: PTH123
-                file.write(json)
-                file.close()
-
-        if 'html' in PROFILE_REQUESTS_OUTPUT:
-            os.makedirs('profiles', exist_ok=True)  # noqa: PTH103
-            html = profiler.output_html()
-            with open(f'profiles/{timestamp}.html', 'w') as file:  # noqa: PTH123
-                file.write(html)
-                file.close()
-
-        return resp
+app = FastAPI()
 
 
 if SM_ENVIRONMENT == 'local':
@@ -103,23 +39,6 @@ if SM_ENVIRONMENT == 'local':
     )
 
 
-class SPAStaticFiles(StaticFiles):
-    """
-    https://stackoverflow.com/a/68363904
-    """
-
-    async def get_response(self, path: str, scope):
-        """
-        Overide get response to server index.html if file isn't found
-        (to make single-page-app work correctly)
-        """
-        response = await super().get_response(path, scope)
-        if response.status_code == 404 and not path.startswith('api'):  # noqa: PLR2004
-            # server index.html if can't find existing resource
-            response = await super().get_response('index.html', scope)
-        return response
-
-
 @app.middleware('http')
 async def add_process_time_header(request: Request, call_next):
     """Add X-Process-Time to all requests for logging"""
@@ -130,86 +49,68 @@ async def add_process_time_header(request: Request, call_next):
     return response
 
 
-@app.exception_handler(404)
-async def not_found(request, exc):
-    """
-    New version of FastAPI not fires this method for 404 errors
-    """
-    if static_dir_exists:
-        return FileResponse(STATIC_DIR + '/index.html')
+client = httpx.AsyncClient(timeout=None)
+TARGET_URL = os.getenv('METAMIST_PROXY_TARGET_URL')
+TARGET_AUDIENCE = os.getenv('METAMIST_PROXY_TARGET_AUDIENCE')
 
-    return request, exc
+HEADERS_TO_PASS = [
+    'sm-ar-guid',
+    'sm-extra-values',
+    'sm-on-behalf-of',
+    'content-type',
+    'accept',
+]
 
 
-@app.exception_handler(Exception)
-async def exception_handler(request: Request, e: Exception):
-    """Generic exception handler"""
-    add_stacktrace = True
-    description: str
+@app.api_route(
+    '/{path:path}', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH']
+)
+async def proxy(
+    request: Request,
+    path: str,
+    author: Annotated[str, Depends(authenticate)],
+):
+    """Proxy to forward requests to new metamist server"""
+    assert TARGET_AUDIENCE
+    assert TARGET_URL
+    """Proxy all requests to the target URL"""
+    url = f'{TARGET_URL.rstrip("/")}/{path}'
+    if request.url.query:
+        url += f'?{request.url.query}'
 
-    if isinstance(e, HTTPException):
-        code = e.status_code
-        name = e.detail
-        description = str(e)
-    elif isinstance(e, ValidationError):
-        # for whatever reason, calling str(e) here fails
-        code = 500
-        name = 'ValidationError'
-        description = str(e.args)
-    else:
-        code = determine_code_from_error(e)
-        name = str(type(e).__name__)
-        description = str(e)
+    # If this isn't an API request, then return a redirect to the new server
+    if not (path in {'graphql', 'api/v1'} or path.startswith(('graphql/', 'api/v1/'))):
+        return RedirectResponse(url=url, status_code=302)
 
-    base_params = {'name': name, 'description': description}
+    headers: dict[str, str] = {}
 
-    if add_stacktrace:
-        st = traceback.format_exc()
-        base_params['stacktrace'] = st
+    for header in HEADERS_TO_PASS:
+        value = request.headers.get(header)
+        if value:
+            headers[header] = value
 
-    response = JSONResponse(
-        status_code=code,
-        content=base_params,
+    # Add Google identity token if available
+    token = await run_in_threadpool(
+        get_google_identity_token,
+        target_audience=TARGET_AUDIENCE,
     )
 
-    # https://github.com/tiangolo/fastapi/issues/457#issuecomment-851547205
-    # FastAPI doesn't run middleware on exception, but if we make a non-GET/INFO
-    # request, then we lose CORS and hence lose the exception in the body of the
-    # response. Grab it manually, and explicitly allow origin if so.
-    middlewares = [
-        m
-        for m in app.user_middleware
-        if isinstance(m, CORSMiddleware) or m.cls == CORSMiddleware
-    ]
-    if middlewares:
-        cors_middleware = middlewares[0]
+    if token:
+        headers['Authorization'] = f'Bearer {token}'
 
-        request_origin = request.headers.get('origin', '')
-        if cors_middleware and '*' in cors_middleware.kwargs['allow_origins']:  # type: ignore
-            response.headers['Access-Control-Allow-Origin'] = '*'
-        elif (
-            cors_middleware
-            and request_origin in cors_middleware.kwargs['allow_origins']  # type: ignore
-        ):
-            response.headers['Access-Control-Allow-Origin'] = request_origin
+    headers['sm-legacy-proxy-author'] = author
 
-    return response
+    req = client.build_request(
+        request.method, url, headers=headers, content=request.stream()
+    )
 
-
-# graphql
-app.include_router(MetamistGraphQLRouter, prefix='/graphql', include_in_schema=False)
-
-for route in routes.__dict__.values():
-    if not isinstance(route, APIRouter):
-        continue
-    app.include_router(route, prefix='/api/v1')
-
-
-if static_dir_exists:
-    # only allow static files if the static files are available
-    app.mount('/', SPAStaticFiles(directory=STATIC_DIR, html=True), name='static')
-
-app.openapi = get_openapi_schema_func(app, _VERSION)  # type: ignore[assignment]
+    r = await client.send(req, stream=True)
+    return StreamingResponse(
+        r.aiter_raw(),
+        status_code=r.status_code,
+        headers=r.headers,
+        background=BackgroundTask(r.aclose),
+    )
 
 
 if __name__ == '__main__':
