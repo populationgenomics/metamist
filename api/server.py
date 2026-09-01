@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import os
 import time
@@ -9,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
-from starlette.responses import FileResponse
+from starlette.responses import FileResponse, RedirectResponse, Response
 
 from api import routes
 from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
@@ -20,6 +21,7 @@ from api.settings import (
     SM_ENVIRONMENT,
 )
 from api.utils.exceptions import determine_code_from_error
+from api.utils.mirror import Comparison, mirror
 from api.utils.openapi import get_openapi_schema_func
 from db.python.connect import SMConnections
 from db.python.utils import get_logger
@@ -46,8 +48,10 @@ async def app_lifespan(_: FastAPI):
     try:
         if not SKIP_DATABASE_CONNECTION:
             await SMConnections.connect()
+        await mirror.open()
         yield
     finally:
+        await mirror.close()
         if not SKIP_DATABASE_CONNECTION:
             await SMConnections.disconnect()
 
@@ -128,6 +132,104 @@ async def add_process_time_header(request: Request, call_next):
     process_time = time.time() - start_time
     response.headers['X-Process-Time'] = f'{round(process_time * 1000, 1)}ms'
     return response
+
+
+async def _buffer_response_body(response) -> bytes:
+    """
+    Drain a response body into bytes so it can be both compared and re-served.
+
+    A response returned by `call_next` is typically a streaming response exposing only
+    `body_iterator`; the exception handler produces a `JSONResponse` with a `.body`.
+    """
+    if hasattr(response, 'body_iterator'):
+        chunks = [chunk async for chunk in response.body_iterator]
+        return b''.join(
+            c if isinstance(c, bytes) else c.encode(response.charset) for c in chunks
+        )
+    return getattr(response, 'body', b'') or b''
+
+
+def _rebuild_response(response, body: bytes) -> Response:
+    """Rebuild a served-able Response from a drained response + its buffered body."""
+    rebuilt = Response(
+        content=body,
+        status_code=response.status_code,
+        headers=dict(response.headers),
+        media_type=response.media_type,
+    )
+    rebuilt.background = response.background
+    return rebuilt
+
+
+# Registered LAST so it is the OUTERMOST middleware: it sees the final client bytes and,
+# because exception handlers run below all middleware, `call_next` always yields a response
+# and never raises. The mirror to the new server happens in a fire-and-forget background
+# task (serve-from-old) so it can never add latency to or fail the client response.
+@app.middleware('http')
+async def mirror_and_compare(request: Request, call_next):
+    """Serve the request locally and mirror it to the new server for comparison."""
+    path = request.scope['path']
+
+    # When serving from the new server, redirect non-API requests (the frontend and its
+    # static assets) to the new server, as the basic proxy did - the whole app should live
+    # on the new server in that mode. API/GraphQL requests continue to be served + compared.
+    if mirror.enabled and mirror.serve_from_new and not mirror.is_api_path(path):
+        return RedirectResponse(
+            url=mirror.target_url(path, request.url.query), status_code=302
+        )
+
+    if not (mirror.enabled and mirror.should_mirror(path)):
+        return await call_next(request)
+
+    # Snapshot everything the background task needs BEFORE the request object goes away.
+    # NB: reading the body here is safe - Starlette's BaseHTTPMiddleware caches and replays
+    # it to the downstream routes (behaviour is coupled to the pinned Starlette version).
+    comparison = Comparison(
+        method=request.method,
+        path=path,
+        query=request.url.query,
+        req_headers=dict(request.headers),
+        req_body=await request.body(),
+    )
+
+    if mirror.serve_from_new:
+        # New server is primary. Start its request concurrently with the old route so the
+        # new (primary) response isn't serialized behind the old one - the old route still
+        # runs as a synchronous backup (its latency may affect the client here, which is
+        # acceptable in this mode), and is used for the comparison and as a fallback.
+        new_task = asyncio.create_task(mirror.call_new_server(comparison))
+        old_response = await call_next(request)
+        old_body = await _buffer_response_body(old_response)
+        comparison.old_status = old_response.status_code
+        comparison.old_body = old_body
+        new_resp = await new_task
+
+        if new_resp is None:
+            # New server unreachable: fall back to serving the old response, and let the
+            # background task retry + record the transport error.
+            mirror.schedule_comparison(comparison, new_prefetched=False)
+            return _rebuild_response(old_response, old_body)
+
+        comparison.new_status = new_resp.status_code
+        comparison.new_body = new_resp.content
+        mirror.schedule_comparison(comparison, new_prefetched=True)
+        served = Response(
+            content=new_resp.content,
+            status_code=new_resp.status_code,
+            media_type=new_resp.headers.get('content-type'),
+        )
+        served.background = old_response.background
+        return served
+
+    # Default: old server is primary. Serve the OLD response as soon as it is ready; the
+    # new-server call and comparison happen entirely in a fire-and-forget background task,
+    # so the new server's latency (or errors) can never affect the old server's response.
+    old_response = await call_next(request)
+    old_body = await _buffer_response_body(old_response)
+    comparison.old_status = old_response.status_code
+    comparison.old_body = old_body
+    mirror.schedule_comparison(comparison, new_prefetched=False)
+    return _rebuild_response(old_response, old_body)
 
 
 @app.exception_handler(404)
