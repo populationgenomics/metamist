@@ -174,13 +174,13 @@ async def mirror_and_compare(request: Request, call_next):
     # static assets) to the new server, as the basic proxy did - the whole app should live
     # on the new server in that mode. API/GraphQL requests continue to be served + compared.
     if mirror.enabled and mirror.serve_from_new and not mirror.is_api_path(path):
-        logger.info('mirror: redirect to new')
+        logger.info(f'mirror: redirect to new for path {path}')
         return RedirectResponse(
             url=mirror.target_url(path, request.url.query), status_code=302
         )
 
     if not (mirror.enabled and mirror.should_mirror(path)):
-        logger.info('mirror: disabled')
+        logger.info(f'mirror: disabled for path {path}')
         return await call_next(request)
 
     # Snapshot everything the background task needs BEFORE the request object goes away.
@@ -195,7 +195,7 @@ async def mirror_and_compare(request: Request, call_next):
     )
 
     if mirror.serve_from_new:
-        logger.info('mirror: serve from new')
+        logger.info(f'mirror: serve from new for path {path}')
         # New server is primary. Start its request concurrently with the old route so the
         # new (primary) response isn't serialized behind the old one - the old route still
         # runs as a synchronous backup (its latency may affect the client here, which is
@@ -227,7 +227,7 @@ async def mirror_and_compare(request: Request, call_next):
     # Default: old server is primary. Serve the OLD response as soon as it is ready; the
     # new-server call and comparison happen entirely in a fire-and-forget background task,
     # so the new server's latency (or errors) can never affect the old server's response.
-    logger.info('mirror: serve from old')
+    logger.info(f'mirror: serve from old for path {path}')
     old_response = await call_next(request)
     old_body = await _buffer_response_body(old_response)
     comparison.old_status = old_response.status_code
