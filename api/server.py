@@ -21,7 +21,7 @@ from api.settings import (
     SM_ENVIRONMENT,
 )
 from api.utils.exceptions import determine_code_from_error
-from api.utils.mirror import Comparison, mirror
+from api.utils.mirror import MirrorContext, mirror
 from api.utils.openapi import get_openapi_schema_func
 from db.python.connect import SMConnections
 from db.python.utils import get_logger
@@ -166,28 +166,29 @@ def _rebuild_response(response, body: bytes) -> Response:
 # and never raises. The mirror to the new server happens in a fire-and-forget background
 # task (serve-from-old) so it can never add latency to or fail the client response.
 @app.middleware('http')
-async def mirror_and_compare(request: Request, call_next):
-    """Serve the request locally and mirror it to the new server for comparison."""
+async def mirror_and_capture(request: Request, call_next):
+    """Serve the request locally and mirror it to the new server, capturing both responses."""
     path = request.scope['path']
+    method = request.method
 
-    # When serving from the new server, redirect non-API requests (the frontend and its
-    # static assets) to the new server, as the basic proxy did - the whole app should live
-    # on the new server in that mode. API/GraphQL requests continue to be served + compared.
-    if mirror.enabled and mirror.serve_from_new and not mirror.is_api_path(path):
-        logger.info(f'mirror: redirect to new for path {path}')
+    # When serving from the new server, redirect non-API requests (the frontend, its static
+    # assets, and the GraphiQL UI served by GET /graphql) to the new server, as the basic
+    # proxy did - the whole app should live on the new server in that mode. Real API/GraphQL
+    # operations continue to be served + captured.
+    if mirror.enabled and mirror.serve_from_new and not mirror.is_api_request(method, path):
+        logger.info(f'mirror: redirect to new for {method} {path}')
         return RedirectResponse(
             url=mirror.target_url(path, request.url.query), status_code=302
         )
 
-    if not (mirror.enabled and mirror.should_mirror(path)):
-        logger.info(f'mirror: disabled for path {path}')
+    if not (mirror.enabled and mirror.should_mirror(method, path)):
         return await call_next(request)
 
     # Snapshot everything the background task needs BEFORE the request object goes away.
     # NB: reading the body here is safe - Starlette's BaseHTTPMiddleware caches and replays
     # it to the downstream routes (behaviour is coupled to the pinned Starlette version).
-    comparison = Comparison(
-        method=request.method,
+    ctx = MirrorContext(
+        method=method,
         path=path,
         query=request.url.query,
         req_headers=dict(request.headers),
@@ -195,27 +196,26 @@ async def mirror_and_compare(request: Request, call_next):
     )
 
     if mirror.serve_from_new:
-        logger.info(f'mirror: serve from new for path {path}')
         # New server is primary. Start its request concurrently with the old route so the
         # new (primary) response isn't serialized behind the old one - the old route still
         # runs as a synchronous backup (its latency may affect the client here, which is
-        # acceptable in this mode), and is used for the comparison and as a fallback.
-        new_task = asyncio.create_task(mirror.call_new_server(comparison))
+        # acceptable in this mode), and is captured and used as a fallback.
+        new_task = asyncio.create_task(mirror.call_new_server(ctx))
         old_response = await call_next(request)
         old_body = await _buffer_response_body(old_response)
-        comparison.old_status = old_response.status_code
-        comparison.old_body = old_body
+        ctx.old_status = old_response.status_code
+        ctx.old_body = old_body
         new_resp = await new_task
 
         if new_resp is None:
             # New server unreachable: fall back to serving the old response, and let the
             # background task retry + record the transport error.
-            mirror.schedule_comparison(comparison, new_prefetched=False)
+            mirror.schedule_capture(ctx, new_prefetched=False)
             return _rebuild_response(old_response, old_body)
 
-        comparison.new_status = new_resp.status_code
-        comparison.new_body = new_resp.content
-        mirror.schedule_comparison(comparison, new_prefetched=True)
+        ctx.new_status = new_resp.status_code
+        ctx.new_body = new_resp.content
+        mirror.schedule_capture(ctx, new_prefetched=True)
         served = Response(
             content=new_resp.content,
             status_code=new_resp.status_code,
@@ -225,14 +225,13 @@ async def mirror_and_compare(request: Request, call_next):
         return served
 
     # Default: old server is primary. Serve the OLD response as soon as it is ready; the
-    # new-server call and comparison happen entirely in a fire-and-forget background task,
-    # so the new server's latency (or errors) can never affect the old server's response.
-    logger.info(f'mirror: serve from old for path {path}')
+    # new-server call and capture happen entirely in a fire-and-forget background task, so
+    # the new server's latency (or errors) can never affect the old server's response.
     old_response = await call_next(request)
     old_body = await _buffer_response_body(old_response)
-    comparison.old_status = old_response.status_code
-    comparison.old_body = old_body
-    mirror.schedule_comparison(comparison, new_prefetched=False)
+    ctx.old_status = old_response.status_code
+    ctx.old_body = old_body
+    mirror.schedule_capture(ctx, new_prefetched=False)
     return _rebuild_response(old_response, old_body)
 
 
