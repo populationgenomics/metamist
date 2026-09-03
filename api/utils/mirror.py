@@ -16,7 +16,6 @@ present) and is designed to never affect the client response:
 """
 
 import asyncio
-import contextlib
 import datetime
 import json
 import uuid
@@ -125,11 +124,34 @@ class Mirror:
 
     async def open(self) -> None:
         """Open the shared httpx client (call from app lifespan startup)."""
-        if self.enabled and self._client is None:
+        if not self.enabled:
+            missing = [
+                name
+                for name, value in (
+                    ('METAMIST_PROXY_TARGET_URL', METAMIST_PROXY_TARGET_URL),
+                    ('METAMIST_PROXY_TARGET_AUDIENCE', METAMIST_PROXY_TARGET_AUDIENCE),
+                    ('METAMIST_PROXY_DIFF_BUCKET', METAMIST_PROXY_DIFF_BUCKET),
+                )
+                if not value
+            ]
+            logger.warning(
+                f'mirror: DISABLED - not writing to bucket. Missing settings: {missing}'
+            )
+            return
+
+        if self._client is None:
             self._client = httpx.AsyncClient(
                 timeout=httpx.Timeout(METAMIST_PROXY_TIMEOUT),
                 limits=httpx.Limits(max_connections=METAMIST_PROXY_MAX_CONCURRENCY),
             )
+        logger.info(
+            'mirror: ENABLED '
+            f'(serve_from={METAMIST_PROXY_SERVE_FROM}, '
+            f'target_url={METAMIST_PROXY_TARGET_URL}, '
+            f'diff_bucket={METAMIST_PROXY_DIFF_BUCKET}, '
+            f'timeout={METAMIST_PROXY_TIMEOUT}s, '
+            f'max_concurrency={METAMIST_PROXY_MAX_CONCURRENCY})'
+        )
 
     async def close(self) -> None:
         """Close the shared httpx client (call from app lifespan shutdown)."""
@@ -197,6 +219,10 @@ class Mirror:
         on a transport-level error (timeout, connection failure, ...).
         """
         if self._client is None:
+            logger.warning(
+                'mirror: cannot call new server - http client is not open '
+                f'(enabled={self.enabled})'
+            )
             return None
 
         url = self.target_url(comparison.path, comparison.query)
@@ -224,12 +250,17 @@ class Mirror:
             )
 
         try:
-            return await self._client.request(
+            resp = await self._client.request(
                 method=comparison.method,
                 url=url,
                 headers=headers,
                 content=comparison.req_body,
             )
+            logger.info(
+                f'mirror: new server responded {resp.status_code} '
+                f'for {comparison.method} {url}'
+            )
+            return resp
         except Exception as e:  # noqa: BLE001 - transport error, recorded as a diff
             logger.warning(f'Mirror request failed for {comparison.method} {url}: {e}')
             return None
@@ -305,10 +336,13 @@ class Mirror:
         path = AnyPath(f'{METAMIST_PROXY_DIFF_BUCKET.rstrip("/")}/{key}')
         # Omit unset optional fields (bodies on a match, new_error on success, ...).
         payload = {k: v for k, v in asdict(record).items() if v is not None}
-        with contextlib.suppress(Exception):
+        try:
             path.parent.mkdir(parents=True, exist_ok=True)  # no-op-ish for cloud paths
+        except Exception as e:  # noqa: BLE001 - mkdir isn't needed for cloud paths
+            logger.debug(f'mirror: could not mkdir {path.parent}: {e}')
         with path.open('w') as f:  # type: ignore[union-attr]
             json.dump(payload, f)
+        logger.info(f'mirror: wrote comparison record to {path}')
 
     async def _run_comparison(
         self, comparison: Comparison, new_prefetched: bool
@@ -324,10 +358,18 @@ class Mirror:
                     comparison.new_body = resp.content
 
             record = self._compare(comparison)
+            logger.info(
+                f'mirror: comparison for {comparison.method} {comparison.path} '
+                f'matched={record.matched} '
+                f'(old_status={record.old_status}, new_status={record.new_status}, '
+                f'new_error={record.new_error})'
+            )
             await run_in_threadpool(self._write_record, record)
-        except Exception as e:  # noqa: BLE001 - the mirror must never affect the client
-            logger.warning(
-                f'Mirror comparison failed for {comparison.method} {comparison.path}: {e}'
+        except Exception:
+            # Full traceback so failures writing to the bucket (auth, permissions, missing
+            # dependency, ...) are visible rather than silently swallowed.
+            logger.exception(
+                f'mirror: comparison failed for {comparison.method} {comparison.path}'
             )
 
     def schedule_comparison(
@@ -341,6 +383,7 @@ class Mirror:
         fetched on the request path and is set on `comparison` (`new_prefetched=True`).
         """
         if not self.enabled:
+            logger.debug('mirror: schedule_comparison skipped - feature disabled')
             return
         if len(self._bg_tasks) >= METAMIST_PROXY_MAX_CONCURRENCY:
             logger.warning('Mirror comparison dropped: too many in-flight comparisons')
@@ -349,6 +392,10 @@ class Mirror:
         task = asyncio.create_task(self._run_comparison(comparison, new_prefetched))
         self._bg_tasks.add(task)
         task.add_done_callback(self._bg_tasks.discard)
+        logger.info(
+            f'mirror: scheduled comparison for {comparison.method} {comparison.path} '
+            f'(new_prefetched={new_prefetched}, in_flight={len(self._bg_tasks)})'
+        )
 
 
 # Shared singleton imported by the server.
