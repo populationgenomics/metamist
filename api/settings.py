@@ -18,6 +18,23 @@ IGNORE_GCP_CREDENTIALS_ERROR = os.getenv('SM_IGNORE_GCP_CREDENTIALS_ERROR') in T
 MEMBERS_CACHE_LOCATION = os.getenv('SM_MEMBERS_CACHE_LOCATION')
 METAMIST_GCP_PROJECT = os.getenv('METAMIST_GCP_PROJECT')
 
+# Config params for the mirroring proxy:
+# The URL for the new server
+METAMIST_PROXY_TARGET_URL = os.getenv('METAMIST_PROXY_TARGET_URL')
+# The IAP audience to use for authenticating requests to the new server
+METAMIST_PROXY_TARGET_AUDIENCE = os.getenv('METAMIST_PROXY_TARGET_AUDIENCE')
+# The bucket to store diffs to
+METAMIST_PROXY_DIFF_BUCKET = os.getenv('METAMIST_PROXY_DIFF_BUCKET')  # bucket name
+# Which server's response is returned to the client: 'old' (default) or 'new'.
+METAMIST_PROXY_SERVE_FROM = os.getenv('METAMIST_PROXY_SERVE_FROM', 'old').lower()
+# Timeout (seconds) for the outbound request to the new server.
+METAMIST_PROXY_TIMEOUT = float(os.getenv('METAMIST_PROXY_TIMEOUT', '60'))
+# Max number of in-flight background mirror comparisons before new ones are dropped.
+# This is only used for in serve from old mode, while storing comparisons. Once we flip
+# to serve from new mode, all requests will be proxied to the new server regardless of
+# concurrency
+METAMIST_PROXY_MAX_CONCURRENCY = int(os.getenv('METAMIST_PROXY_MAX_CONCURRENCY', '50'))
+
 SEQR_URL = os.getenv('SM_SEQR_URL')
 SEQR_AUDIENCE = os.getenv('SM_SEQR_AUDIENCE')
 SEQR_MAP_LOCATION = os.getenv('SM_SEQR_MAP_LOCATION')
