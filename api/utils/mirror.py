@@ -13,6 +13,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.security import HTTPAuthorizationCredentials
 from google.cloud import storage
 from google.cloud.storage.retry import DEFAULT_RETRY
+from httpx import Response as HttpxResponse
 from starlette.responses import JSONResponse, Response
 
 from cpg_utils.cloud import get_google_identity_token
@@ -317,9 +318,14 @@ class Mirror:
         """Run in the background, call new server and then write response record."""
         try:
             author = await run_in_threadpool(self._resolve_author, ctx.req_headers)
-            resp = await self.call_new_server(ctx, author)
+            resp: HttpxResponse | None = None
+
+            if author is not None:
+                resp = await self.call_new_server(ctx, author)
+
             if resp is None:
-                ctx.new_error = 'transport_error'
+                error = 'missing_author' if author is None else 'transport_error'
+                ctx.new_error = error
             else:
                 ctx.new_status = resp.status_code
                 ctx.new_body = resp.content
