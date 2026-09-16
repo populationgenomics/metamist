@@ -85,12 +85,21 @@ class Mirror:
     # Request headers forwarded to the new server, we don't need to pass everything and
     # particularly not auth headers as those need to be replaced. These ones are
     # the important ones
-    HEADERS_TO_PASS = (
+    REQUEST_HEADERS_TO_PASS = (
         'sm-ar-guid',
         'sm-extra-values',
         'sm-on-behalf-of',
         'content-type',
         'accept',
+    )
+
+    # list of headers to pass on from new server when proxying. We don't set many
+    # headers in metamist so the list is pretty short.
+    RESPONSE_HEADERS_TO_PASS = (
+        'content-type',
+        'content-disposition',  # file/export downloads
+        'x-bq-cost',  # billing cost header
+        'x-process-time',  # request timing added by the new server's middleware
     )
 
     # Avoid mirroring these paths as they have duplicated side effects.
@@ -207,7 +216,7 @@ class Mirror:
         url = self.target_url(ctx.path, ctx.query)
 
         headers: dict[str, str] = {}
-        for header in self.HEADERS_TO_PASS:
+        for header in self.REQUEST_HEADERS_TO_PASS:
             value = ctx.req_headers.get(header)
             if value:
                 headers[header] = value
@@ -274,10 +283,16 @@ class Mirror:
                     'description': 'The upstream metamist server could not be reached.',
                 },
             )
+
+        headers = {
+            k: v
+            for k, v in resp.headers.items()
+            if k.lower() in self.RESPONSE_HEADERS_TO_PASS
+        }
         return Response(
             content=resp.content,
             status_code=resp.status_code,
-            media_type=resp.headers.get('content-type'),
+            headers=headers,
         )
 
     # -- capture + recording -------------------------------------------------------
