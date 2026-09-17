@@ -136,7 +136,7 @@ class AnalysisTable(DbBase):
         _query = """
             INSERT INTO analysis_cohort
                 (analysis_id, cohort_id, audit_log_id)
-            VALUES (:aid, :cid, :audit_log_id)
+            VALUES (%(aid)s, %(cid)s, %(audit_log_id)s)
         """
 
         audit_log_id = await self.audit_log_id()
