@@ -96,7 +96,11 @@ def authenticate(
     # If this request has come from the old sample metadata cloud run service, which
     # now just proxies requests to this new service, then we want to act as the user
     # that the proxy is sending us.
-    if sm_legacy_proxy_author and SM_LEGACY_PROXY_SA and author == SM_LEGACY_PROXY_SA:
+    if SM_LEGACY_PROXY_SA is not None and author == SM_LEGACY_PROXY_SA:
+        if not sm_legacy_proxy_author:
+            raise HTTPException(
+                status_code=401, detail='Proxy requests must provide author'
+            )
         author = sm_legacy_proxy_author
 
     if author:
