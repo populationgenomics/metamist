@@ -441,6 +441,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ac/f9/19d478beddb04dbef759eebb8fd41f5f7fac27b22325001015487c8b830c/cpg-utils-5.2.0.tar.gz", hash = "sha256:5ebb7ae7f4e79705c80d0e154d6f8fe00f55e70823f5ab585881bd9b9b38ea10", size = 41923, upload-time = "2024-12-09T22:48:55.706Z" }
 
 [[package]]
+name = "cross-web"
+version = "0.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4a/a0/bdb8370215987cc5bde497cb8b976b17ab14841566ecef2aab6ae3e6c7b0/cross_web-0.7.0.tar.gz", hash = "sha256:15fbc8b9a824a055db8127fd6e43e0773074f620fdecb6b2b587d3d0a2bdd459", size = 332407, upload-time = "2026-05-19T14:18:48.849Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7a/4a/78b52ec2edcbd9b123638f4e0421fd8699ebe653ebf63ac5f82abd2665bc/cross_web-0.7.0-py3-none-any.whl", hash = "sha256:ddea9be3c68b48eaf16561847a5831a559786949c544b3701432e00a4e8d19d9", size = 25207, upload-time = "2026-05-19T14:18:47.614Z" },
+]
+
+[[package]]
 name = "cryptography"
 version = "44.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1188,25 +1200,6 @@ wheels = [
 ]
 
 [[package]]
-name = "libcst"
-version = "1.5.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pyyaml" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/27/a6/a19b587108b15d3e0bfa8d0944265809581c8b8e161e22c9c9060afbbf4a/libcst-1.5.1.tar.gz", hash = "sha256:71cb294db84df9e410208009c732628e920111683c2f2b2e0c5b71b98464f365", size = 773387, upload-time = "2024-11-18T21:48:06.236Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/c1/83f7ff3a225ad09527b8d15b410e1bba168bafe0d134d93645b1d8b69859/libcst-1.5.1-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:db7711a762b0327b581be5a963908fecd74412bdda34db34553faa521563c22d", size = 2123894, upload-time = "2024-11-18T21:46:52.913Z" },
-    { url = "https://files.pythonhosted.org/packages/5b/70/7b765a0a8db8084703fe408ed1c583c434e99b8ec3e7c6192732a1959eb8/libcst-1.5.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:aa524bd012aaae1f485fd44490ef5abf708b14d2addc0f06b28de3e4585c4b9e", size = 2032548, upload-time = "2024-11-18T21:46:55.415Z" },
-    { url = "https://files.pythonhosted.org/packages/3c/01/d4111674d3cfe817c12ef79f8d39b2058a3bd8cd01a307a7db62118cd0ed/libcst-1.5.1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:f3ffb8135c09e41e8cf710b152c33e9b7f1d0d0b9f242bae0c502eb082fdb1fb", size = 2173948, upload-time = "2024-11-18T21:46:57.405Z" },
-    { url = "https://files.pythonhosted.org/packages/4e/3b/0e7698e7715d2ed44512718dd6f45d5d698498b5c9fa906b4028a369a7f6/libcst-1.5.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:76a8ac7a84f9b6f678a668bff85b360e0a93fa8d7f25a74a206a28110734bb2a", size = 2264422, upload-time = "2024-11-18T21:46:59.268Z" },
-    { url = "https://files.pythonhosted.org/packages/0d/c4/a76444a28015fb7327cfdbde7d3f88f633e88fce2fe910c7aaa7d4780422/libcst-1.5.1-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:89c808bdb5fa9ca02df41dd234cbb0e9de0d2e0c029c7063d5435a9f6781cc10", size = 2341569, upload-time = "2024-11-18T21:47:01.391Z" },
-    { url = "https://files.pythonhosted.org/packages/54/1c/3f116e3baa47f71929467b404643c09e31af7acb77de8d2b3fe5d1b06212/libcst-1.5.1-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:40fbbaa8b839bfbfa5b300623ca2b6b0768b58bbc31b341afbc99110c9bee232", size = 2219836, upload-time = "2024-11-18T21:47:03.765Z" },
-    { url = "https://files.pythonhosted.org/packages/ea/f7/746b6d91125cf1f398889d1b4488b10cc3df6b35d9762c2131294a1e8217/libcst-1.5.1-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:c7021e3904d8d088c369afc3fe17c279883e583415ef07edacadba76cfbecd27", size = 2325108, upload-time = "2024-11-18T21:47:06.319Z" },
-    { url = "https://files.pythonhosted.org/packages/fc/82/260932412cd9d6c1ac60283889adc18c21ffc55c8b5b63309b95bc277f76/libcst-1.5.1-cp311-cp311-win_amd64.whl", hash = "sha256:f053a5deb6a214972dbe9fa26ecd8255edb903de084a3d7715bf9e9da8821c50", size = 2031804, upload-time = "2024-11-18T21:47:08.574Z" },
-]
-
-[[package]]
 name = "license-expression"
 version = "30.4.4"
 source = { registry = "https://pypi.org/simple" }
@@ -1340,7 +1333,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytz" },
     { name = "ruff" },
-    { name = "strawberry-graphql", extra = ["debug-server"] },
+    { name = "strawberry-graphql" },
     { name = "testcontainers", extra = ["mysql"] },
     { name = "types-pymysql" },
 ]
@@ -1372,7 +1365,7 @@ requires-dist = [
     { name = "requests", specifier = "~=2.32.4" },
     { name = "setuptools", specifier = ">=80.9.0" },
     { name = "slack-sdk", specifier = "==3.20.2" },
-    { name = "strawberry-graphql", extras = ["fastapi"], specifier = "==0.268.1" },
+    { name = "strawberry-graphql", extras = ["fastapi"], specifier = "==0.315.7" },
     { name = "tabulate", specifier = ">=0.9.0" },
     { name = "urllib3", specifier = ">=2.6.3" },
     { name = "uvicorn", specifier = "~=0.34.2" },
@@ -1394,7 +1387,7 @@ dev = [
     { name = "pytest-cov", specifier = ">=6.0.0" },
     { name = "pytz", specifier = ">=2024.2" },
     { name = "ruff", specifier = ">=0.15.0" },
-    { name = "strawberry-graphql", extras = ["debug-server"], specifier = "==0.268.1" },
+    { name = "strawberry-graphql", extras = ["debug-server"], specifier = "==0.315.7" },
     { name = "testcontainers", extras = ["mysql"], specifier = ">=4.8.1" },
     { name = "types-pymysql", specifier = ">=1.1.0.20241103" },
 ]
@@ -2174,29 +2167,21 @@ wheels = [
 
 [[package]]
 name = "strawberry-graphql"
-version = "0.268.1"
+version = "0.315.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "cross-web" },
     { name = "graphql-core" },
     { name = "packaging" },
     { name = "python-dateutil" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/03/dd/e67811c48f36dc673a43e3807a6b4c7fdace85082ab0f7209e45c9df0cfc/strawberry_graphql-0.268.1.tar.gz", hash = "sha256:1156ccd0777f6e3924c03b9c680b40cde014256add74918e001bb2d88caf0b69", size = 204671, upload-time = "2025-05-12T23:49:59.154Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ae/6a/49ea67e9419d934c505835fdb8cae63eb13bf4a99575e1c0e91c3b239eeb/strawberry_graphql-0.315.7.tar.gz", hash = "sha256:cce4c30b22686d4420eef1da640c8644d03478489181da505acf93a48bb4a629", size = 223087, upload-time = "2026-05-19T16:50:26.284Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bc/7c/5b666e0e5206a031e8021d8fc5855617b6f0c6ca1103953ab6018043726d/strawberry_graphql-0.268.1-py3-none-any.whl", hash = "sha256:cfbb31f7fc4e01e99f7c58cd64c9767020c303be3035aac89563e8e134ba866a", size = 298687, upload-time = "2025-05-12T23:49:55.663Z" },
+    { url = "https://files.pythonhosted.org/packages/13/1e/2266df7e27a809de2eb610b644553b8d4cfb888c77db8c06b59d9378b6f7/strawberry_graphql-0.315.7-py3-none-any.whl", hash = "sha256:859c21b06c328357d935f5b735601e9f06342967033c9f1afe1db968aeabff24", size = 325535, upload-time = "2026-05-19T16:50:23.834Z" },
 ]
 
 [package.optional-dependencies]
-debug-server = [
-    { name = "libcst" },
-    { name = "pygments" },
-    { name = "python-multipart" },
-    { name = "rich" },
-    { name = "starlette" },
-    { name = "typer" },
-    { name = "uvicorn" },
-]
 fastapi = [
     { name = "fastapi" },
     { name = "python-multipart" },
@@ -2296,11 +2281,11 @@ wheels = [
 
 [[package]]
 name = "typing-extensions"
-version = "4.12.2"
+version = "4.16.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/df/db/f35a00659bc03fec321ba8bce9420de607a1d37f8342eee1863174c69557/typing_extensions-4.12.2.tar.gz", hash = "sha256:1a7ead55c7e559dd4dee8856e3a88b41225abfe1ce8df57b7c13915fe121ffb8", size = 85321, upload-time = "2024-06-07T18:52:15.995Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/cc/6253133b5bb138fc3306cebfbda2c520f545d36b5be2c7255cc528bb45d6/typing_extensions-4.16.0.tar.gz", hash = "sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5", size = 113555, upload-time = "2026-07-02T08:40:05.92Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/26/9f/ad63fc0248c5379346306f8668cda6e2e2e9c95e01216d2b8ffd9ff037d0/typing_extensions-4.12.2-py3-none-any.whl", hash = "sha256:04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d", size = 37438, upload-time = "2024-06-07T18:52:13.582Z" },
+    { url = "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl", hash = "sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8", size = 45571, upload-time = "2026-07-02T08:40:04.659Z" },
 ]
 
 [[package]]
