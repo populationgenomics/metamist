@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
-from starlette.responses import FileResponse
+from starlette.responses import FileResponse, RedirectResponse, Response
 
 from api import routes
 from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
@@ -20,6 +20,7 @@ from api.settings import (
     SM_ENVIRONMENT,
 )
 from api.utils.exceptions import determine_code_from_error
+from api.utils.mirror import MirrorContext, mirror
 from api.utils.openapi import get_openapi_schema_func
 from db.python.connect import SMConnections
 from db.python.utils import get_logger
@@ -46,8 +47,11 @@ async def app_lifespan(_: FastAPI):
     try:
         if not SKIP_DATABASE_CONNECTION:
             await SMConnections.connect()
+        # Open the mirror httpx client to limit overhead on mirror requests
+        await mirror.open()
         yield
     finally:
+        await mirror.close()
         if not SKIP_DATABASE_CONNECTION:
             await SMConnections.disconnect()
 
@@ -128,6 +132,94 @@ async def add_process_time_header(request: Request, call_next):
     process_time = time.time() - start_time
     response.headers['X-Process-Time'] = f'{round(process_time * 1000, 1)}ms'
     return response
+
+
+async def _buffer_response_body(response) -> bytes:
+    """
+    Get response body as bytes to allow for comparison
+    """
+    # Responses will generally have a body_iterator, it is only in the case of handled
+    # exceptions which produce a JSONResponse that they will just have `body`
+    if hasattr(response, 'body_iterator'):
+        chunks = [chunk async for chunk in response.body_iterator]
+        return b''.join(
+            c if isinstance(c, bytes) else c.encode(response.charset) for c in chunks
+        )
+    return getattr(response, 'body', b'') or b''
+
+
+def _rebuild_response(response, body: bytes) -> Response:
+    """Rebuild a Response placing the buffered body as response content."""
+    rebuilt = Response(
+        content=body,
+        status_code=response.status_code,
+        headers=dict(response.headers),
+        media_type=response.media_type,
+    )
+    rebuilt.background = response.background
+    return rebuilt
+
+
+# Middleware to handle mirroring or proxying of requests to new server
+# This is registered last so this middleware will see the response just before
+# it would be sent back to the client after all other middleware has been applied.
+@app.middleware('http')
+async def mirror_and_capture(request: Request, call_next):
+    """
+    Handle the two mirror serve-from modes.
+
+    In serve_from_new mode the new server is primary and the this server is a transparent
+    reverse-proxy. Every API request is forwarded to the new server and its response is
+    returned without any additional processing.
+    In serve_from_old mode the old server is primary and mirrors requests to the new
+    server in the background so responses can be compared without impacting response time.
+    """
+    path = request.scope['path']
+    method = request.method
+
+    # When in serve from new mode the new server is primary. Requests are either
+    # proxied to the new server and returned from there, or a redirect is returned.
+    # Urls are redirected if it doesn't make sense to proxy them, eg. for urls that would
+    # always be loaded in a web browser.
+    if mirror.enabled and mirror.serve_from_new:
+        if not mirror.is_api_request(method, path):
+            logger.info(f'mirror: redirect to new for {method} {path}')
+            return RedirectResponse(
+                url=mirror.target_url(path, request.url.query), status_code=302
+            )
+        ctx = MirrorContext(
+            method=method,
+            path=path,
+            query=request.url.query,
+            req_headers=dict(request.headers),
+            req_body=await request.body(),
+        )
+        return await mirror.proxy_to_new(ctx)
+
+    # If in serve from old mode, and the mirror is disabled or the path isn't api or
+    # is in the deny list - then just continue processing the request on the old server
+    if not (mirror.enabled and mirror.should_mirror(method, path)):
+        return await call_next(request)
+
+    # Finally, if in serve from old mode, the old server (this server) handles the
+    # request primarily, and a response is returned as soon as available. Then
+    # in the background the request is proxied to the new server and both responses are
+    # recorded to the proxy diff bucket.
+
+    # Build the mirror context, capturing the request body before `call_next` consumes it.
+    ctx = MirrorContext(
+        method=method,
+        path=path,
+        query=request.url.query,
+        req_headers=dict(request.headers),
+        req_body=await request.body(),
+    )
+    old_response = await call_next(request)
+    old_body = await _buffer_response_body(old_response)
+    ctx.old_status = old_response.status_code
+    ctx.old_body = old_body
+    mirror.schedule_capture(ctx)
+    return _rebuild_response(old_response, old_body)
 
 
 @app.exception_handler(404)
