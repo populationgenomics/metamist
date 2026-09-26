@@ -167,8 +167,8 @@ class ProjectInsightsDb(DbBase):
                 row['sequencing_type'],
                 row['sequencing_technology'],
             )
-            if value_field == 'sequencing_group_ids':
-                parsed_rows[key] = [int(sgid) for sgid in row[value_field].split(',')]
+            if value_field.endswith('_ids'):
+                parsed_rows[key] = [int(v) for v in row[value_field].split(',') if v]
             else:
                 try:
                     parsed_rows[key] = row[value_field]
@@ -286,7 +286,7 @@ GROUP BY analysis_id;
         return {
             'id': cram_row.id if cram_row else None,
             'output': cram_row.output if cram_row else None,
-            'timestamp_completed': cram_row.timestamp_completed.strftime('%d-%m-%y')
+            'timestamp_completed': cram_row.timestamp_completed.strftime('%Y-%m-%d')
             if cram_row
             else None,
         }
@@ -310,9 +310,9 @@ GROUP BY analysis_id;
         self,
         summary_row_key: ProjectSeqTypeTechnologyKey,
         project: Project,
-        total_families: int,
-        total_participants: int,
-        total_samples: int,
+        family_ids: list[int],
+        participant_ids: list[int],
+        sample_ids: list[int],
         total_sequencing_groups: int,
         crams: list[SequencingGroupInternalId],
         analysis_sequencing_groups: dict[AnalysisId, list[SequencingGroupInternalId]],
@@ -336,14 +336,17 @@ GROUP BY analysis_id;
             dataset=project.name,
             sequencing_type=summary_row_key.sequencing_type,
             sequencing_technology=summary_row_key.sequencing_technology,
-            total_families=total_families,
-            total_participants=total_participants,
-            total_samples=total_samples,
+            total_families=len(family_ids),
+            total_participants=len(participant_ids),
+            total_samples=len(sample_ids),
             total_sequencing_groups=total_sequencing_groups,
             total_crams=len(set(crams)),
             latest_annotate_dataset=latest_annotate_dataset,
             latest_snv_es_index=latest_snv_es_index,
             latest_sv_es_index=latest_sv_es_index,
+            family_ids=family_ids,
+            participant_ids=participant_ids,
+            sample_ids=sample_ids,
         )
 
     def get_insights_details_internal_row(  # noqa: PLR0913
@@ -386,8 +389,8 @@ GROUP BY analysis_id;
             project=project.id,
             dataset=project.name,
             sequencing_type=sequencing_type,
-            sequencing_platform=sequencing_technology,
-            sequencing_technology=sequencing_platform,
+            sequencing_platform=sequencing_platform,
+            sequencing_technology=sequencing_technology,
             sample_type=sequencing_group_details.sample_type,
             family_id=sequencing_group_details.family_id,
             family_ext_id=sequencing_group_details.family_external_id,
@@ -409,13 +412,13 @@ GROUP BY analysis_id;
     # Project Insights Summary queries
     async def _total_families_by_project_id_and_seq_fields(
         self, project_ids: list[ProjectId], sequencing_types: list[SequencingType]
-    ) -> dict[ProjectSeqTypeTechnologyKey, int]:
+    ) -> dict[ProjectSeqTypeTechnologyKey, list[int]]:
         _query = """
 SELECT
     f.project,
     sg.type as sequencing_type,
     sg.technology as sequencing_technology,
-    COUNT(DISTINCT f.id) as num_families
+    GROUP_CONCAT(DISTINCT f.id) as family_ids
 FROM
     family f
     LEFT JOIN family_participant fp ON f.id = fp.family_id
@@ -424,6 +427,7 @@ FROM
 WHERE
     f.project IN :projects
     AND sg.type IN :sequencing_types
+    AND NOT sg.archived
 GROUP BY
     f.project,
     sg.type,
@@ -438,18 +442,18 @@ GROUP BY
             },
         )
         return self.parse_project_seqtype_technology_keyed_rows(
-            _query_results, 'num_families'
+            _query_results, 'family_ids'
         )
 
     async def _total_participants_by_project_id_and_seq_fields(
         self, project_ids: list[ProjectId], sequencing_types: list[SequencingType]
-    ) -> dict[ProjectSeqTypeTechnologyKey, int]:
+    ) -> dict[ProjectSeqTypeTechnologyKey, list[int]]:
         _query = """
 SELECT
     p.project,
     sg.type as sequencing_type,
     sg.technology as sequencing_technology,
-    COUNT(DISTINCT p.id) as num_participants
+    GROUP_CONCAT(DISTINCT p.id) as participant_ids
 FROM
     participant p
     LEFT JOIN sample s ON p.id = s.participant_id
@@ -457,6 +461,7 @@ FROM
 WHERE
     p.project IN :projects
     AND sg.type IN :sequencing_types
+    AND NOT sg.archived
 GROUP BY
     p.project,
     sg.type,
@@ -470,24 +475,25 @@ GROUP BY
             },
         )
         return self.parse_project_seqtype_technology_keyed_rows(
-            _query_results, 'num_participants'
+            _query_results, 'participant_ids'
         )
 
     async def _total_samples_by_project_id_and_seq_fields(
         self, project_ids: list[ProjectId], sequencing_types: list[SequencingType]
-    ) -> dict[ProjectSeqTypeTechnologyKey, int]:
+    ) -> dict[ProjectSeqTypeTechnologyKey, list[int]]:
         _query = """
 SELECT
     s.project,
     sg.type as sequencing_type,
     sg.technology as sequencing_technology,
-    COUNT(DISTINCT s.id) as num_samples
+    GROUP_CONCAT(DISTINCT s.id) as sample_ids
 FROM
     sample s
     LEFT JOIN sequencing_group sg on sg.sample_id = s.id
 WHERE
     s.project IN :projects
     AND sg.type IN :sequencing_types
+    AND NOT sg.archived
 GROUP BY
     s.project,
     sg.type,
@@ -501,7 +507,7 @@ GROUP BY
             },
         )
         return self.parse_project_seqtype_technology_keyed_rows(
-            _query_results, 'num_samples'
+            _query_results, 'sample_ids'
         )
 
     async def _total_sequencing_groups_by_project_id_and_seq_fields(
@@ -519,6 +525,7 @@ FROM
 WHERE
     s.project IN :projects
     AND sg.type IN :sequencing_types
+    AND NOT sg.archived
 GROUP BY
     s.project,
     sg.type,
@@ -555,6 +562,7 @@ WHERE
     AND sg.type IN :sequencing_types
     AND a.type = 'CRAM'
     AND a.status = 'COMPLETED'
+    AND NOT sg.archived
 GROUP BY
     a.project,
     sg.type,
@@ -598,9 +606,11 @@ FROM
             MAX(a.timestamp_completed) as max_timestamp
         FROM analysis a
         INNER JOIN analysis_sequencing_group asg ON a.id = asg.analysis_id
+        INNER JOIN sequencing_group sg2 ON sg2.id = asg.sequencing_group_id
         WHERE a.type='CRAM'
         AND a.status='COMPLETED'
         AND a.project IN :projects
+        AND NOT sg2.archived
         GROUP BY asg.sequencing_group_id
     ) max_timestamps ON asg.sequencing_group_id = max_timestamps.sequencing_group_id
     AND a.timestamp_completed = max_timestamps.max_timestamp
@@ -608,7 +618,8 @@ WHERE
     a.project IN :projects
     AND sg.type IN :sequencing_types
     AND a.type = 'CRAM'
-    AND a.status = 'COMPLETED';
+    AND a.status = 'COMPLETED'
+    AND NOT sg.archived;
         """
         _query_results = await self.connection.fetch_all(
             _query,
@@ -657,7 +668,7 @@ INNER JOIN (
     FROM analysis
     WHERE
         status = 'COMPLETED'
-        AND type = 'CUSTOM'
+        AND type in ('CUSTOM', 'matrixtable')
         AND JSON_EXTRACT(meta, '$.stage') = 'AnnotateDataset'
         AND JSON_UNQUOTE(JSON_EXTRACT(meta, '$.sequencing_type')) IN :sequencing_types
     GROUP BY project, JSON_EXTRACT(meta, '$.sequencing_type')
@@ -665,7 +676,7 @@ INNER JOIN (
 AND a.timestamp_completed = max_timestamps.max_timestamp
 AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) = max_timestamps.sequencing_type
 WHERE
-    a.type = 'CUSTOM'
+    a.type in ('CUSTOM', 'matrixtable')
     AND a.status = 'COMPLETED'
     AND a.project IN :projects
     AND JSON_UNQUOTE(JSON_EXTRACT(a.meta, '$.sequencing_type')) IN :sequencing_types
@@ -767,6 +778,7 @@ FROM
 WHERE
     f.project IN :projects
     AND sg.type IN :sequencing_types
+    AND NOT sg.archived
 ORDER BY
     f.project,
     sg.type,
@@ -1022,19 +1034,19 @@ INNER JOIN (
                 latest_es_indices_by_project_id_and_seq_type_and_stage,
             )
 
-            total_families_by_project_id_and_seq_fields.setdefault(rowkey, 0)
-            total_participants_by_project_id_and_seq_fields.setdefault(rowkey, 0)
-            total_samples_by_project_id_and_seq_fields.setdefault(rowkey, 0)
-
             response.append(
                 self.get_insights_summary_internal_row(
                     summary_row_key=rowkey,
                     project=project,
-                    total_families=total_families_by_project_id_and_seq_fields[rowkey],
-                    total_participants=total_participants_by_project_id_and_seq_fields[
-                        rowkey
-                    ],
-                    total_samples=total_samples_by_project_id_and_seq_fields[rowkey],
+                    family_ids=total_families_by_project_id_and_seq_fields.get(
+                        rowkey, []
+                    ),
+                    participant_ids=total_participants_by_project_id_and_seq_fields.get(
+                        rowkey, []
+                    ),
+                    sample_ids=total_samples_by_project_id_and_seq_fields.get(
+                        rowkey, []
+                    ),
                     total_sequencing_groups=total_sequencing_groups,
                     crams=crams_in_project_with_sequencing_fields,
                     analysis_sequencing_groups=analysis_sequencing_groups,
