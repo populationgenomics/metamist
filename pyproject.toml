@@ -30,7 +30,7 @@ dependencies = [
     "google-cloud-storage==1.43.0",
     "pyarrow~=23.0",
     "slack-sdk==3.20.2",
-    "strawberry-graphql[fastapi]==0.268.1",
+    "strawberry-graphql[fastapi]==0.315.7",
     "uvicorn~=0.34.2",
 ]
 
@@ -163,7 +163,7 @@ dev = [
     "testcontainers[mysql]>=4.8.1",
     "types-pymysql>=1.1.0.20241103",
     "pip-audit>=2.7.3",
-    "strawberry-graphql[debug-server]==0.268.1",
+    "strawberry-graphql[debug-server]==0.315.7",
     "greenlet==3.1.1",
     "metamist",
     "ruff>=0.15.0",
