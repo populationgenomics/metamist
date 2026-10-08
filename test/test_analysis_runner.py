@@ -164,3 +164,19 @@ class TestAnalysisRunner:
         )['data']['analysisRunner']['createAnalysisRunnerLog']
 
         assert analysis_runner_log_entry == ar_guid
+
+    @pytest.mark.asyncio
+    async def test_insert_skip_duplicates(self) -> None:
+        """Test inserting an existing ar_guid does not throw an error"""
+        ar_entry = self.get_test_analysis('<ar-guid>')
+
+        # Insert entry
+        assert await self.al.insert_analysis_runner_entry(ar_entry) == ar_entry.ar_guid
+
+        # Insert entry again
+        assert await self.al.insert_analysis_runner_entry(ar_entry) == ar_entry.ar_guid
+
+        db_ars = await self.al.query(
+            AnalysisRunnerFilter(ar_guid=GenericFilter(eq=ar_entry.ar_guid))
+        )
+        assert len(db_ars) == 1
