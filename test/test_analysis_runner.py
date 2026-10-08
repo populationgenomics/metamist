@@ -180,4 +180,3 @@ class TestAnalysisRunner:
             AnalysisRunnerFilter(ar_guid=GenericFilter(eq=ar_entry.ar_guid))
         )
         assert len(db_ars) == 1
-
