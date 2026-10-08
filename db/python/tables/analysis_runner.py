@@ -77,6 +77,7 @@ class AnalysisRunnerTable(DbBase):
         {analysis_runner.hail_version}, {analysis_runner.batch_url}, {analysis_runner.submitting_user}, {meta_param},
         {analysis_runner.output_path}, {audit_log_id}
         )
+        ON CONFLICT (ar_guid) DO NOTHING
         """
 
         await self.connection.pg_connection.execute(_query)
