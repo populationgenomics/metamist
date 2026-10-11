@@ -515,7 +515,7 @@ class SampleTable(DbBase):
         # Query to update the sequencing group table replacing the merge sid with
         # the id to keep
         queries.append(t"""
-            UPDATE analysis_sequencing_group
+            UPDATE sequencing_group
             SET sample_id = {id_keep}, audit_log_id = {audit_log_id}
             WHERE sample_id = {id_merge}
         """)
@@ -525,6 +525,12 @@ class SampleTable(DbBase):
             UPDATE sample
             SET audit_log_id = {audit_log_id}
             WHERE id = {id_merge}
+        """)
+
+        # Query to delete the sample's external id
+        queries.append(t"""
+            DELETE FROM sample_external_id
+            WHERE sample_id = {id_merge}
         """)
 
         # Query to delete the merged sample
