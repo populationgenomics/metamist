@@ -32,7 +32,6 @@ from google.cloud import storage
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, image_path
-from cpg_utils.hail_batch import get_batch
 from metamist.apis import AnalysisApi, SampleApi, SequencingGroupApi
 from metamist.graphql import gql, query_async
 from metamist.models import (
@@ -598,6 +597,9 @@ async def reheader_analysis_files_in_batch(
     Uses samtools for CRAM files and bcftools for VCF/GVCF files.
     For other text based files, performs a simple find-and-replace operation with sed.
     """
+    # Imported here so hail is only needed when a batch is actually submitted
+    from cpg_utils.hail_batch import get_batch  # noqa: PLC0415
+
     batch = get_batch()
     n_jobs = 0
     for old_path, new_path in source_paths_new_paths:

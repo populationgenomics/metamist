@@ -1,3 +1,4 @@
+import sys
 import unittest
 from contextlib import ExitStack
 from types import SimpleNamespace
@@ -29,6 +30,12 @@ def make_analysis(
         else {'path': f'gs://cpg-src-main/cram/{SOURCE_SG}.cram'},
         'sequencingGroups': [{'id': f'SG_{i}'} for i in range(n_sgs)],
     }
+
+
+def patch_get_batch(batch: MagicMock):
+    """Stands in for cpg_utils.hail_batch, which needs hail installed"""
+    hail_batch = MagicMock(get_batch=MagicMock(return_value=batch))
+    return patch.dict(sys.modules, {'cpg_utils.hail_batch': hail_batch})
 
 
 def mock_path(path: str, exists: bool = False) -> MagicMock:
@@ -314,7 +321,7 @@ class TestReheaderAndUpsert(unittest.IsolatedAsyncioTestCase):
         old_path = mock_path('gs://cpg-src-main-web/mito/r/sr.png')
         new_path = mock_path('gs://cpg-dst-main-web/mito/r/sr.png')
         batch = MagicMock()
-        with patch.object(dsg, 'get_batch', return_value=batch):
+        with patch_get_batch(batch):
             await dsg.reheader_analysis_files_in_batch(
                 SOURCE_SG, NEW_SG, [(old_path, new_path)]
             )
@@ -379,7 +386,7 @@ class TestReheaderCommands(unittest.IsolatedAsyncioTestCase):
         new_path = mock_path(source.replace(SOURCE_SG, NEW_SG))
         batch = MagicMock()
         with (
-            patch.object(dsg, 'get_batch', return_value=batch),
+            patch_get_batch(batch),
             patch.object(dsg, 'image_path', side_effect=lambda name: name),
             patch.object(dsg, 'config_retrieve', return_value='driver'),
         ):

@@ -64,6 +64,8 @@ repos:
           ]
         additional_dependencies:
           - strawberry-graphql[fastapi]==0.268.1
+          # graphql-core 3.3 breaks the strawberry 0.268 mypy plugin, match uv.lock
+          - graphql-core==3.2.5
           - types-PyMySQL==1.1.0.1
 
   - repo: https://github.com/woodruffw/zizmor-pre-commit
