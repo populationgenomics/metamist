@@ -1,4 +1,5 @@
 import unittest
+from contextlib import ExitStack
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -462,60 +463,132 @@ class TestSomalier(unittest.TestCase):
 class TestMain(unittest.IsolatedAsyncioTestCase):
     """Tests for the end to end flow, with Metamist and GCS mocked"""
 
-    async def test_main_creates_sg_copies_files_and_registers_analyses(self):
-        """A new SG is created, files deduplicated and copied, analyses created"""
-        recorded = [(to_path('gs://cpg-src-main/a'), to_path('gs://cpg-dst-main/a'))]
-        unrecorded = [
-            (to_path('gs://cpg-src-main/a'), to_path('gs://cpg-dst-main/a')),
-            (to_path('gs://cpg-src-main/b'), to_path('gs://cpg-dst-main/b')),
-        ]
+    recorded = [(to_path('gs://cpg-src-main/a'), to_path('gs://cpg-dst-main/a'))]
+    unrecorded = [
+        (to_path('gs://cpg-src-main/a'), to_path('gs://cpg-dst-main/a')),
+        (to_path('gs://cpg-src-main/b'), to_path('gs://cpg-dst-main/b')),
+    ]
+
+    async def run_main(self, **kwargs) -> dict[str, MagicMock]:
+        """Runs main with everything external mocked, returning the mocks"""
         sample_api = MagicMock()
         sample_api.upsert_samples_async = AsyncMock(
             return_value=[{'sequencing_groups': [{'id': NEW_SG}]}]
         )
-        with (
-            patch.object(
-                dsg, 'get_participant_sample', AsyncMock(return_value=(7, None))
+        mocks = {
+            'get_participant_sample': AsyncMock(return_value=(7, None)),
+            'get_sample_upsert': AsyncMock(),
+            'SampleApi': MagicMock(return_value=sample_api),
+            'get_analyses_to_upsert': AsyncMock(
+                return_value=(['analysis'], self.recorded)
             ),
-            patch.object(dsg, 'get_sample_upsert', AsyncMock()) as get_sample_upsert,
-            patch.object(dsg, 'SampleApi', return_value=sample_api),
-            patch.object(
-                dsg,
-                'get_analyses_to_upsert',
-                AsyncMock(return_value=(['analysis'], recorded)),
-            ),
-            patch.object(
-                dsg, 'get_unrecorded_analysis_files', return_value=unrecorded
-            ) as get_unrecorded,
-            patch.object(dsg, 'config_retrieve', side_effect=['full', 'billing']),
-            patch.object(
-                dsg, 'reheader_analysis_files_in_batch', AsyncMock()
-            ) as reheader,
-            patch.object(dsg, 'upsert_analyses_records', AsyncMock()) as upsert,
-            patch.object(dsg, 'SequencingGroupApi') as sg_api,
-        ):
+            'get_unrecorded_analysis_files': MagicMock(return_value=self.unrecorded),
+            'config_retrieve': MagicMock(side_effect=['full', 'billing']),
+            'reheader_analysis_files_in_batch': AsyncMock(),
+            'log_file_updates': MagicMock(),
+            'upsert_analyses_records': AsyncMock(),
+            'SequencingGroupApi': MagicMock(),
+        }
+        with ExitStack() as stack:
+            for name, mock in mocks.items():
+                stack.enter_context(patch.object(dsg, name, mock))
             await dsg.main(
                 SOURCE_SG,
                 'src',
                 'dst',
                 'PARTICIPANT-1',
                 new_participant_id='PARTICIPANT-1',
+                **kwargs,
             )
+        return mocks
 
-        get_sample_upsert.assert_awaited_once_with(
+    async def test_main_creates_sg_copies_files_and_registers_analyses(self):
+        """A new SG is created, files deduplicated and copied, analyses created"""
+        mocks = await self.run_main()
+
+        mocks['get_sample_upsert'].assert_awaited_once_with(
             'src', SOURCE_SG, 'PARTICIPANT-1', 7, None
         )
-        get_unrecorded.assert_called_once_with(
+        mocks['get_unrecorded_analysis_files'].assert_called_once_with(
             'cpg-src-main', 'cpg-dst-main', SOURCE_SG, NEW_SG, billing_project='billing'
         )
+        reheader = mocks['reheader_analysis_files_in_batch']
         self.assertEqual(
             reheader.await_args.kwargs['source_paths_new_paths'],
-            [recorded[0], unrecorded[1]],
+            [self.recorded[0], self.unrecorded[1]],
         )
-        upsert.assert_awaited_once_with(
+        mocks['log_file_updates'].assert_not_called()
+        mocks['upsert_analyses_records'].assert_awaited_once_with(
             dataset='dst', analyses_to_upsert=['analysis'], dry_run=False
         )
-        sg_api.assert_not_called()
+        mocks['SequencingGroupApi'].assert_not_called()
+
+    async def test_dry_run_writes_nothing(self):
+        """A dry run logs the plan but creates, copies and archives nothing"""
+        mocks = await self.run_main(dry_run=True, deactivate_original_sg=True)
+
+        mocks['SampleApi'].assert_not_called()
+        mocks['reheader_analysis_files_in_batch'].assert_not_awaited()
+        mocks['SequencingGroupApi'].assert_not_called()
+        mocks['get_unrecorded_analysis_files'].assert_called_once_with(
+            'cpg-src-main',
+            'cpg-dst-main',
+            SOURCE_SG,
+            dsg.DRY_RUN_SG_ID,
+            billing_project='billing',
+        )
+        mocks['log_file_updates'].assert_called_once_with(
+            SOURCE_SG, dsg.DRY_RUN_SG_ID, [self.recorded[0], self.unrecorded[1]]
+        )
+        mocks['upsert_analyses_records'].assert_awaited_once_with(
+            dataset='dst', analyses_to_upsert=['analysis'], dry_run=True
+        )
+
+
+class TestDryRunFileUpdates(unittest.TestCase):
+    """Tests for logging the file updates in a dry run"""
+
+    def test_file_update_method(self):
+        """Each file type maps to the update the real run would make"""
+        self.assertEqual(dsg.file_update_method('gs://b/r/sr.png'), 'binary copy')
+        self.assertEqual(
+            dsg.file_update_method('gs://b/x.cram.somalier'), 'somalier rewrite'
+        )
+        self.assertEqual(dsg.file_update_method('gs://b/x.cram'), 'reheader')
+        self.assertEqual(dsg.file_update_method('gs://b/x.sd.txt.gz'), 'bgzip edit')
+        self.assertEqual(dsg.file_update_method('gs://b/x.html'), 'text edit')
+
+    def test_log_file_updates_writes_nothing(self):
+        """Files are sized and somalier headers checked, but nothing is written"""
+        cram = (mock_path('gs://b/x.cram'), mock_path('gs://c/x.cram'))
+        existing = (mock_path('gs://b/y.html'), mock_path('gs://c/y.html', exists=True))
+        somalier = (mock_path('gs://b/x.somalier'), mock_path('gs://c/x.somalier'))
+        with (
+            patch.object(dsg, 'file_size', return_value=1024**3) as file_size,
+            patch.object(dsg, 'somalier_file_commands') as somalier_commands,
+            self.assertLogs(dsg.logger, level='INFO') as logs,
+        ):
+            dsg.log_file_updates(SOURCE_SG, NEW_SG, [cram, existing, somalier])
+
+        self.assertEqual(file_size.call_count, 2)
+        somalier_commands.assert_called_once_with(
+            'gs://b/x.somalier', 'gs://c/x.somalier', (SOURCE_SG, NEW_SG), dry_run=True
+        )
+        self.assertIn('Would skip existing file: gs://c/y.html', logs.output[1])
+        self.assertIn('2.0 GiB would be copied', logs.output[-1])
+        for path in [*cram, *somalier]:
+            path.copy.assert_not_called()
+
+    def test_somalier_dry_run_checks_without_writing(self):
+        """The somalier header is checked but no file is written"""
+        files = {'old': MagicMock(), 'new': MagicMock()}
+        encoded = SOURCE_SG.encode()
+        files['old'].read_bytes.return_value = (
+            b'\x02' + bytes([len(encoded)]) + encoded + b'\x00'
+        )
+        with patch.object(dsg, 'to_path', side_effect=files.get):
+            dsg.somalier_file_commands('old', 'new', (SOURCE_SG, NEW_SG), dry_run=True)
+        files['new'].write_bytes.assert_not_called()
 
 
 if __name__ == '__main__':

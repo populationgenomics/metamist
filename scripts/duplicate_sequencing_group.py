@@ -11,7 +11,7 @@ Steps:
     user can provide a sample ID and participant ID to associate with the new sequencing group.
 2. Script queries the original dataset for the sequencing group and its associated analysis files.
     Only single sequencing group analyses are copied, cohort-level analyses are skipped.
-    Use duplicate_sequencing_group_dry_run.py to preview everything that will be copied.
+    Use --dry-run to log everything that would be created and copied.
 3. Script creates a new sequencing group in the new dataset, copying over the analysis files to
     the new dataset's storage bucket(s). This is also done for unrecorded analysis files that are not
     listed in the analysis records.
@@ -50,6 +50,8 @@ logging.basicConfig(
     stream=sys.stderr,
     level=logging.INFO,
 )
+# gql logs every GraphQL request and response at INFO, which buries the dry run output
+logging.getLogger('gql').setLevel(logging.WARNING)
 
 # ============================================================================
 # CONSTANTS AND CONFIGURATION
@@ -104,6 +106,9 @@ SG_DATA_QUERY = gql(
     }
     """
 )
+
+# Stands in for the new SG ID in dry runs, as no sequencing group is created
+DRY_RUN_SG_ID = 'NEW_SG_ID'
 
 ANALYSIS_TYPES = ['cram', 'gvcf', 'web', 'sv', 'mito-cram', 'somalier', 'exomiser']
 
@@ -542,6 +547,19 @@ def file_is_binary(path: str) -> bool:
     return path.lower().endswith(BINARY_FILE_EXTENSIONS)
 
 
+def file_update_method(path: str) -> str:
+    """Returns how a copied file is updated to carry the new SG ID"""
+    if file_is_binary(path):
+        return 'binary copy'
+    if path.endswith('.somalier'):
+        return 'somalier rewrite'
+    if file_reheaderable(path):
+        return 'reheader'
+    if path.endswith('.gz'):
+        return 'bgzip edit'
+    return 'text edit'
+
+
 def file_gatk_check(path: str):
     """
     Check if this is a file from GATK-SV CollectSVEvidence that needs bgzip reheadering,
@@ -586,14 +604,13 @@ async def reheader_analysis_files_in_batch(
         if new_path.exists():
             logger.info(f'Skipping update for existing file: {new_path!s}')
             continue
-        if file_is_binary(str(old_path)):
+        method = file_update_method(str(old_path))
+        if method == 'binary copy':
             # e.g. report images, which don't contain the SG ID, so copy as-is
             logger.info(f'Copying binary file {old_path!s} to {new_path!s}')
             old_path.copy(new_path)
             continue
-        if str(old_path).endswith(
-            '.somalier'
-        ):  # special case for binary .somalier files, run locally
+        if method == 'somalier rewrite':  # binary .somalier files, run locally
             somalier_file_commands(
                 str(old_path),
                 str(new_path),
@@ -602,7 +619,7 @@ async def reheader_analysis_files_in_batch(
             continue
         job = batch.new_job(f'Update SG ID in {old_path!s}')
         n_jobs += 1
-        if file_reheaderable(str(old_path)):
+        if method == 'reheader':
             job.storage(file_size(old_path) + 2 * 1024**3)  # Allow 2 GiB extra
             main_file_commands(
                 batch,
@@ -611,7 +628,7 @@ async def reheader_analysis_files_in_batch(
                 str(new_path),
                 (source_sequencing_group_id, new_sequencing_group_id),
             )
-        elif str(old_path).endswith('.gz'):
+        elif method == 'bgzip edit':
             job.storage(file_size(old_path) + 512 * 1024**2)  # Allow 512 MiB extra
             bgzipped_file_commands(
                 batch,
@@ -633,6 +650,34 @@ async def reheader_analysis_files_in_batch(
         batch.run(wait=True)
     else:
         logger.info('No files need updating in batch.')
+
+
+def log_file_updates(
+    source_sequencing_group_id: str,
+    new_sequencing_group_id: str,
+    source_paths_new_paths: list[tuple[Path, Path]],
+) -> None:
+    """Logs how each file would be copied and updated, without writing anything"""
+    total_size = 0
+    for old_path, new_path in source_paths_new_paths:
+        if new_path.exists():
+            logger.info(f'DRY RUN :: Would skip existing file: {new_path!s}')
+            continue
+        method = file_update_method(str(old_path))
+        size = file_size(old_path)
+        total_size += size
+        logger.info(
+            f'DRY RUN :: {method} ({size / 1024**2:.1f} MiB): {old_path!s} -> {new_path!s}'
+        )
+        if method == 'somalier rewrite':
+            # Check the header now, as a mismatch would stop the real run part way
+            somalier_file_commands(
+                str(old_path),
+                str(new_path),
+                (source_sequencing_group_id, new_sequencing_group_id),
+                dry_run=True,
+            )
+    logger.info(f'DRY RUN :: {total_size / 1024**3:.1f} GiB would be copied')
 
 
 def main_file_commands(batch, job, old_path: str, new_path: str, sid: tuple[str, str]):
@@ -702,7 +747,9 @@ def secondary_file_commands(batch, job, new_path: str):
         batch.write_output(job.new_md5, new_path)
 
 
-def somalier_file_commands(old_path: str, new_path: str, sid: tuple[str, str]):
+def somalier_file_commands(
+    old_path: str, new_path: str, sid: tuple[str, str], dry_run: bool = False
+):
     """Uses python to read and rewrite the binary somalier files with updated SG IDs"""
     logger.info(f'Reheadering somalier file for {old_path}, writing to {new_path}')
     data = to_path(old_path).read_bytes()
@@ -734,6 +781,10 @@ def somalier_file_commands(old_path: str, new_path: str, sid: tuple[str, str]):
 
     # Combine the pieces
     new_data = header_version + header_length_new + data_new_sample_id + remaining_data
+
+    if dry_run:
+        logger.info(f'DRY RUN :: Somalier sample ID {current_sample_id} checked')
+        return
 
     # --- 4. Write the New File ---
     to_path(new_path).write_bytes(new_data)
@@ -794,6 +845,7 @@ async def main(  # noqa: D417
     new_participant_id: str = None,
     reuse_sequencing_group_id: str = None,
     deactivate_original_sg: bool = False,
+    dry_run: bool = False,
 ) -> None:
     """
     Duplicates a sequencing group from one dataset to another, optionally using a new sample and participant ID.
@@ -808,6 +860,7 @@ async def main(  # noqa: D417
         new_participant_id (str, optional): Optional participant ID (or external participant ID) to associate with the new sequencing group.
         reuse_sequencing_group_id (str, optional): Optional existing sequencing group ID to reuse instead of creating a new one.
         deactivate_original_sg (bool, optional): Optional flag to deactivate the original sequencing group.
+        dry_run (bool, optional): Log what would be created and copied, without writing anything.
     """
     if new_sample_id or new_participant_id:
         # Validate and save these values for later input into the upsert call if they are provided.
@@ -839,10 +892,16 @@ async def main(  # noqa: D417
         logger.info(
             f'Prepared sample upsert for new dataset {new_dataset}: {sample_upsert}'
         )
-        new_sample = await SampleApi().upsert_samples_async(
-            new_dataset, [sample_upsert]
-        )
-        new_sequencing_group_id = new_sample[0]['sequencing_groups'][0]['id']
+        if dry_run:
+            logger.info(
+                f'DRY RUN :: Skipping sample upsert, using {DRY_RUN_SG_ID} for the new SG ID.'
+            )
+            new_sequencing_group_id = DRY_RUN_SG_ID
+        else:
+            new_sample = await SampleApi().upsert_samples_async(
+                new_dataset, [sample_upsert]
+            )
+            new_sequencing_group_id = new_sample[0]['sequencing_groups'][0]['id']
 
     # Fetch the analysis file paths
     logger.info(
@@ -876,23 +935,32 @@ async def main(  # noqa: D417
     logger.info(f'Total files to move: {len(source_paths_new_paths)}')
 
     # Reheader and update analysis files with hail batch, replacing SG IDs within the files
-    logger.info('Reheadering analysis files in batch to update SG IDs.')
-    await reheader_analysis_files_in_batch(
-        source_sequencing_group_id=original_sg_id,
-        new_sequencing_group_id=new_sequencing_group_id,
-        source_paths_new_paths=source_paths_new_paths,
-    )
+    if dry_run:
+        log_file_updates(
+            original_sg_id, new_sequencing_group_id, source_paths_new_paths
+        )
+    else:
+        logger.info('Reheadering analysis files in batch to update SG IDs.')
+        await reheader_analysis_files_in_batch(
+            source_sequencing_group_id=original_sg_id,
+            new_sequencing_group_id=new_sequencing_group_id,
+            source_paths_new_paths=source_paths_new_paths,
+        )
 
     # Upsert the analyses with the new outputs and meta data
     logger.info(f'Upserting analyses to new dataset {new_dataset}.')
     await upsert_analyses_records(
         dataset=new_dataset,
         analyses_to_upsert=analyses_to_upsert,
-        dry_run=False,
+        dry_run=dry_run,
     )
 
     # Optionally deactivate the original sequencing group
-    if deactivate_original_sg:
+    if deactivate_original_sg and dry_run:
+        logger.info(
+            f'DRY RUN :: Would deactivate original sequencing group {original_sg_id}.'
+        )
+    elif deactivate_original_sg:
         logger.info(
             f'Deactivating original sequencing group {original_sg_id} in dataset {source_dataset}.'
         )
@@ -941,6 +1009,11 @@ if __name__ == '__main__':
         action='store_true',
         help='Optional flag to deactivate the original sequencing group.',
     )
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='Log what would be created and copied, without writing anything.',
+    )
     args = parser.parse_args()
     asyncio.run(
         main(
@@ -952,5 +1025,6 @@ if __name__ == '__main__':
             new_participant_id=args.new_participant_id,
             reuse_sequencing_group_id=args.reuse_sequencing_group_id,
             deactivate_original_sg=args.deactivate_original_sg,
+            dry_run=args.dry_run,
         )
     )
