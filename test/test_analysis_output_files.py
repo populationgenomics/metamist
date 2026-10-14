@@ -145,7 +145,21 @@ class TestOutputFiles:
         analysis = await analysis_layer.get_analysis_by_id(analysis_id)
         assert analysis
         assert analysis.output == output_path
-        assert analysis.outputs == output_path
+        # A file that wasn't found still comes back file-shaped, with empty values
+        assert analysis.outputs == {
+            'id': None,
+            'parent_id': None,
+            'path': output_path,
+            'basename': 'this_file_doesnt_exist.txt',
+            'dirname': '',
+            'nameroot': 'this_file_doesnt_exist',
+            'nameext': '.txt',
+            'file_checksum': None,
+            'size': 0,
+            'meta': None,
+            'valid': False,
+            'secondary_files': {},
+        }
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
@@ -529,9 +543,11 @@ class TestOutputFiles:
             analysis = await analysis_layer.get_analysis_by_id(analysis_id)
             assert analysis
 
-            # An invalid file gets no output_file row, so it falls back to a
-            # bare string output rather than a structured one.
-            assert analysis.output == path
+            # An invalid file gets no output_file row, but is still returned
+            # file-shaped, flagged as not valid.
+            assert isinstance(analysis.outputs, dict)
+            assert analysis.outputs['mt']['path'] == path
+            assert analysis.outputs['mt']['valid'] is False
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
