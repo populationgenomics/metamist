@@ -9,9 +9,11 @@ from test.testbase import DbIsolatedTest, run_as_sync
 
 
 QUERY_BY_CONFIG_PATH = """
-query AnalysisRunners($project: String!, $configPath: String!) {
-    project(name: $project) {
-        analysisRunner(configPath: {eq: $configPath}) { arGuid configPath }
+query AnalysisRunners($projects: [Int!]!, $configPath: String!) {
+    analysisRunners(project: {in_: $projects}, configPath: {eq: $configPath}) {
+        arGuid
+        configPath
+        project { name }
     }
 }
 """
@@ -160,7 +162,7 @@ class TestAnalysisRunner(DbIsolatedTest):
         """Test filter config paths"""
 
         pending_marker = 'SEQERA-PENDING'
-        resolved_value = 'gs://cpg-config/<ar-guid-set>.toml'
+        resolved_value = 'gs://bucket/<ar-guid-set>.toml'
         config_paths = {
             '<ar-guid-set>': resolved_value,
             '<ar-guid-pending>': pending_marker,
@@ -207,7 +209,7 @@ class TestAnalysisRunner(DbIsolatedTest):
             await self.al.update_analysis_runner_entry(
                 self.project_id,
                 '<missing-ar-guid>',
-                config_path='gs://cpg-config/missing.json',
+                config_path='gs://bucket/missing.json',
             )
 
     async def insert_with_config_paths(self, ar_guid: str, config_path: str):
@@ -239,15 +241,15 @@ class TestAnalysisRunner(DbIsolatedTest):
         """Return arGuid/s for queried config_path"""
         result = await self.run_graphql_query_async(
             QUERY_BY_CONFIG_PATH,
-            variables={'project': self.project_name, 'configPath': config_path},
+            variables={'projects': [self.project_id], 'configPath': config_path},
         )
-        return [ar['arGuid'] for ar in result['project']['analysisRunner']]
+        return [ar['arGuid'] for ar in result['analysisRunners']]
 
     @run_as_sync
     async def test_graphql_config_path_filter(self):
         """Test filter config paths via GraphQL"""
         pending_marker = 'SEQERA-PENDING'
-        resolved_value = 'gs://cpg-config/a.toml'
+        resolved_value = 'gs://bucket/a.toml'
         await self.insert_with_config_paths('<ar-guid-set>', resolved_value)
 
         await self.insert_with_config_paths('<ar-guid-pending>', pending_marker)
@@ -268,7 +270,7 @@ class TestAnalysisRunner(DbIsolatedTest):
         pending_marker = 'SEQERA-PENDING'
         await self.insert_with_config_paths('<ar-guid-pending>', pending_marker)
 
-        new_config_path = 'gs://cpg-config/<ar-guid-pending>.json'
+        new_config_path = 'gs://bucket/<ar-guid-pending>.json'
 
         await self.run_graphql_query_async(
             UPDATE_MUTATION,

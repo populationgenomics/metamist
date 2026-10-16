@@ -415,7 +415,6 @@ class GraphQLProject:
         repository: GraphQLFilter[str] | None = None,
         access_level: GraphQLFilter[str] | None = None,
         environment: GraphQLFilter[str] | None = None,
-        config_path: GraphQLFilter[str] | None = None,
     ) -> list['GraphQLAnalysisRunner']:
         connection = info.context['connection']
         alayer = AnalysisRunnerLayer(connection)
@@ -426,7 +425,6 @@ class GraphQLProject:
             repository=repository.to_internal_filter() if repository else None,
             access_level=access_level.to_internal_filter() if access_level else None,
             environment=environment.to_internal_filter() if environment else None,
-            config_path=config_path.to_internal_filter() if config_path else None,
         )
         analysis_runners = await alayer.query(filter_)
         return [GraphQLAnalysisRunner.from_internal(ar) for ar in analysis_runners]
@@ -1688,6 +1686,27 @@ class Query:  # entry point to graphql.
                 f'Expected exactly one analysis runner expected, found {len(analysis_runners)}'
             )
         return GraphQLAnalysisRunner.from_internal(analysis_runners[0])
+
+    @strawberry.field
+    async def analysis_runners(
+        self,
+        info: Info[GraphQLContext, 'Query'],
+        project: GraphQLFilter[int],
+        config_path: GraphQLFilter[str] | None = None,
+    ) -> list[GraphQLAnalysisRunner]:
+        """Fetch Analysis runner logs given the filter criteria."""
+        connection = info.context['connection']
+        connection.check_access_to_projects_for_ids(
+            project.all_values(), allowed_roles=ReadAccessRoles
+        )
+
+        alayer = AnalysisRunnerLayer(connection)
+        filter_ = AnalysisRunnerFilter(
+            project=project.to_internal_filter(),
+            config_path=config_path.to_internal_filter() if config_path else None,
+        )
+        analysis_runners = await alayer.query(filter_)
+        return [GraphQLAnalysisRunner.from_internal(ar) for ar in analysis_runners]
 
     @strawberry.field
     async def analyses(
