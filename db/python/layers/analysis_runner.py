@@ -1,8 +1,10 @@
 from db.python.connect import Connection
+from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
 from db.python.tables.analysis_runner import AnalysisRunnerFilter, AnalysisRunnerTable
+from db.python.utils import NotFoundError
 from models.models.analysis_runner import AnalysisRunnerInternal
-from models.models.project import ReadAccessRoles
+from models.models.project import ProjectId, ReadAccessRoles
 
 
 class AnalysisRunnerLayer(BaseLayer):
@@ -38,3 +40,28 @@ class AnalysisRunnerLayer(BaseLayer):
     ) -> str:
         """Insert analysis runner log"""
         return await self.at.insert_analysis_runner_entry(analysis_runner)
+
+    # UPDATES
+
+    async def update_analysis_runner_entry(
+        self,
+        project: ProjectId,
+        ar_guid: str,
+        config_path: str,
+    ) -> None:
+        """Update the config path of an AR log"""
+
+        ar_entry = await self.at.query(
+            AnalysisRunnerFilter(
+                ar_guid=GenericFilter(eq=ar_guid), project=GenericFilter(eq=project)
+            )
+        )
+
+        if not ar_entry:
+            raise NotFoundError(
+                f"Couldn't find analysis runner log with ar_guid = {ar_guid}"
+            )
+
+        await self.at.update_analysis_runner_entry(
+            project, ar_guid, config_path=config_path
+        )

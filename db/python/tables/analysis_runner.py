@@ -18,6 +18,7 @@ class AnalysisRunnerFilter(GenericFilterModel):
     repository: GenericFilter[str] | None = None
     access_level: GenericFilter[str] | None = None
     environment: GenericFilter[str] | None = None
+    config_path: GenericFilter[str] | None = None
 
 
 class AnalysisRunnerTable(DbBase):
@@ -85,9 +86,32 @@ ON DUPLICATE KEY UPDATE ar_guid = ar_guid
             'meta': to_db_json(analysis_runner.meta),
             'output_path': analysis_runner.output_path,
             'audit_log_id': await self.audit_log_id(),
-            'project': self.project_id,
+            'project': analysis_runner.project,
         }
 
         await self.connection.execute(_query, values)
 
         return analysis_runner.ar_guid
+
+    async def update_analysis_runner_entry(
+        self,
+        project: ProjectId,
+        ar_guid: str,
+        config_path: str,
+    ) -> None:
+        """
+        Update the config path of an existing analysis runner entry
+        """
+
+        _query = """
+UPDATE analysis_runner
+SET config_path = :config_path, audit_log_id = :audit_log_id
+WHERE ar_guid = :ar_guid AND project = :project
+"""
+        values = {
+            'ar_guid': ar_guid,
+            'project': project,
+            'config_path': config_path,
+            'audit_log_id': await self.audit_log_id(),
+        }
+        await self.connection.execute(_query, values)
