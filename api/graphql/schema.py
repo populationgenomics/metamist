@@ -415,6 +415,7 @@ class GraphQLProject:
         repository: GraphQLFilter[str] | None = None,
         access_level: GraphQLFilter[str] | None = None,
         environment: GraphQLFilter[str] | None = None,
+        config_path: GraphQLFilter[str] | None = None,
     ) -> list['GraphQLAnalysisRunner']:
         connection = info.context['connection']
         alayer = AnalysisRunnerLayer(connection)
@@ -425,6 +426,7 @@ class GraphQLProject:
             repository=repository.to_internal_filter() if repository else None,
             access_level=access_level.to_internal_filter() if access_level else None,
             environment=environment.to_internal_filter() if environment else None,
+            config_path=config_path.to_internal_filter() if config_path else None,
         )
         analysis_runners = await alayer.query(filter_)
         return [GraphQLAnalysisRunner.from_internal(ar) for ar in analysis_runners]

@@ -73,6 +73,7 @@ async def get_analysis_runner_logs(
     repository: str | None = None,
     access_level: str | None = None,
     environment: str | None = None,
+    config_path: str | None = None,
     connection: Connection = get_project_db_connection(ReadAccessRoles),
 ) -> list[AnalysisRunner]:
     """Get analysis runner logs"""
@@ -88,6 +89,7 @@ async def get_analysis_runner_logs(
         repository=GenericFilter(eq=repository),
         access_level=GenericFilter(eq=access_level),
         environment=GenericFilter(eq=environment),
+        config_path=GenericFilter(eq=config_path),
         project=GenericFilter(eq=connection.project_id),
     )
 

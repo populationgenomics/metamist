@@ -31,6 +31,13 @@ class AnalysisRunnerInput:
     cwd: str | None = None
 
 
+@strawberry.input
+class AnalysisRunnerUpdateInput:
+    """Analysis runner update input"""
+
+    config_path: str
+
+
 @strawberry.type
 class AnalysisRunnerMutations:
     """Analysis Runner mutations"""
@@ -75,3 +82,26 @@ class AnalysisRunnerMutations:
         )
 
         return analysis_id
+
+    @strawberry.mutation
+    async def update_analysis_runner_log(
+        self,
+        project: str,
+        ar_guid: str,
+        ar_update_input: AnalysisRunnerUpdateInput,
+        info: Info,
+    ) -> bool:
+        """Set the config path of an analysis runner log"""
+        connection: Connection = info.context['connection']
+
+        (target_project,) = connection.get_and_check_access_to_projects_for_names(
+            [project], FullWriteAccessRoles
+        )
+        alayer = AnalysisRunnerLayer(connection)
+
+        await alayer.update_analysis_runner_entry(
+            target_project.id,
+            ar_guid,
+            config_path=ar_update_input.config_path,
+        )
+        return True
