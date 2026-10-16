@@ -302,29 +302,22 @@ VALUES ({cs_id_keys}) RETURNING id;"""
         ] = defaultdict(lambda: defaultdict(list))
 
         for row in rows:
-            file_id = row['id']
-            if file_id:
-                # Building OutputFileInternal object with secondary files if available
+            if row['id']:
                 file_internal = OutputFileInternal.from_db(**dict(row))
-                # If no json_structure, just set to the output.
-
-                if row['json_structure'] is None:
-                    analysis_files[row['analysis_id']]['output'] = row['path']
-                else:
-                    analysis_files[row['analysis_id']]['output'] = ''
-
-                # if analysis_files[row['analysis_id']]['outputs'] is a str, we set it to a list and append the str to it:
-                if isinstance(analysis_files[row['analysis_id']]['outputs'], str):
-                    analysis_files[row['analysis_id']]['outputs'] = [
-                        analysis_files[row['analysis_id']]['outputs']  # type: ignore [list-item]
-                    ]
-                analysis_files[row['analysis_id']]['outputs'].append(  # type: ignore [union-attr]
-                    (file_internal, row['json_structure'])
-                )
             else:
-                # If no file_id, just set to the output.
-                analysis_files[row['analysis_id']]['output'] = row['output']
-                analysis_files[row['analysis_id']]['outputs'] = row['output']
+                # The file wasn't found when the output was registered, so it was
+                # stored as a plain string. Keep `outputs` file-shaped regardless.
+                file_internal = OutputFileInternal.not_found(row['output'])
+
+            # If no json_structure, just set to the output.
+            if row['json_structure'] is None:
+                analysis_files[row['analysis_id']]['output'] = file_internal.path
+            else:
+                analysis_files[row['analysis_id']]['output'] = ''
+
+            analysis_files[row['analysis_id']]['outputs'].append(  # type: ignore [union-attr]
+                (file_internal, row['json_structure'])
+            )
 
         # Transforming analysis_files into the desired output format
         analysis_output_files = {
