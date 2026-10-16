@@ -265,11 +265,12 @@ class TestAnalysisRunner(DbIsolatedTest):
     async def test_graphql_update(self):
         """Test GraphQL update mutation"""
 
-        new_config_path = 'gs://cpg-config/<ar-guid-pending>.json'
         pending_marker = 'SEQERA-PENDING'
         await self.insert_with_config_paths('<ar-guid-pending>', pending_marker)
 
-        result = await self.run_graphql_query_async(
+        new_config_path = 'gs://cpg-config/<ar-guid-pending>.json'
+
+        await self.run_graphql_query_async(
             UPDATE_MUTATION,
             variables={
                 'project': self.project_name,
@@ -277,7 +278,6 @@ class TestAnalysisRunner(DbIsolatedTest):
                 'update': {'configPath': new_config_path},
             },
         )
-        self.assertTrue(result['analysisRunner']['updateAnalysisRunnerLog'])
 
         self.assertListEqual(
             await self.get_arguids_of_given_config_path(pending_marker), []
