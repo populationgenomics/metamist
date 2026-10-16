@@ -6,7 +6,40 @@ from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers.analysis_runner import AnalysisRunnerLayer
 from db.python.tables.analysis_runner import AnalysisRunnerFilter
+from db.python.utils import NotFoundError
 from models.models.analysis_runner import AnalysisRunnerInternal
+from test.conftest import GraphQLQueryFunction
+
+
+QUERY_BY_CONFIG_PATH = """
+query AnalysisRunners($projects: [Int!]!, $configPath: String!) {
+    analysisRunners(project: {in_: $projects}, configPath: {eq: $configPath}) {
+        arGuid
+        configPath
+        project { name }
+    }
+}
+"""
+
+CREATE_MUTATION = """
+mutation CreateAnalysisRunner($project: String!, $ar: AnalysisRunnerInput!) {
+    analysisRunner {
+        createAnalysisRunnerLog(project: $project, analysisRunner: $ar)
+    }
+}
+"""
+
+UPDATE_MUTATION = """
+mutation UpdateAnalysisRunner(
+    $project: String!, $arGuid: String!, $update: AnalysisRunnerUpdateInput!
+) {
+    analysisRunner {
+        updateAnalysisRunnerLog(
+            project: $project, arGuid: $arGuid, arUpdateInput: $update
+        )
+    }
+}
+"""
 
 
 class TestAnalysisRunner:
@@ -180,3 +213,144 @@ class TestAnalysisRunner:
             AnalysisRunnerFilter(ar_guid=GenericFilter(eq=ar_entry.ar_guid))
         )
         assert len(db_ars) == 1
+
+    @pytest.mark.asyncio
+    async def test_query_config_path(self) -> None:
+        """Test filter config paths"""
+
+        pending_marker = 'SEQERA-PENDING'
+        resolved_value = 'gs://bucket/<ar-guid-set>.toml'
+
+        config_paths = {
+            '<ar-guid-pending>': pending_marker,
+            '<ar-guid-set>': resolved_value,
+            '<ar-guid-null>': None,
+        }
+
+        for ar_guid, config_path in config_paths.items():
+            ar_entry = self.get_test_analysis(ar_guid)
+            ar_entry.config_path = config_path
+            await self.al.insert_analysis_runner_entry(ar_entry)
+
+        ar_fetched = await self.al.query(
+            AnalysisRunnerFilter(
+                project=GenericFilter(eq=self.project_id),
+                config_path=GenericFilter(eq=pending_marker),
+            )
+        )
+        assert len(ar_fetched) == 1
+        assert ar_fetched[0].ar_guid == '<ar-guid-pending>'
+
+        ar_fetched = await self.al.query(
+            AnalysisRunnerFilter(
+                project=GenericFilter(eq=self.project_id),
+                config_path=GenericFilter(eq=resolved_value),
+            )
+        )
+        assert len(ar_fetched) == 1
+        assert ar_fetched[0].ar_guid == '<ar-guid-set>'
+
+        ar_fetched = await self.al.query(
+            AnalysisRunnerFilter(
+                project=GenericFilter(eq=self.project_id),
+                config_path=GenericFilter(isnull=True),
+            )
+        )
+        assert len(ar_fetched) == 1
+        assert ar_fetched[0].ar_guid == '<ar-guid-null>'
+
+    @pytest.mark.asyncio
+    async def test_update_nonexistent_entry(self) -> None:
+        """Test updating a nonexistent ar entry raises NotFoundError"""
+
+        with pytest.raises(NotFoundError):
+            await self.al.update_analysis_runner_entry(
+                self.project_id,
+                '<missing-ar-guid>',
+                config_path='gs://bucket/missing.toml',
+            )
+
+    async def insert_with_config_paths(
+        self, graphql_query: GraphQLQueryFunction, ar_guid: str, config_path: str
+    ) -> None:
+        """Insert one AR entry per ar_guid with the given config path, through GraphQL"""
+
+        await graphql_query(
+            CREATE_MUTATION,
+            {
+                'project': self.project_name,
+                'ar': {
+                    'arGuid': ar_guid,
+                    'accessLevel': 'test',
+                    'repository': 'repository',
+                    'commit': 'commit',
+                    'script': 'script',
+                    'description': 'description',
+                    'driverImage': 'driver_image',
+                    'configPath': config_path,
+                    'environment': 'gcp',
+                    'batchUrl': 'batch_url',
+                    'submittingUser': 'submitting_user',
+                    'meta': {'meta': 'meta'},
+                    'outputPath': 'output_path',
+                },
+            },
+        )
+
+    async def get_ids_given_config_path(
+        self, graphql_query: GraphQLQueryFunction, config_path: str
+    ) -> list[str]:
+        """Get arGuid list given config path"""
+        result = await graphql_query(
+            QUERY_BY_CONFIG_PATH,
+            {'projects': [self.project_id], 'configPath': config_path},
+        )
+        return [ar['arGuid'] for ar in result['data']['analysisRunners']]
+
+
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_graphql_config_path_filter(self, graphql_query) -> None:
+        """Test the configPath filter through GraphQL"""
+
+        pending_marker = 'SEQERA-PENDING'
+        resolved_value = 'gs://cpg-config/a.toml'
+        await self.insert_with_config_paths(
+            graphql_query, '<ar-guid-set>', resolved_value
+        )
+        await self.insert_with_config_paths(
+            graphql_query, '<ar-guid-pending>', pending_marker
+        )
+
+        assert await self.get_ids_given_config_path(graphql_query, pending_marker) == [
+            '<ar-guid-pending>'
+        ]
+        assert await self.get_ids_given_config_path(graphql_query, resolved_value) == [
+            '<ar-guid-set>'
+        ]
+        assert await self.get_ids_given_config_path(graphql_query, 'missing') == []
+
+
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_graphql_update(self, graphql_query) -> None:
+        """Test the analysisRunner config update"""
+
+        new_config_path = 'gs://cpg-config/<ar-guid-pending>.toml'
+        await self.insert_with_config_paths(
+            graphql_query, '<ar-guid-pending>', 'SEQERA-PENDING'
+        )
+
+        await graphql_query(
+            UPDATE_MUTATION,
+            {
+                'project': self.project_name,
+                'arGuid': '<ar-guid-pending>',
+                'update': {'configPath': new_config_path},
+            },
+        )
+
+        assert await self.get_ids_given_config_path(graphql_query, 'SEQERA-PENDING') == []
+        assert await self.get_ids_given_config_path(graphql_query, new_config_path) == [
+            '<ar-guid-pending>'
+        ]

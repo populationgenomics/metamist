@@ -1721,6 +1721,27 @@ class Query:  # entry point to graphql.
             return GraphQLAnalysisRunner.from_internal(analysis_runners[0])
 
     @strawberry.field
+    async def analysis_runners(
+        self,
+        info: Info[GraphQLContext, Query],
+        project: GraphQLFilter[int],
+        config_path: GraphQLFilter[str] | None = None,
+    ) -> list[GraphQLAnalysisRunner]:
+        """Fetch Analysis runner logs given the filter criteria."""
+        async with info.context.get_connection() as connection:
+            connection.check_access_to_projects_for_ids(
+                project.all_values(), allowed_roles=ReadAccessRoles
+            )
+
+            alayer = AnalysisRunnerLayer(connection)
+            filter_ = AnalysisRunnerFilter(
+                project=project.to_internal_filter(),
+                config_path=config_path.to_internal_filter() if config_path else None,
+            )
+            analysis_runners = await alayer.query(filter_)
+            return [GraphQLAnalysisRunner.from_internal(ar) for ar in analysis_runners]
+
+    @strawberry.field
     async def analyses(
         self,
         info: Info[GraphQLContext, Query],

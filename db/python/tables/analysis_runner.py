@@ -20,6 +20,7 @@ class AnalysisRunnerFilter(GenericFilterModel):
     repository: GenericFilter[str] | None = None
     access_level: GenericFilter[str] | None = None
     environment: GenericFilter[str] | None = None
+    config_path: GenericFilter[str] | None = None
 
 
 class AnalysisRunnerTable(DbBase):
@@ -82,3 +83,22 @@ class AnalysisRunnerTable(DbBase):
 
         await self.connection.pg_connection.execute(_query)
         return analysis_runner.ar_guid
+
+    async def update_analysis_runner_entry(
+        self,
+        project: ProjectId,
+        ar_guid: str,
+        config_path: str,
+    ) -> None:
+        """
+        Update the config path of an existing analysis runner entry
+        """
+        audit_log_id = await self.audit_log_id()
+
+        _query = t"""
+        UPDATE analysis_runner
+        SET config_path = {config_path}, audit_log_id = {audit_log_id}
+        WHERE ar_guid = {ar_guid} AND project = {project}
+        """
+
+        await self.connection.pg_connection.execute(_query)
