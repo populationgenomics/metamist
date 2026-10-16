@@ -314,7 +314,7 @@ class TestAnalysisRunner:
         """Test the configPath filter through GraphQL"""
 
         pending_marker = 'SEQERA-PENDING'
-        resolved_value = 'gs://cpg-config/a.toml'
+        resolved_value = 'gs://bucket/a.toml'
         await self.insert_with_config_paths(
             graphql_query, '<ar-guid-set>', resolved_value
         )
@@ -336,7 +336,7 @@ class TestAnalysisRunner:
     async def test_graphql_update(self, graphql_query) -> None:
         """Test the analysisRunner config update"""
 
-        new_config_path = 'gs://cpg-config/<ar-guid-pending>.toml'
+        new_config_path = 'gs://bucket/<ar-guid-pending>.toml'
         await self.insert_with_config_paths(
             graphql_query, '<ar-guid-pending>', 'SEQERA-PENDING'
         )
