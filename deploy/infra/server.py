@@ -98,7 +98,7 @@ def create_server_resources(
                     #
                     # During testing, uvicorn released http2 support so we switched back
                     # to that. Uvicorn has the same low default keepalive (52) but
-                    # handlesthe race condition better, returning well formed responses
+                    # handles the race condition better, returning well-formed responses
                     # but still resulting in 503s. The fix for this is to increase the
                     # keepalive value above the load balancer idle timeout of 600s,
                     # hence the value below of 620 seconds. In testing this value seems
