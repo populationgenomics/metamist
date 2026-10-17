@@ -65,6 +65,7 @@ VALUES (
     :description, :driver_image, :config_path, :cwd, :environment,
     :hail_version, :batch_url, :submitting_user, :meta, :output_path, :audit_log_id
 )
+ON DUPLICATE KEY UPDATE ar_guid = ar_guid
 """
         values = {
             'ar_guid': analysis_runner.ar_guid,

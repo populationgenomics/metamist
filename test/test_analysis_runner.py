@@ -122,3 +122,41 @@ class TestAnalysisRunner(DbIsolatedTest):
         )
         self.assertEqual(len(db_ars), 2)
         self.assertSetEqual({a.ar_guid for a in db_ars}, guids_to_query)
+
+    @run_as_sync
+    async def test_insert_skip_duplicates(self):
+        """Test inserting an existing ar_guid does not throw an error"""
+        analysis = AnalysisRunnerInternal(
+            ar_guid='<ar-guid>',
+            project=self.project_id,
+            output_path='output_path',
+            timestamp=datetime.datetime(2024, 1, 1),
+            access_level='test',
+            repository='repository',
+            config_path='config_path',
+            environment='gcp',
+            submitting_user='submitting_user',
+            commit='commit',
+            script='script',
+            description='description',
+            hail_version='1.0',
+            cwd='cwd',
+            driver_image='driver_image',
+            batch_url='batch_url',
+            meta={'meta': 'meta'},
+        )
+
+        # Insert entry
+        self.assertEqual(
+            await self.al.insert_analysis_runner_entry(analysis), analysis.ar_guid
+        )
+
+        # Insert entry again
+        self.assertEqual(
+            await self.al.insert_analysis_runner_entry(analysis), analysis.ar_guid
+        )
+
+        db_ars = await self.al.query(
+            AnalysisRunnerFilter(ar_guid=GenericFilter(eq=analysis.ar_guid))
+        )
+        self.assertEqual(len(db_ars), 1)
