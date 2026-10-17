@@ -10,6 +10,8 @@ Steps:
 1. User provides original sequencing group ID, source dataset, new dataset. Optionally,
     user can provide a sample ID and participant ID to associate with the new sequencing group.
 2. Script queries the original dataset for the sequencing group and its associated analysis files.
+    Only single sequencing group analyses are copied, cohort-level analyses are skipped.
+    Use --dry-run to log everything that would be created and copied.
 3. Script creates a new sequencing group in the new dataset, copying over the analysis files to
     the new dataset's storage bucket(s). This is also done for unrecorded analysis files that are not
     listed in the analysis records.
@@ -21,6 +23,7 @@ Steps:
 
 import argparse
 import asyncio
+import fnmatch
 import logging
 import sys
 from typing import Any
@@ -29,7 +32,6 @@ from google.cloud import storage
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, image_path
-from cpg_utils.hail_batch import get_batch
 from metamist.apis import AnalysisApi, SampleApi, SequencingGroupApi
 from metamist.graphql import gql, query_async
 from metamist.models import (
@@ -47,6 +49,8 @@ logging.basicConfig(
     stream=sys.stderr,
     level=logging.INFO,
 )
+# gql logs every GraphQL request and response at INFO, which buries the dry run output
+logging.getLogger('gql').setLevel(logging.WARNING)
 
 # ============================================================================
 # CONSTANTS AND CONFIGURATION
@@ -79,6 +83,9 @@ SG_DATA_QUERY = gql(
                 type
                 technology
                 platform
+                sample {
+                    type
+                }
                 assays {
                     id
                     type
@@ -89,6 +96,9 @@ SG_DATA_QUERY = gql(
                     type
                     meta
                     outputs
+                    sequencingGroups {
+                        id
+                    }
                 }
             }
         }
@@ -96,9 +106,27 @@ SG_DATA_QUERY = gql(
     """
 )
 
-ANALYSIS_TYPES = ['cram', 'gvcf', 'web', 'sv']
+# Stands in for the new SG ID in dry runs, as no sequencing group is created
+DRY_RUN_SG_ID = 'NEW_SG_ID'
 
-# File paths that are not recorded in the analysis records but need to be copied
+ANALYSIS_TYPES = ['cram', 'gvcf', 'web', 'sv', 'mito-cram', 'somalier', 'exomiser']
+
+# Copied as-is rather than run through sed, which could corrupt them
+BINARY_FILE_EXTENSIONS = (
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.ico',
+    '.pdf',
+    '.woff',
+    '.woff2',
+    '.ttf',
+)
+
+# File paths that are not recorded in the analysis records but need to be copied.
+# A '*' matches any characters, e.g. a tool version directory. Files recorded by an
+# analysis as well are only copied once.
 UNRECORDED_ANALYSIS_FILES = [
     # Mito CRAM files
     'gs://{bucket_name}/mito/{sg_id}.base_level_coverage.tsv',
@@ -120,6 +148,7 @@ UNRECORDED_ANALYSIS_FILES = [
     'gs://{bucket_name}/qc/quality_by_cycle_metrics/{sg_id}.quality_by_cycle_metrics',
     'gs://{bucket_name}/qc/quality_yield_metrics/{sg_id}.quality_yield_metrics',
     'gs://{bucket_name}/qc/picard_wgs_metrics/{sg_id}.picard-wgs-metrics',
+    'gs://{bucket_name}/qc/markduplicates_metrics/{sg_id}.markduplicates-metrics',
     # Single Sample SV stage files
     'gs://{bucket_name}/sv_evidence/{sg_id}.coverage_counts.tsv.gz',
     'gs://{bucket_name}/sv_evidence/{sg_id}.pe.txt.gz',
@@ -131,6 +160,16 @@ UNRECORDED_ANALYSIS_FILES = [
     # Stripy stage files
     'gs://{bucket_name}-analysis/stripy/{sg_id}.stripy.json',
     'gs://{bucket_name}-analysis/stripy/{sg_id}.stripy.log.txt',
+    # Versioned Stripy stage files
+    'gs://{bucket_name}/stripy/*/{sg_id}.log',
+    'gs://{bucket_name}-web/stripy/*/{sg_id}__default.html',
+    # Exomiser stage files
+    'gs://{bucket_name}-analysis/exomiser_inputs/{sg_id}.ped',
+    'gs://{bucket_name}-analysis/exomiser_inputs/{sg_id}_phenopacket.json',
+    'gs://{bucket_name}-analysis/exomiser_results/{sg_id}.json',
+    'gs://{bucket_name}-analysis/exomiser_results/{sg_id}.tsv',
+    'gs://{bucket_name}-analysis/exomiser_results/{sg_id}.variants.tsv',
+    'gs://{bucket_name}-analysis/exomiser_results/{sg_id}.yaml',
     # MitoReport stage files
     'gs://{bucket_name}-analysis/mito/{sg_id}.coverage_mean.txt',
     'gs://{bucket_name}-analysis/mito/{sg_id}.coverage_median.txt',
@@ -221,6 +260,11 @@ async def get_sample_upsert(
             'analysisTypes': [],
         },
     )
+    if not response['project']['sequencingGroups']:
+        raise ValueError(
+            f'Sequencing group {original_sg_id} not found in {source_dataset}. '
+            'Only active sequencing groups can be duplicated.'
+        )
     original_sg_data = response['project']['sequencingGroups'][0]
     assays = [
         AssayUpsert(
@@ -246,6 +290,8 @@ async def get_sample_upsert(
     sample = SampleUpsert(
         id=sample_id,
         external_ids={'': external_sample_id},
+        # Only set the type on new samples, so an existing sample is left unchanged
+        type=None if sample_id else original_sg_data['sample']['type'],
         participant_id=participant_id,
         sequencing_groups=[sg],
     )
@@ -255,6 +301,33 @@ async def get_sample_upsert(
 # ============================================================================
 # ANALYSIS DISCOVERY AND PREPARATION FUNCTIONS
 # ============================================================================
+
+
+def analysis_output_path(analysis: dict[str, Any]) -> str | None:
+    """Returns the primary output path of an analysis, if one is recorded"""
+    outputs = analysis['outputs']
+    if isinstance(outputs, str):
+        return outputs
+    return (outputs or {}).get('path')
+
+
+def analysis_skip_reason(analysis: dict[str, Any]) -> str | None:
+    """
+    Returns why an analysis should not be copied to the new SG, or None to copy it.
+    Expects an analysis from SG_DATA_QUERY, already filtered to completed analyses
+    of the types in ANALYSIS_TYPES.
+    """
+    n_sequencing_groups = len(analysis['sequencingGroups'])
+    if n_sequencing_groups > 1:
+        # e.g. dataset index pages, which would leak other samples into the new dataset
+        return f'cohort-level analysis covering {n_sequencing_groups} sequencing groups'
+    if analysis['type'] == 'sv' and analysis['meta'].get('stage') != (
+        'GatherSampleEvidence'
+    ):
+        return f'sv analysis from stage {analysis["meta"].get("stage")}'
+    if not analysis_output_path(analysis):
+        return 'no recorded outputs path'
+    return None
 
 
 async def get_analyses_to_upsert(
@@ -280,27 +353,14 @@ async def get_analyses_to_upsert(
     files_to_move = []
     for sg in analysis_query_result['project']['sequencingGroups']:
         for analysis in sg['analyses']:
-            if (
-                analysis['type'] == 'sv'
-                and analysis['meta'].get('stage') != 'GatherSampleEvidence'
-            ):
-                # Skip the SV analyses that are not the GatherSampleEvidence stage
-                continue
-
-            current_outputs = analysis['outputs']
-            if isinstance(current_outputs, str):
-                current_outputs = {
-                    'path': current_outputs,
-                }
-
-            if not current_outputs.get('path'):
-                logger.warning(
-                    f'Analysis {analysis["id"]} of type {analysis["type"]} has no recorded outputs path, skipping.'
+            if skip_reason := analysis_skip_reason(analysis):
+                logger.info(
+                    f'Skipping {analysis["type"]} analysis {analysis["id"]}: {skip_reason}'
                 )
                 continue
 
             # Create the new outputs by replacing the source dataset and SG ID with the new ones
-            source_path = current_outputs['path']
+            source_path = analysis_output_path(analysis)
             new_path = source_path.replace(source_dataset, new_dataset).replace(
                 source_sequencing_group_id, new_sequencing_group_id
             )
@@ -344,20 +404,11 @@ async def get_analyses_to_upsert(
     return analyses_to_copy, files_to_move
 
 
-def get_unrecorded_analysis_files(
-    source_dataset: str,
-    source_sequencing_group_id: str,
-    new_dataset: str,
-    new_sequencing_group_id: str,
-) -> list[tuple[Path, Path]]:
-    """
-    Returns the list of filepaths which are unrecorded in the
-    analysis records, but still need to be copied over to the new dataset.
-    """
-    storage_client = storage.Client()
-    billing_project = config_retrieve(['workflow', 'dataset_gcp_project'])
-
-    if config_retrieve(['workflow', 'access_level']) == 'test':
+def get_bucket_names(
+    source_dataset: str, new_dataset: str, access_level: str
+) -> tuple[str, str]:
+    """Returns the (source, destination) main bucket names"""
+    if access_level == 'test':
         source_bucket_name = f'cpg-{source_dataset}'
     else:
         source_bucket_name = f'cpg-{source_dataset}-main'
@@ -366,35 +417,67 @@ def get_unrecorded_analysis_files(
         destination_bucket_name = f'cpg-{new_dataset}'
     else:
         destination_bucket_name = f'cpg-{new_dataset}-main'
+    return source_bucket_name, destination_bucket_name
 
+
+def resolve_source_paths(
+    storage_client: storage.Client, path: str, billing_project: str | None
+) -> list[str]:
+    """
+    Returns the existing files for an unrecorded path: every file under a folder
+    path ending in '/', every file matching a path containing '*', otherwise the
+    file itself if it exists.
+    """
+    bucket_name, _, name = path.removeprefix('gs://').partition('/')
+    bucket = storage_client.bucket(bucket_name, user_project=billing_project)
+    if name.endswith('/') or '*' in name:
+        return [
+            f'gs://{bucket_name}/{blob.name}'
+            for blob in storage_client.list_blobs(bucket, prefix=name.split('*')[0])
+            if name.endswith('/') or fnmatch.fnmatchcase(blob.name, name)
+        ]
+    return [path] if bucket.blob(name).exists() else []
+
+
+def get_unrecorded_analysis_files(
+    source_bucket_name: str,
+    destination_bucket_name: str,
+    source_sequencing_group_id: str,
+    new_sequencing_group_id: str,
+    billing_project: str | None,
+    storage_client: storage.Client | None = None,
+) -> list[tuple[Path, Path]]:
+    """
+    Returns the list of filepaths which are unrecorded in the
+    analysis records, but still need to be copied over to the new dataset.
+    """
+    storage_client = storage_client or storage.Client()
     files_to_move = []
     for source_path_template in UNRECORDED_ANALYSIS_FILES + UNRECORDED_ANALYSIS_FOLDERS:
-        source_path = source_path_template.format(
+        path = source_path_template.format(
             bucket_name=source_bucket_name,
             sg_id=source_sequencing_group_id,
         )
-        if source_path.endswith('/'):  # If the path is a folder
-            source_bucket = storage_client.bucket(
-                bucket_name=source_bucket_name,
-                user_project=billing_project,
-            )
-            blobs = storage_client.list_blobs(
-                source_bucket,
-                prefix=source_path.removeprefix(f'gs://{source_bucket.name}/'),
-            )
-            file_paths = [blob.path for blob in blobs]
-        elif to_path(source_path).exists():
-            file_paths = [source_path]  # Single file
-        else:
-            file_paths = []  # File does not exist
-
-        for source_path in file_paths:  # Rename and add to move list
+        for source_path in resolve_source_paths(storage_client, path, billing_project):
             new_path = source_path.replace(
                 source_bucket_name, destination_bucket_name
             ).replace(source_sequencing_group_id, new_sequencing_group_id)
             files_to_move.append((to_path(source_path), to_path(new_path)))
 
     return files_to_move
+
+
+def dedupe_file_moves(
+    source_paths_new_paths: list[tuple[Path, Path]],
+) -> list[tuple[Path, Path]]:
+    """Drops repeated source files, e.g. ones both recorded and in the unrecorded list"""
+    seen = set()
+    unique = []
+    for source_path, new_path in source_paths_new_paths:
+        if str(source_path) not in seen:
+            seen.add(str(source_path))
+            unique.append((source_path, new_path))
+    return unique
 
 
 async def upsert_analyses_records(
@@ -430,7 +513,7 @@ async def upsert_analyses_records(
         )
         promises.append(analysis_api.create_analysis_async(dataset, analysis_to_create))
 
-    return asyncio.gather(*promises)
+    return await asyncio.gather(*promises)
 
 
 # ============================================================================
@@ -456,6 +539,24 @@ def file_reheaderable(path: str) -> bool:
             '.g.vcf.gz',
         ]
     )
+
+
+def file_is_binary(path: str) -> bool:
+    """Returns whether this is a binary file that should be copied without edits"""
+    return path.lower().endswith(BINARY_FILE_EXTENSIONS)
+
+
+def file_update_method(path: str) -> str:
+    """Returns how a copied file is updated to carry the new SG ID"""
+    if file_is_binary(path):
+        return 'binary copy'
+    if path.endswith('.somalier'):
+        return 'somalier rewrite'
+    if file_reheaderable(path):
+        return 'reheader'
+    if path.endswith('.gz'):
+        return 'bgzip edit'
+    return 'text edit'
 
 
 def file_gatk_check(path: str):
@@ -496,14 +597,22 @@ async def reheader_analysis_files_in_batch(
     Uses samtools for CRAM files and bcftools for VCF/GVCF files.
     For other text based files, performs a simple find-and-replace operation with sed.
     """
+    # Imported here so hail is only needed when a batch is actually submitted
+    from cpg_utils.hail_batch import get_batch  # noqa: PLC0415
+
     batch = get_batch()
+    n_jobs = 0
     for old_path, new_path in source_paths_new_paths:
         if new_path.exists():
             logger.info(f'Skipping update for existing file: {new_path!s}')
             continue
-        if str(old_path).endswith(
-            '.somalier'
-        ):  # special case for binary .somalier files, run locally
+        method = file_update_method(str(old_path))
+        if method == 'binary copy':
+            # e.g. report images, which don't contain the SG ID, so copy as-is
+            logger.info(f'Copying binary file {old_path!s} to {new_path!s}')
+            old_path.copy(new_path)
+            continue
+        if method == 'somalier rewrite':  # binary .somalier files, run locally
             somalier_file_commands(
                 str(old_path),
                 str(new_path),
@@ -511,7 +620,8 @@ async def reheader_analysis_files_in_batch(
             )
             continue
         job = batch.new_job(f'Update SG ID in {old_path!s}')
-        if file_reheaderable(str(old_path)):
+        n_jobs += 1
+        if method == 'reheader':
             job.storage(file_size(old_path) + 2 * 1024**3)  # Allow 2 GiB extra
             main_file_commands(
                 batch,
@@ -520,7 +630,7 @@ async def reheader_analysis_files_in_batch(
                 str(new_path),
                 (source_sequencing_group_id, new_sequencing_group_id),
             )
-        elif str(old_path).endswith('.gz'):
+        elif method == 'bgzip edit':
             job.storage(file_size(old_path) + 512 * 1024**2)  # Allow 512 MiB extra
             bgzipped_file_commands(
                 batch,
@@ -538,7 +648,38 @@ async def reheader_analysis_files_in_batch(
                 (source_sequencing_group_id, new_sequencing_group_id),
             )
 
-    batch.run(wait=True)
+    if n_jobs:
+        batch.run(wait=True)
+    else:
+        logger.info('No files need updating in batch.')
+
+
+def log_file_updates(
+    source_sequencing_group_id: str,
+    new_sequencing_group_id: str,
+    source_paths_new_paths: list[tuple[Path, Path]],
+) -> None:
+    """Logs how each file would be copied and updated, without writing anything"""
+    total_size = 0
+    for old_path, new_path in source_paths_new_paths:
+        if new_path.exists():
+            logger.info(f'DRY RUN :: Would skip existing file: {new_path!s}')
+            continue
+        method = file_update_method(str(old_path))
+        size = file_size(old_path)
+        total_size += size
+        logger.info(
+            f'DRY RUN :: {method} ({size / 1024**2:.1f} MiB): {old_path!s} -> {new_path!s}'
+        )
+        if method == 'somalier rewrite':
+            # Check the header now, as a mismatch would stop the real run part way
+            somalier_file_commands(
+                str(old_path),
+                str(new_path),
+                (source_sequencing_group_id, new_sequencing_group_id),
+                dry_run=True,
+            )
+    logger.info(f'DRY RUN :: {total_size / 1024**3:.1f} GiB would be copied')
 
 
 def main_file_commands(batch, job, old_path: str, new_path: str, sid: tuple[str, str]):
@@ -608,7 +749,9 @@ def secondary_file_commands(batch, job, new_path: str):
         batch.write_output(job.new_md5, new_path)
 
 
-def somalier_file_commands(old_path: str, new_path: str, sid: tuple[str, str]):
+def somalier_file_commands(
+    old_path: str, new_path: str, sid: tuple[str, str], dry_run: bool = False
+):
     """Uses python to read and rewrite the binary somalier files with updated SG IDs"""
     logger.info(f'Reheadering somalier file for {old_path}, writing to {new_path}')
     data = to_path(old_path).read_bytes()
@@ -640,6 +783,10 @@ def somalier_file_commands(old_path: str, new_path: str, sid: tuple[str, str]):
 
     # Combine the pieces
     new_data = header_version + header_length_new + data_new_sample_id + remaining_data
+
+    if dry_run:
+        logger.info(f'DRY RUN :: Somalier sample ID {current_sample_id} checked')
+        return
 
     # --- 4. Write the New File ---
     to_path(new_path).write_bytes(new_data)
@@ -700,6 +847,7 @@ async def main(  # noqa: D417
     new_participant_id: str = None,
     reuse_sequencing_group_id: str = None,
     deactivate_original_sg: bool = False,
+    dry_run: bool = False,
 ) -> None:
     """
     Duplicates a sequencing group from one dataset to another, optionally using a new sample and participant ID.
@@ -714,6 +862,7 @@ async def main(  # noqa: D417
         new_participant_id (str, optional): Optional participant ID (or external participant ID) to associate with the new sequencing group.
         reuse_sequencing_group_id (str, optional): Optional existing sequencing group ID to reuse instead of creating a new one.
         deactivate_original_sg (bool, optional): Optional flag to deactivate the original sequencing group.
+        dry_run (bool, optional): Log what would be created and copied, without writing anything.
     """
     if new_sample_id or new_participant_id:
         # Validate and save these values for later input into the upsert call if they are provided.
@@ -745,10 +894,16 @@ async def main(  # noqa: D417
         logger.info(
             f'Prepared sample upsert for new dataset {new_dataset}: {sample_upsert}'
         )
-        new_sample = await SampleApi().upsert_samples_async(
-            new_dataset, [sample_upsert]
-        )
-        new_sequencing_group_id = new_sample[0]['sequencing_groups'][0]['id']
+        if dry_run:
+            logger.info(
+                f'DRY RUN :: Skipping sample upsert, using {DRY_RUN_SG_ID} for the new SG ID.'
+            )
+            new_sequencing_group_id = DRY_RUN_SG_ID
+        else:
+            new_sample = await SampleApi().upsert_samples_async(
+                new_dataset, [sample_upsert]
+            )
+            new_sequencing_group_id = new_sample[0]['sequencing_groups'][0]['id']
 
     # Fetch the analysis file paths
     logger.info(
@@ -763,34 +918,51 @@ async def main(  # noqa: D417
     logger.info(f'Found {len(analyses_to_upsert)} analyses to copy.')
 
     # Fetch unrecorded analysis file paths
-    unrecorded_file_moves = get_unrecorded_analysis_files(
+    source_bucket_name, destination_bucket_name = get_bucket_names(
         source_dataset,
-        original_sg_id,
         new_dataset,
-        new_sequencing_group_id,
+        config_retrieve(['workflow', 'access_level']),
     )
-    source_paths_new_paths.extend(unrecorded_file_moves)
+    unrecorded_file_moves = get_unrecorded_analysis_files(
+        source_bucket_name,
+        destination_bucket_name,
+        original_sg_id,
+        new_sequencing_group_id,
+        billing_project=config_retrieve(['workflow', 'dataset_gcp_project']),
+    )
+    source_paths_new_paths = dedupe_file_moves(
+        source_paths_new_paths + unrecorded_file_moves
+    )
 
     logger.info(f'Total files to move: {len(source_paths_new_paths)}')
 
     # Reheader and update analysis files with hail batch, replacing SG IDs within the files
-    logger.info('Reheadering analysis files in batch to update SG IDs.')
-    await reheader_analysis_files_in_batch(
-        source_sequencing_group_id=original_sg_id,
-        new_sequencing_group_id=new_sequencing_group_id,
-        source_paths_new_paths=source_paths_new_paths,
-    )
+    if dry_run:
+        log_file_updates(
+            original_sg_id, new_sequencing_group_id, source_paths_new_paths
+        )
+    else:
+        logger.info('Reheadering analysis files in batch to update SG IDs.')
+        await reheader_analysis_files_in_batch(
+            source_sequencing_group_id=original_sg_id,
+            new_sequencing_group_id=new_sequencing_group_id,
+            source_paths_new_paths=source_paths_new_paths,
+        )
 
     # Upsert the analyses with the new outputs and meta data
     logger.info(f'Upserting analyses to new dataset {new_dataset}.')
     await upsert_analyses_records(
         dataset=new_dataset,
         analyses_to_upsert=analyses_to_upsert,
-        dry_run=False,
+        dry_run=dry_run,
     )
 
     # Optionally deactivate the original sequencing group
-    if deactivate_original_sg:
+    if deactivate_original_sg and dry_run:
+        logger.info(
+            f'DRY RUN :: Would deactivate original sequencing group {original_sg_id}.'
+        )
+    elif deactivate_original_sg:
         logger.info(
             f'Deactivating original sequencing group {original_sg_id} in dataset {source_dataset}.'
         )
@@ -836,12 +1008,16 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--deactivate_original_sg',
-        type=bool,
-        default=False,
+        action='store_true',
         help='Optional flag to deactivate the original sequencing group.',
     )
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='Log what would be created and copied, without writing anything.',
+    )
     args = parser.parse_args()
-    asyncio.get_event_loop().run_until_complete(
+    asyncio.run(
         main(
             original_sg_id=args.original_sg_id,
             source_dataset=args.source_dataset,
@@ -850,6 +1026,7 @@ if __name__ == '__main__':
             new_sample_id=args.new_sample_id,
             new_participant_id=args.new_participant_id,
             reuse_sequencing_group_id=args.reuse_sequencing_group_id,
-            deactivate_original_sg=bool(args.deactivate_original_sg),
+            deactivate_original_sg=args.deactivate_original_sg,
+            dry_run=args.dry_run,
         )
     )
