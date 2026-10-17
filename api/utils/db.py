@@ -11,7 +11,6 @@ from google.auth.transport import requests
 from google.oauth2 import id_token
 
 from api.settings import get_default_user
-from api.utils.gcp import email_from_id_token
 from db.python.connect import Connection, SMConnections
 from db.python.gcp_connect import BqConnection
 from models.models.project import Project, ProjectId, ProjectMemberRole
@@ -86,7 +85,15 @@ def authenticate(
         )
 
     elif token:
-        author = email_from_id_token(token.credentials)
+        # We no longer allow direct invocation of the cloud run so this path should
+        # never be taken. IAP will always intercept requests and add the IAP JWT
+        # assertion header. Slightly annoyingly we can't remove `token` from the auth
+        # params otherwise it would be removed from the auto generated python client
+        # where it is still needed.
+        logging.warning(
+            'Bearer token presented without an IAP assertion, rejecting. '
+            'Authentication is only available via IAP.'
+        )
 
     elif default_user := get_default_user():
         # this should only happen in LOCAL environments
