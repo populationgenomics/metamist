@@ -1,5 +1,6 @@
 import dataclasses
 import datetime
+from typing import Any
 
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
@@ -96,20 +97,27 @@ ON DUPLICATE KEY UPDATE ar_guid = ar_guid
     async def update_analysis_runner_entry(
         self,
         ar_guid: str,
-        config_path: str,
+        config_path: str | None = None,
+        batch_url: str | None = None,
     ) -> None:
         """
-        Update an existing AnalysisRunner entry
+        Update an existing AnalysisRunner entry, only the given fields are updated
         """
-
-        _query = """
-UPDATE analysis_runner
-SET config_path = :config_path, audit_log_id = :audit_log_id
-WHERE ar_guid = :ar_guid
-"""
-        values = {
+        fields: dict[str, Any] = {
             'ar_guid': ar_guid,
-            'config_path': config_path,
             'audit_log_id': await self.audit_log_id(),
         }
-        await self.connection.execute(_query, values)
+        updaters = ['audit_log_id = :audit_log_id']
+
+        if config_path is not None:
+            updaters.append('config_path = :config_path')
+            fields['config_path'] = config_path
+
+        if batch_url is not None:
+            updaters.append('batch_url = :batch_url')
+            fields['batch_url'] = batch_url
+
+        fields_str = ', '.join(updaters)
+        _query = f'UPDATE analysis_runner SET {fields_str} WHERE ar_guid = :ar_guid'
+
+        await self.connection.execute(_query, fields)
