@@ -47,6 +47,11 @@ class ServerConfig(BaseModel):
     cloudrun_min_instances: int
     cloudrun_max_instances: int
     cloudrun_max_concurrent_requests: int
+    # Cloud run only accepts '1', '2', '4' or '8' for cpu, and the memory value
+    # caps out based on the cpu chosen, see
+    # https://cloud.google.com/run/docs/configuring/services/memory-limits
+    cloudrun_cpu: str
+    cloudrun_memory: str
 
 
 class MigrationsConfig(BaseModel):
