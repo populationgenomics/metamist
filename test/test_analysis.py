@@ -23,6 +23,7 @@ from models.models import (
     SequencingGroupUpsertInternal,
     parse_sql_bool,
 )
+from models.models.output_file import OutputFileInternal
 
 
 class TestAnalysis:
@@ -446,7 +447,7 @@ class TestAnalysis:
                 sequencing_group_ids=[],
                 cohort_ids=[],
                 output='test://test_output',
-                outputs='test://test_output',
+                outputs=OutputFileInternal.not_found('test://test_output').model_dump(),
                 timestamp_completed=init_timestamp_completed,
                 project=1,
                 meta={'sequencing_type': 'genome', 'size': 1024},
