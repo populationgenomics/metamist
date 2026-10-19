@@ -7,7 +7,10 @@ from db.python.filters import GenericFilter
 from db.python.layers.analysis_runner import AnalysisRunnerLayer
 from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from db.python.utils import NotFoundError
-from models.models.analysis_runner import AnalysisRunnerInternal
+from models.models.analysis_runner import (
+    AnalysisRunnerInternal,
+    AnalysisRunnerUpdateBody,
+)
 from test.conftest import GraphQLQueryFunction
 
 
@@ -21,22 +24,31 @@ query AnalysisRunners($projects: [Int!]!, $configPath: String!) {
 }
 """
 
-CREATE_MUTATION = """
-mutation CreateAnalysisRunner($project: String!, $ar: AnalysisRunnerInput!) {
-    analysisRunner {
-        createAnalysisRunnerLog(project: $project, analysisRunner: $ar)
+QUERY_BY_AR_GUID = """
+query AnalysisRunners($arGuids: [String!]!) {
+    analysisRunners(arGuid: {in_: $arGuids}) {
+        arGuid
+        project { name }
+    }
+}
+"""
+
+QUERY_WITHOUT_PROJECT_OR_AR_GUID = """
+query AnalysisRunners {
+    analysisRunners(configPath: {eq: "SEQERA-PENDING"}) {
+        arGuid
     }
 }
 """
 
 UPDATE_MUTATION = """
-mutation UpdateAnalysisRunner(
-    $project: String!, $arGuid: String!, $update: AnalysisRunnerUpdateInput!
-) {
+mutation UpdateAnalysisRunner($arGuid: String!, $update: AnalysisRunnerUpdateInput!) {
     analysisRunner {
-        updateAnalysisRunnerLog(
-            project: $project, arGuid: $arGuid, arUpdateInput: $update
-        )
+        updateAnalysisRunnerLog(arGuid: $arGuid, arUpdateInput: $update) {
+            arGuid
+            configPath
+            project { name }
+        }
     }
 }
 """
@@ -216,7 +228,7 @@ class TestAnalysisRunner:
 
     @pytest.mark.asyncio
     async def test_query_config_path(self) -> None:
-        """Test filter config paths"""
+        """Test filter Analysis Runner entries given config path"""
 
         pending_marker = 'SEQERA-PENDING'
         resolved_value = 'gs://bucket/<ar-guid-set>.toml'
@@ -259,98 +271,100 @@ class TestAnalysisRunner:
         assert len(ar_fetched) == 1
         assert ar_fetched[0].ar_guid == '<ar-guid-null>'
 
-    @pytest.mark.asyncio
-    async def test_update_nonexistent_entry(self) -> None:
-        """Test updating a nonexistent ar entry raises NotFoundError"""
-
-        with pytest.raises(NotFoundError):
-            await self.al.update_analysis_runner_entry(
-                self.project_id,
-                '<missing-ar-guid>',
-                config_path='gs://bucket/missing.toml',
-            )
-
-    async def insert_with_config_paths(
-        self, graphql_query: GraphQLQueryFunction, ar_guid: str, config_path: str
-    ) -> None:
-        """Insert one AR entry per ar_guid with the given config path, through GraphQL"""
-
-        await graphql_query(
-            CREATE_MUTATION,
-            {
-                'project': self.project_name,
-                'ar': {
-                    'arGuid': ar_guid,
-                    'accessLevel': 'test',
-                    'repository': 'repository',
-                    'commit': 'commit',
-                    'script': 'script',
-                    'description': 'description',
-                    'driverImage': 'driver_image',
-                    'configPath': config_path,
-                    'environment': 'gcp',
-                    'batchUrl': 'batch_url',
-                    'submittingUser': 'submitting_user',
-                    'meta': {'meta': 'meta'},
-                    'outputPath': 'output_path',
-                },
-            },
-        )
-
-    async def get_ids_given_config_path(
-        self, graphql_query: GraphQLQueryFunction, config_path: str
-    ) -> list[str]:
-        """Get arGuid list given config path"""
-        result = await graphql_query(
-            QUERY_BY_CONFIG_PATH,
-            {'projects': [self.project_id], 'configPath': config_path},
-        )
-        return [ar['arGuid'] for ar in result['data']['analysisRunners']]
-
-
     @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
-    async def test_graphql_config_path_filter(self, graphql_query) -> None:
-        """Test the configPath filter through GraphQL"""
+    async def test_graphql_ar_guid_filter(self, graphql_query) -> None:
+        """Test query AnalysisRunner entries on arGuids"""
+
+        await self.al.insert_analysis_runner_entry(
+            self.get_test_analysis('<ar-guid-1>')
+        )
+        await self.al.insert_analysis_runner_entry(
+            self.get_test_analysis('<ar-guid-2>')
+        )
+
+        result = await graphql_query(
+            QUERY_BY_AR_GUID,
+            {'arGuids': ['<ar-guid-1>', '<ar-guid-2>', '<ar-guid-3>']},
+        )
+        ar_entries = result['data']['analysisRunners']
+        ar_guids = [ar['arGuid'] for ar in ar_entries]
+        assert '<ar-guid-1>' in ar_guids
+        assert '<ar-guid-2>' in ar_guids
+        assert '<ar-guid-3>' not in ar_guids
+
+    @pytest.mark.asyncio
+    async def test_graphql_requires_project_or_ar_guid(self, graphql_query) -> None:
+        """Test throws error when neither project nor arGuid is given"""
+
+        result = await graphql_query(QUERY_WITHOUT_PROJECT_OR_AR_GUID)
+        assert result['data'] is None
+        assert 'Must provide project or ar_guid' in result['errors'][0]['message']
+
+    @pytest.mark.asyncio
+    async def test_graphql_config_path_filter(
+        self, graphql_query: GraphQLQueryFunction
+    ) -> None:
+        """Test query AnalysisRunner entries given config path"""
 
         pending_marker = 'SEQERA-PENDING'
-        resolved_value = 'gs://bucket/a.toml'
-        await self.insert_with_config_paths(
-            graphql_query, '<ar-guid-set>', resolved_value
-        )
-        await self.insert_with_config_paths(
-            graphql_query, '<ar-guid-pending>', pending_marker
-        )
+        resolved_value = 'gs://bucket/<ar-guid-set>.toml'
+        for ar_guid, config_path in (
+            ('<ar-guid-set>', resolved_value),
+            ('<ar-guid-pending>', pending_marker),
+        ):
+            ar_entry = self.get_test_analysis(ar_guid)
+            ar_entry.config_path = config_path
+            await self.al.insert_analysis_runner_entry(ar_entry)
 
-        assert await self.get_ids_given_config_path(graphql_query, pending_marker) == [
-            '<ar-guid-pending>'
-        ]
-        assert await self.get_ids_given_config_path(graphql_query, resolved_value) == [
-            '<ar-guid-set>'
-        ]
-        assert await self.get_ids_given_config_path(graphql_query, 'missing') == []
+        async def get_ids_given_config_path(path: str) -> list[str]:
+            result = await graphql_query(
+                QUERY_BY_CONFIG_PATH,
+                {'projects': [self.project_id], 'configPath': path},
+            )
+            return [ar['arGuid'] for ar in result['data']['analysisRunners']]
 
+        assert await get_ids_given_config_path(pending_marker) == ['<ar-guid-pending>']
+        assert await get_ids_given_config_path(resolved_value) == ['<ar-guid-set>']
+        assert await get_ids_given_config_path('missing') == []
 
     @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
-    async def test_graphql_update(self, graphql_query) -> None:
-        """Test the analysisRunner config update"""
+    async def test_graphql_update(self, graphql_query: GraphQLQueryFunction) -> None:
+        """Test updateAnalysisRunnerLog sets the config path"""
 
-        new_config_path = 'gs://bucket/<ar-guid-pending>.toml'
-        await self.insert_with_config_paths(
-            graphql_query, '<ar-guid-pending>', 'SEQERA-PENDING'
-        )
+        ar_entry = self.get_test_analysis('<ar-guid>')
+        ar_entry.config_path = 'SEQERA-PENDING'
+        await self.al.insert_analysis_runner_entry(ar_entry)
 
-        await graphql_query(
+        new_config_path = 'gs://bucket/<ar-guid>.toml'
+        result = await graphql_query(
             UPDATE_MUTATION,
-            {
-                'project': self.project_name,
-                'arGuid': '<ar-guid-pending>',
-                'update': {'configPath': new_config_path},
-            },
+            {'arGuid': '<ar-guid>', 'update': {'configPath': new_config_path}},
         )
 
-        assert await self.get_ids_given_config_path(graphql_query, 'SEQERA-PENDING') == []
-        assert await self.get_ids_given_config_path(graphql_query, new_config_path) == [
-            '<ar-guid-pending>'
-        ]
+        assert result['data']['analysisRunner']['updateAnalysisRunnerLog'] == {
+            'arGuid': '<ar-guid>',
+            'configPath': new_config_path,
+            'project': {'name': self.project_name},
+        }
+        ar_entries = await self.al.query(
+            AnalysisRunnerFilter(ar_guid=GenericFilter(eq='<ar-guid>'))
+        )
+        assert len(ar_entries) == 1
+        assert ar_entries[0].config_path == new_config_path
+
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_graphql_update_nonexistent_entry(
+        self, graphql_query: GraphQLQueryFunction
+    ) -> None:
+        """Test updateAnalysisRunnerLog errors for an unknown arGuid"""
+
+        result = await graphql_query(
+            UPDATE_MUTATION,
+            {'arGuid': '<missing-ar-guid>', 'update': {'configPath': 'gs://x.toml'}},
+        )
+
+        assert result['data'] is None
+        assert "Couldn't find analysis runner log" in result['errors'][0]['message']

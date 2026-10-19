@@ -86,19 +86,18 @@ class AnalysisRunnerTable(DbBase):
 
     async def update_analysis_runner_entry(
         self,
-        project: ProjectId,
         ar_guid: str,
         config_path: str,
     ) -> None:
         """
-        Update the config path of an existing analysis runner entry
+        Update an existing AnalysisRunner entry
         """
         audit_log_id = await self.audit_log_id()
 
         _query = t"""
         UPDATE analysis_runner
         SET config_path = {config_path}, audit_log_id = {audit_log_id}
-        WHERE ar_guid = {ar_guid} AND project = {project}
+        WHERE ar_guid = {ar_guid}
         """
 
         await self.connection.pg_connection.execute(_query)

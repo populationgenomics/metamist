@@ -3,8 +3,11 @@ from db.python.filters import GenericFilter
 from db.python.layers.base import BaseLayer
 from db.python.tables.analysis_runner import AnalysisRunnerFilter, AnalysisRunnerTable
 from db.python.utils import NotFoundError
-from models.models.analysis_runner import AnalysisRunnerInternal
-from models.models.project import ProjectId, ReadAccessRoles
+from models.models.analysis_runner import (
+    AnalysisRunnerInternal,
+    AnalysisRunnerUpdateBody,
+)
+from models.models.project import FullWriteAccessRoles, ReadAccessRoles
 
 
 class AnalysisRunnerLayer(BaseLayer):
@@ -44,24 +47,24 @@ class AnalysisRunnerLayer(BaseLayer):
     # UPDATES
 
     async def update_analysis_runner_entry(
-        self,
-        project: ProjectId,
-        ar_guid: str,
-        config_path: str,
+        self, ar_update_body: AnalysisRunnerUpdateBody
     ) -> None:
-        """Update the config path of an AR log"""
-
-        ar_entry = await self.at.query(
-            AnalysisRunnerFilter(
-                ar_guid=GenericFilter(eq=ar_guid), project=GenericFilter(eq=project)
-            )
+        """Update an AnalysisRunner entry"""
+        ar_guid = ar_update_body.ar_guid
+        ar_entries = await self.at.query(
+            AnalysisRunnerFilter(ar_guid=GenericFilter(eq=ar_guid))
         )
 
-        if not ar_entry:
+        if not ar_entries:
             raise NotFoundError(
                 f"Couldn't find analysis runner log with ar_guid = {ar_guid}"
             )
 
+        project = ar_entries[0].project
+        self.connection.check_access_to_projects_for_ids(
+            [project], allowed_roles=FullWriteAccessRoles
+        )
+
         await self.at.update_analysis_runner_entry(
-            project, ar_guid, config_path=config_path
+            ar_guid, config_path=ar_update_body.config_path
         )
