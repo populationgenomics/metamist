@@ -287,11 +287,20 @@ class AnalysisTable(DbBase):
         self, analysis_ids: list[int]
     ) -> dict[int, dict[str, RecursiveDict]]:
         """Fetches all output files for a list of analysis IDs"""
+        # The order by statement here is to match the inherent ordering of rows in
+        # mariadb to maintain backwards compatibility and ensure that an analysis
+        # with multiple outputs populates the `output` field in the same way mariadb did.
+        # Once we do away with the `output` field entirely, this can be removed.
         _query = t"""
             SELECT DISTINCT ao.analysis_id, f.*, ao.json_structure, ao.output
             FROM analysis_outputs ao
             LEFT JOIN output_file f ON ao.file_id = f.id
             WHERE ao.analysis_id = ANY({analysis_ids})
+            ORDER BY
+                ao.analysis_id,
+                f.id NULLS FIRST,
+                ao.json_structure NULLS FIRST,
+                ao.output NULLS FIRST
         """
         acur = await self.connection.pg_connection.execute(_query)
         rows = await acur.fetchall()
