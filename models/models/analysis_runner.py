@@ -107,3 +107,10 @@ class AnalysisRunner(SMBase):
     meta: dict[str, str]
     project: str
     audit_log_id: int | None
+
+
+class AnalysisRunnerUpdateBody(SMBase):
+    """Represents the shape for updating an AnalysisRunner record"""
+
+    ar_guid: str
+    config_path: str

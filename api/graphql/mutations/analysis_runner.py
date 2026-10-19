@@ -1,13 +1,23 @@
 import datetime
+from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 from strawberry.scalars import JSON
 from strawberry.types import Info
 
 from db.python.connect import Connection
+from db.python.filters import GenericFilter
 from db.python.layers.analysis_runner import AnalysisRunnerLayer
-from models.models.analysis_runner import AnalysisRunnerInternal
+from db.python.tables.analysis_runner import AnalysisRunnerFilter
+from models.models.analysis_runner import (
+    AnalysisRunnerInternal,
+    AnalysisRunnerUpdateBody,
+)
 from models.models.project import FullWriteAccessRoles
+
+
+if TYPE_CHECKING:
+    from api.graphql.schema import GraphQLAnalysisRunner
 
 
 @strawberry.input
@@ -86,22 +96,23 @@ class AnalysisRunnerMutations:
     @strawberry.mutation
     async def update_analysis_runner_log(
         self,
-        project: str,
         ar_guid: str,
         ar_update_input: AnalysisRunnerUpdateInput,
         info: Info,
-    ) -> bool:
-        """Set the config path of an analysis runner log"""
+    ) -> Annotated['GraphQLAnalysisRunner', strawberry.lazy('api.graphql.schema')]:
+        """Update an analysis runner log"""
+        from api.graphql.schema import GraphQLAnalysisRunner  # noqa: PLC0415
+
         connection: Connection = info.context['connection']
-
-        (target_project,) = connection.get_and_check_access_to_projects_for_names(
-            [project], FullWriteAccessRoles
-        )
+        # write access to the log's project is checked in the layer
         alayer = AnalysisRunnerLayer(connection)
-
         await alayer.update_analysis_runner_entry(
-            target_project.id,
-            ar_guid,
-            config_path=ar_update_input.config_path,
+            ar_update_body=AnalysisRunnerUpdateBody(
+                ar_guid=ar_guid,
+                config_path=ar_update_input.config_path,
+            ),
         )
-        return True
+        (updated_entry,) = await alayer.query(
+            AnalysisRunnerFilter(ar_guid=GenericFilter(eq=ar_guid))
+        )
+        return GraphQLAnalysisRunner.from_internal(updated_entry)

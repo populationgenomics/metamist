@@ -4,7 +4,10 @@ from db.python.filters import GenericFilter
 from db.python.layers.analysis_runner import AnalysisRunnerLayer
 from db.python.tables.analysis_runner import AnalysisRunnerFilter
 from db.python.utils import NotFoundError
-from models.models.analysis_runner import AnalysisRunnerInternal
+from models.models.analysis_runner import (
+    AnalysisRunnerInternal,
+    AnalysisRunnerUpdateBody,
+)
 from test.testbase import DbIsolatedTest, run_as_sync
 
 
@@ -18,22 +21,31 @@ query AnalysisRunners($projects: [Int!]!, $configPath: String!) {
 }
 """
 
-CREATE_MUTATION = """
-mutation CreateAnalysisRunner($project: String!, $ar: AnalysisRunnerInput!) {
-    analysisRunner {
-        createAnalysisRunnerLog(project: $project, analysisRunner: $ar)
+QUERY_BY_AR_GUID = """
+query AnalysisRunners($arGuids: [String!]!) {
+    analysisRunners(arGuid: {in_: $arGuids}) {
+        arGuid
+        project { name }
+    }
+}
+"""
+
+QUERY_WITHOUT_PROJECT_OR_AR_GUID = """
+query AnalysisRunners {
+    analysisRunners(configPath: {eq: "SEQERA-PENDING"}) {
+        arGuid
     }
 }
 """
 
 UPDATE_MUTATION = """
-mutation UpdateAnalysisRunner(
-    $project: String!, $arGuid: String!, $update: AnalysisRunnerUpdateInput!
-) {
+mutation UpdateAnalysisRunner($arGuid: String!, $update: AnalysisRunnerUpdateInput!) {
     analysisRunner {
-        updateAnalysisRunnerLog(
-            project: $project, arGuid: $arGuid, arUpdateInput: $update
-        )
+        updateAnalysisRunnerLog(arGuid: $arGuid, arUpdateInput: $update) {
+            arGuid
+            configPath
+            project { name }
+        }
     }
 }
 """
@@ -203,88 +215,107 @@ class TestAnalysisRunner(DbIsolatedTest):
         self.assertEqual(ar_fetched[0].ar_guid, '<ar-guid-null>')
 
     @run_as_sync
-    async def test_update_not_found(self):
-        """Test updating a non-existing ar entry raises NotFoundError"""
+    async def test_update_nonexistent_entry(self):
+        """Test updating a nonexistent AnalysisRunner entry raises NotFoundError"""
         with self.assertRaises(NotFoundError):
             await self.al.update_analysis_runner_entry(
-                self.project_id,
-                '<missing-ar-guid>',
-                config_path='gs://bucket/missing.json',
+                AnalysisRunnerUpdateBody(
+                    ar_guid='<missing-ar-guid>',
+                    config_path='gs://bucket/missing.toml',
+                )
             )
 
-    async def insert_with_config_paths(self, ar_guid: str, config_path: str):
-        """Insert AR entry for given ar_guid and config_path"""
-
-        await self.run_graphql_query_async(
-            CREATE_MUTATION,
-            variables={
-                'project': self.project_name,
-                'ar': {
-                    'arGuid': ar_guid,
-                    'accessLevel': 'test',
-                    'repository': 'repository',
-                    'commit': 'commit',
-                    'script': 'script',
-                    'description': 'description',
-                    'driverImage': 'driver_image',
-                    'configPath': config_path,
-                    'environment': 'gcp',
-                    'batchUrl': 'batch_url',
-                    'submittingUser': 'submitting_user',
-                    'meta': {'meta': 'meta'},
-                    'outputPath': 'output_path',
-                },
-            },
+    @run_as_sync
+    async def test_graphql_ar_guid_filter(self):
+        """Test query AnalysisRunner entries on arGuids"""
+        await self.al.insert_analysis_runner_entry(
+            self.get_test_analysis('<ar-guid-1>')
+        )
+        await self.al.insert_analysis_runner_entry(
+            self.get_test_analysis('<ar-guid-2>')
         )
 
-    async def get_arguids_of_given_config_path(self, config_path: str) -> list[str]:
-        """Return arGuid/s for queried config_path"""
         result = await self.run_graphql_query_async(
-            QUERY_BY_CONFIG_PATH,
-            variables={'projects': [self.project_id], 'configPath': config_path},
+            QUERY_BY_AR_GUID,
+            variables={'arGuids': ['<ar-guid-1>', '<ar-guid-2>', '<ar-guid-3>']},
         )
-        return [ar['arGuid'] for ar in result['analysisRunners']]
+        ar_guids = [ar['arGuid'] for ar in result['analysisRunners']]
+        self.assertIn('<ar-guid-1>', ar_guids)
+        self.assertIn('<ar-guid-2>', ar_guids)
+        self.assertNotIn('<ar-guid-3>', ar_guids)
+
+    @run_as_sync
+    async def test_graphql_requires_project_or_ar_guid(self):
+        """Test throws error when neither project nor arGuid is given"""
+        with self.assertRaisesRegex(Exception, 'Must provide project or ar_guid'):
+            await self.run_graphql_query_async(QUERY_WITHOUT_PROJECT_OR_AR_GUID)
 
     @run_as_sync
     async def test_graphql_config_path_filter(self):
-        """Test filter config paths via GraphQL"""
+        """Test query AnalysisRunner entries given config path"""
         pending_marker = 'SEQERA-PENDING'
-        resolved_value = 'gs://bucket/a.toml'
-        await self.insert_with_config_paths('<ar-guid-set>', resolved_value)
+        resolved_value = 'gs://bucket/<ar-guid-set>.toml'
+        for ar_guid, config_path in (
+            ('<ar-guid-set>', resolved_value),
+            ('<ar-guid-pending>', pending_marker),
+        ):
+            ar_entry = self.get_test_analysis(ar_guid)
+            ar_entry.config_path = config_path
+            await self.al.insert_analysis_runner_entry(ar_entry)
 
-        await self.insert_with_config_paths('<ar-guid-pending>', pending_marker)
+        async def get_ids_given_config_path(path: str) -> list[str]:
+            result = await self.run_graphql_query_async(
+                QUERY_BY_CONFIG_PATH,
+                variables={'projects': [self.project_id], 'configPath': path},
+            )
+            return [ar['arGuid'] for ar in result['analysisRunners']]
 
         self.assertListEqual(
-            await self.get_arguids_of_given_config_path(pending_marker),
-            ['<ar-guid-pending>'],
+            await get_ids_given_config_path(pending_marker), ['<ar-guid-pending>']
         )
         self.assertListEqual(
-            await self.get_arguids_of_given_config_path(resolved_value),
-            ['<ar-guid-set>'],
+            await get_ids_given_config_path(resolved_value), ['<ar-guid-set>']
         )
+        self.assertListEqual(await get_ids_given_config_path('missing'), [])
 
     @run_as_sync
     async def test_graphql_update(self):
-        """Test GraphQL update mutation"""
+        """Test updateAnalysisRunnerLog sets the config path"""
+        ar_entry = self.get_test_analysis('<ar-guid>')
+        ar_entry.config_path = 'SEQERA-PENDING'
+        await self.al.insert_analysis_runner_entry(ar_entry)
 
-        pending_marker = 'SEQERA-PENDING'
-        await self.insert_with_config_paths('<ar-guid-pending>', pending_marker)
-
-        new_config_path = 'gs://bucket/<ar-guid-pending>.json'
-
-        await self.run_graphql_query_async(
+        new_config_path = 'gs://bucket/<ar-guid>.toml'
+        result = await self.run_graphql_query_async(
             UPDATE_MUTATION,
             variables={
-                'project': self.project_name,
-                'arGuid': '<ar-guid-pending>',
+                'arGuid': '<ar-guid>',
                 'update': {'configPath': new_config_path},
             },
         )
 
-        self.assertListEqual(
-            await self.get_arguids_of_given_config_path(pending_marker), []
+        self.assertDictEqual(
+            result['analysisRunner']['updateAnalysisRunnerLog'],
+            {
+                'arGuid': '<ar-guid>',
+                'configPath': new_config_path,
+                'project': {'name': self.project_name},
+            },
         )
-        self.assertListEqual(
-            await self.get_arguids_of_given_config_path(new_config_path),
-            ['<ar-guid-pending>'],
+        ar_entries = await self.al.query(
+            AnalysisRunnerFilter(ar_guid=GenericFilter(eq='<ar-guid>'))
         )
+        self.assertEqual(len(ar_entries), 1)
+        self.assertEqual(ar_entries[0].config_path, new_config_path)
+
+    @run_as_sync
+    async def test_graphql_update_nonexistent_entry(self):
+        """Test updateAnalysisRunnerLog errors for an unknown arGuid"""
+        with self.assertRaisesRegex(Exception, "Couldn't find analysis runner log"):
+            await self.run_graphql_query_async(
+                UPDATE_MUTATION,
+                variables={
+                    'arGuid': '<missing-ar-guid>',
+                    'update': {'configPath': 'gs://x.toml'},
+                },
+            )

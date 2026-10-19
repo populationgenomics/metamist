@@ -95,22 +95,20 @@ ON DUPLICATE KEY UPDATE ar_guid = ar_guid
 
     async def update_analysis_runner_entry(
         self,
-        project: ProjectId,
         ar_guid: str,
         config_path: str,
     ) -> None:
         """
-        Update the config path of an existing analysis runner entry
+        Update an existing AnalysisRunner entry
         """
 
         _query = """
 UPDATE analysis_runner
 SET config_path = :config_path, audit_log_id = :audit_log_id
-WHERE ar_guid = :ar_guid AND project = :project
+WHERE ar_guid = :ar_guid
 """
         values = {
             'ar_guid': ar_guid,
-            'project': project,
             'config_path': config_path,
             'audit_log_id': await self.audit_log_id(),
         }
