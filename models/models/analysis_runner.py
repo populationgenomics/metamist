@@ -80,7 +80,8 @@ class AnalysisRunner(SMBase):
 
 
 class AnalysisRunnerUpdateBody(SMBase):
-    """Represents the shape for updating an AnalysisRunner record"""
+    """Represents the input shape for updating an AnalysisRunner record"""
 
     ar_guid: str
-    config_path: str
+    config_path: str | None = None
+    batch_url: str | None = None

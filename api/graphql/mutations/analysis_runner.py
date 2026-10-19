@@ -45,9 +45,10 @@ class AnalysisRunnerInput:
 
 @strawberry.input
 class AnalysisRunnerUpdateInput:
-    """Analysis input shape for updating entries"""
+    """Input for updating analysis runner logs, only the given fields are updated"""
 
-    config_path: str
+    config_path: str | None = None
+    batch_url: str | None = None
 
 
 @strawberry.type
@@ -111,6 +112,7 @@ class AnalysisRunnerMutations:
                 ar_update_body=AnalysisRunnerUpdateBody(
                     ar_guid=ar_guid,
                     config_path=ar_update_input.config_path,
+                    batch_url=ar_update_input.batch_url,
                 ),
             )
             (updated_entry,) = await alayer.query(

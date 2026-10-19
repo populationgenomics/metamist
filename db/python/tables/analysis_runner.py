@@ -1,6 +1,7 @@
 import dataclasses
 import datetime
 
+from psycopg import sql
 from psycopg.rows import class_row
 from psycopg.types.json import Jsonb
 
@@ -87,17 +88,22 @@ class AnalysisRunnerTable(DbBase):
     async def update_analysis_runner_entry(
         self,
         ar_guid: str,
-        config_path: str,
+        config_path: str | None = None,
+        batch_url: str | None = None,
     ) -> None:
         """
-        Update an existing AnalysisRunner entry
+        Update an existing AnalysisRunner entry, only the given fields are updated
         """
         audit_log_id = await self.audit_log_id()
+        setters = [t'audit_log_id = {audit_log_id}']
 
-        _query = t"""
-        UPDATE analysis_runner
-        SET config_path = {config_path}, audit_log_id = {audit_log_id}
-        WHERE ar_guid = {ar_guid}
-        """
+        if config_path is not None:
+            setters.append(t'config_path = {config_path}')
+
+        if batch_url is not None:
+            setters.append(t'batch_url = {batch_url}')
+
+        fields_str = sql.SQL(', ').join(setters)
+        _query = t'UPDATE analysis_runner SET {fields_str:q} WHERE ar_guid = {ar_guid}'
 
         await self.connection.pg_connection.execute(_query)
