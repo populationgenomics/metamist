@@ -1,14 +1,20 @@
 import json
 import logging
+import threading
+import time
 from collections.abc import AsyncGenerator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from http import HTTPStatus
 from os import getenv
 from typing import Any
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from google.auth.exceptions import MalformedError
 from google.auth.transport import requests
 from google.oauth2 import id_token
+from requests.adapters import HTTPAdapter, Retry
+from requests.sessions import Session
 
 from api.settings import get_default_user
 from db.python.connect import Connection, SMConnections
@@ -18,6 +24,35 @@ from models.models.project import Project, ProjectId, ProjectMemberRole
 
 EXPECTED_AUDIENCE = getenv('SM_OAUTHAUDIENCE')
 SM_LEGACY_PROXY_SA = getenv('SM_LEGACY_PROXY_SA')
+
+
+## IAP Cert fetching Config ##
+
+# To verify the IAP JWT ID token, the `id_token.verify_token` method needs to fetch
+# the certificates from a gstatic url. While this URL is generally pretty reliable
+# we have noticed some instance where requests to it fail with a SSL error. It also
+# does add around ~100ms latency to every request if we don't cache it. There are a
+# few parameters here that can be tweaked:
+
+# IAP_CERTS_CACHE_SECONDS: Is how long to cache the certificate for, certificates change
+# very infrequently and a failure to verify will trigger a refetch so we can keep this
+# value quite high, currently 1 hour.
+IAP_CERTS_CACHE_SECONDS = 60 * 60
+
+# IAP_CERTS_REFRESH_SECONDS: The minimum amount of time between refresh requests that
+# bypass the cache. If the certificates become out of date the response we'll get is
+# that the JWT is malformed. This is the same response that we get for an actual invalid
+# JWT - so we don't want to bypass the cache too often in case the API is being hit by
+# actual invalid JWTs. Currently this is set so that refreshes will happen at most every
+# minute
+IAP_CERTS_REFRESH_SECONDS = 60
+
+# IAP_CERTS_TIMEOUT_SECONDS: General timeout for the http request for certificates. This
+# is just to override the default for the request transport which is 120 seconds - which
+# is an unreasonably long amount of time for certificates
+IAP_CERTS_TIMEOUT_SECONDS = 10
+
+IAP_CERTS_URL = 'https://www.gstatic.com/iap/verify/public_key'
 
 
 def get_jwt_from_request(request: Request) -> str | None:
@@ -228,6 +263,72 @@ async def dependable_get_bq_connection(author: str = Depends(authenticate)):
     return await BqConnection.get_connection_no_project(author)
 
 
+class CachingCertsRequest(requests.Request):
+    """
+    The google auth verify_token request accepts a instance of the requests.Request
+    transport. This is a minimal implementation of a transport that caches keys as it
+    fetches, with retries enabled for the session.
+
+    This avoids making the http request on _every_ request that hits metamist.
+    """
+
+    def __init__(self):
+        session = Session()
+        session.mount(
+            'https://',
+            HTTPAdapter(
+                max_retries=Retry(
+                    total=3,
+                    backoff_factor=0.2,
+                    status_forcelist=(429, 500, 502, 503, 504),
+                )
+            ),
+        )
+        super().__init__(session=session)
+        # url -> (time fetched, response)
+        self._cache: dict[str, tuple[float, Any]] = {}
+        # authenticate() is a sync dependency, so this is shared across the threadpool.
+        # having a lock here avoids a bunch of requests being made if nothing is cached
+        # yet.
+        self._lock = threading.Lock()
+
+    def __call__(
+        self, url, *args, timeout=IAP_CERTS_TIMEOUT_SECONDS, max_age=None, **kwargs
+    ):
+        if max_age is None:
+            max_age = IAP_CERTS_CACHE_SECONDS
+
+        with self._lock:
+            fetched_at, cached = self._cache.get(url, (0.0, None))
+            if cached is not None and time.monotonic() - fetched_at <= max_age:
+                return cached
+
+            response = super().__call__(url, *args, timeout=timeout, **kwargs)
+            # Don't cache non-ok statuses, statuses in the forcelist above will be
+            # retried and won't make it to here, but there's still plenty of possible
+            # statuses that we don't want to cache.
+            if response.status == HTTPStatus.OK:
+                self._cache[url] = (time.monotonic(), response)
+
+            return response
+
+    def refresh(self, url):
+        """Refresh certs"""
+        self(url, max_age=IAP_CERTS_REFRESH_SECONDS)
+
+
+iap_certs_request = CachingCertsRequest()
+
+
+def _verify_iap_jwt(iap_jwt: str, audience: str):
+    return id_token.verify_token(
+        iap_jwt,
+        iap_certs_request,
+        audience=audience,
+        certs_url=IAP_CERTS_URL,
+    )
+
+
 def validate_iap_jwt_and_get_email(iap_jwt: str, audience: str):
     """
     Validate an IAP JWT and return email
@@ -238,12 +339,15 @@ def validate_iap_jwt_and_get_email(iap_jwt: str, audience: str):
     """
 
     try:
-        decoded_jwt = id_token.verify_token(
-            iap_jwt,
-            requests.Request(),
-            audience=audience,
-            certs_url='https://www.gstatic.com/iap/verify/public_key',
-        )
+        try:
+            decoded_jwt = _verify_iap_jwt(iap_jwt, audience)
+        except MalformedError:
+            # If we get a malformed error, quickly do a refresh of the iap certs just
+            # in case the ones we have cached are out of date and that is causing
+            # the malformed error.
+            iap_certs_request.refresh(IAP_CERTS_URL)
+            decoded_jwt = _verify_iap_jwt(iap_jwt, audience)
+
         return decoded_jwt['email']
     except Exception as e:
         logging.error(f'JWT validation error {e}')
