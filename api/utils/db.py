@@ -25,18 +25,34 @@ from models.models.project import Project, ProjectId, ProjectMemberRole
 EXPECTED_AUDIENCE = getenv('SM_OAUTHAUDIENCE')
 SM_LEGACY_PROXY_SA = getenv('SM_LEGACY_PROXY_SA')
 
-IAP_CERTS_URL = 'https://www.gstatic.com/iap/verify/public_key'
-# How long to cache IAP certs for, these change very infrequently and a failure to
-# verify will trigger a refetch, so we can have a pretty high TTL here
+
+## IAP Cert fetching Config ##
+
+# To verify the IAP JWT ID token, the `id_token.verify_token` method needs to fetch
+# the certificates from a gstatic url. While this URL is generally pretty reliable
+# we have noticed some instance where requests to it fail with a SSL error. It also
+# does add around ~100ms latency to every request if we don't cache it. There are a
+# few parameters here that can be tweaked:
+
+# IAP_CERTS_CACHE_SECONDS: Is how long to cache the certificate for, certificates change
+# very infrequently and a failure to verify will trigger a refetch so we can keep this
+# value quite high, currently 1 hour.
 IAP_CERTS_CACHE_SECONDS = 60 * 60
-# The minimum amount of time between refresh requests caused by malformed tokens. We
-# do want a malformed token to cause an attempt to refresh certs incase the malformed
-# response is due to out of date cached certs, but don't want to do it too often as
-# the JWT might legitimately be malformed.
+
+# IAP_CERTS_REFRESH_SECONDS: The minimum amount of time between refresh requests that
+# bypass the cache. If the certificates become out of date the response we'll get is
+# that the JWT is malformed. This is the same response that we get for an actual invalid
+# JWT - so we don't want to bypass the cache too often in case the API is being hit by
+# actual invalid JWTs. Currently this is set so that refreshes will happen at most every
+# minute
 IAP_CERTS_REFRESH_SECONDS = 60
-# default is 120 seconds, which is far too long for just fetching a cert, and timeout
-# will be retried.
+
+# IAP_CERTS_TIMEOUT_SECONDS: General timeout for the http request for certificates. This
+# is just to override the default for the request transport which is 120 seconds - which
+# is an unreasonably long amount of time for certificates
 IAP_CERTS_TIMEOUT_SECONDS = 10
+
+IAP_CERTS_URL = 'https://www.gstatic.com/iap/verify/public_key'
 
 
 def get_jwt_from_request(request: Request) -> str | None:
