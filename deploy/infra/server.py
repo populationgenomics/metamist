@@ -88,7 +88,43 @@ def create_server_resources(
             containers=[
                 gcp.cloudrunv2.ServiceTemplateContainerArgs(
                     image=image.repo_digest,
-                    commands=['hypercorn', '--bind', '0.0.0.0:8080', 'api.server:app'],
+                    # In the initial testing of this we used hypercorn as uvicorn did
+                    # not support http2. We found that hypercorn was causing frequent
+                    # 503 errors with a malformed response. After investigation it was
+                    # determined that this was due to the low default keepalive time
+                    # causing cloud run to churn new connections. Each time a connection
+                    # was closed there was a small chance of a race condition where a
+                    # new request was routed to it, causing the 503.
+                    #
+                    # During testing, uvicorn released http2 support so we switched back
+                    # to that. Uvicorn has the same low default keepalive (52) but
+                    # handles the race condition better, returning well-formed responses
+                    # but still resulting in 503s. The fix for this is to increase the
+                    # keepalive value above the load balancer idle timeout of 600s,
+                    # hence the value below of 620 seconds. In testing this value seems
+                    # to work well. Connections aren't churned and there doesn't seem to
+                    # be a performance downside of the high keepalive value.
+                    commands=[
+                        'uvicorn',
+                        'api.server:app',
+                        '--host',
+                        '0.0.0.0',
+                        '--port',
+                        '8080',
+                        '--http',
+                        'zttp',
+                        '--http2',
+                        '--timeout-keep-alive',
+                        '620',
+                        # Cloud run allows a 10s grace period for an instance to handle
+                        # shutdown after sending SIGTERM. Set this value to below the
+                        # 10 seconds otherwise uvicorn will wait indefinitely and get
+                        # hard killed.
+                        '--timeout-graceful-shutdown',
+                        '8',
+                        # Avoid access logs as they'd duplicate the cloud run ones
+                        '--no-access-log',
+                    ],
                     resources=gcp.cloudrunv2.ServiceTemplateContainerResourcesArgs(
                         limits={
                             'memory': config.server.cloudrun_memory,
