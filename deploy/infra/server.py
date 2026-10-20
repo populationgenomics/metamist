@@ -126,8 +126,17 @@ def create_server_resources(
                         '--no-access-log',
                     ],
                     resources=gcp.cloudrunv2.ServiceTemplateContainerResourcesArgs(
-                        limits={'memory': '8Gi', 'cpu': '4'},
+                        limits={
+                            'memory': config.server.cloudrun_memory,
+                            'cpu': config.server.cloudrun_cpu,
+                        },
                         startup_cpu_boost=True,
+                        # Request-based billing, this is the default for cloud run, but
+                        # when you specify `resources` the default flips to
+                        # Instance-based billing where you're billed for the whole time
+                        # the instance is active. cpu_idle=True ensures we stay with
+                        # Request-based billing.
+                        cpu_idle=True,
                     ),
                     envs=[
                         gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
@@ -217,11 +226,11 @@ def create_server_resources(
                             value=config.server.sm_legacy_proxy_sa,
                         ),
                         gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name='DB_POOL_MIN_SIZE',
+                            name='SM_DB_POOL_MIN_SIZE',
                             value=str(config.server.db_min_pool_size),
                         ),
                         gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
-                            name='DB_POOL_MAX_SIZE',
+                            name='SM_DB_POOL_MAX_SIZE',
                             value=str(config.server.db_max_pool_size),
                         ),
                         gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
