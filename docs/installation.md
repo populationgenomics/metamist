@@ -157,10 +157,10 @@ Now that everything is set up, you can start the api server. If you are using vs
 
 ![Run and Debug](../resources/debug-api.png)
 
-If you are not using vscode, you can run the API with hypercorn.
+If you are not using vscode, you can run the API with uvicorn.
 
 ```bash
-uv run hypercorn --bind 0.0.0.0:8000 api.server:app
+uv run uvicorn --host 0.0.0.0 --port 8000 api.server:app
 ```
 
 

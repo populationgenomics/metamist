@@ -337,7 +337,7 @@ class ProjectInsightsDb(DbBase):
         sequencing_platform: SequencingPlatform,
         sequencing_technology: SequencingTechnology,
         sequencing_group_details: SequencingGroupDetailRow,
-        sequencing_group_cram: AnalysisRow,
+        sequencing_group_cram: AnalysisRow | None,
         analysis_sequencing_groups: dict[AnalysisId, list[SequencingGroupInternalId]],
         latest_annotate_dataset_id: AnalysisId | None,
         latest_snv_es_index_id: AnalysisId | None,
@@ -1114,8 +1114,7 @@ class ProjectInsightsDb(DbBase):
                     continue
                 sg_id = details_row.sequencing_group_id
                 sequencing_group_cram = sequencing_groups_crams.get(sg_id)
-                # This has to exist for the next method call to work, so assert for it
-                assert sequencing_group_cram
+
                 response.append(
                     self.get_insights_details_internal_row(
                         project=project,
