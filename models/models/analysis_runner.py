@@ -98,7 +98,7 @@ class AnalysisRunner(SMBase):
     script: str
     description: str
     driver_image: str
-    config_path: str
+    config_path: str | None
     cwd: str | None
     environment: str
     hail_version: str | None
@@ -115,3 +115,4 @@ class AnalysisRunnerUpdateBody(SMBase):
     ar_guid: str
     config_path: str | None = None
     batch_url: str | None = None
+    meta: dict[str, str | None] | None = None

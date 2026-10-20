@@ -52,8 +52,12 @@ class AnalysisRunnerLayer(BaseLayer):
         """Update an AnalysisRunner entry, only the given fields are updated"""
         ar_guid = ar_update_body.ar_guid
 
-        if ar_update_body.config_path is None and ar_update_body.batch_url is None:
-            raise ValueError('Must provide config_path or batch_url')
+        if (
+            ar_update_body.config_path is None
+            and ar_update_body.batch_url is None
+            and ar_update_body.meta is None
+        ):
+            raise ValueError('Must provide config_path, batch_url or meta')
 
         ar_entries = await self.at.query(
             AnalysisRunnerFilter(ar_guid=GenericFilter(eq=ar_guid))
@@ -73,4 +77,5 @@ class AnalysisRunnerLayer(BaseLayer):
             ar_guid,
             config_path=ar_update_body.config_path,
             batch_url=ar_update_body.batch_url,
+            meta=ar_update_body.meta,
         )

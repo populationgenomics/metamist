@@ -1694,6 +1694,7 @@ class Query:  # entry point to graphql.
         project: GraphQLFilter[int] | None = None,
         ar_guid: GraphQLFilter[str] | None = None,
         config_path: GraphQLFilter[str] | None = None,
+        meta: GraphQLMetaFilter | None = None,
     ) -> list[GraphQLAnalysisRunner]:
         """Fetch Analysis runner logs given the filter criteria."""
 
@@ -1706,6 +1707,7 @@ class Query:  # entry point to graphql.
             project=project.to_internal_filter() if project else None,
             ar_guid=ar_guid.to_internal_filter() if ar_guid else None,
             config_path=config_path.to_internal_filter() if config_path else None,
+            meta=graphql_meta_filter_to_internal_filter(meta),
         )
         analysis_runners = await alayer.query(filter_)
         return [GraphQLAnalysisRunner.from_internal(ar) for ar in analysis_runners]

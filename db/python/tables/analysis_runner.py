@@ -2,7 +2,7 @@ import dataclasses
 import datetime
 from typing import Any
 
-from db.python.filters import GenericFilter, GenericFilterModel
+from db.python.filters import GenericFilter, GenericFilterModel, GenericMetaFilter
 from db.python.tables.base import DbBase
 from db.python.utils import to_db_json
 from models.models.analysis_runner import AnalysisRunnerInternal
@@ -20,6 +20,7 @@ class AnalysisRunnerFilter(GenericFilterModel):
     access_level: GenericFilter[str] | None = None
     environment: GenericFilter[str] | None = None
     config_path: GenericFilter[str] | None = None
+    meta: GenericMetaFilter | None = None
 
 
 class AnalysisRunnerTable(DbBase):
@@ -99,6 +100,7 @@ ON DUPLICATE KEY UPDATE ar_guid = ar_guid
         ar_guid: str,
         config_path: str | None = None,
         batch_url: str | None = None,
+        meta: dict[str, str | None] | None = None,
     ) -> None:
         """
         Update an existing AnalysisRunner entry, only the given fields are updated
@@ -116,6 +118,10 @@ ON DUPLICATE KEY UPDATE ar_guid = ar_guid
         if batch_url is not None:
             updaters.append('batch_url = :batch_url')
             fields['batch_url'] = batch_url
+
+        if meta is not None:
+            updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
+            fields['meta'] = to_db_json(meta)
 
         fields_str = ', '.join(updaters)
         _query = f'UPDATE analysis_runner SET {fields_str} WHERE ar_guid = :ar_guid'

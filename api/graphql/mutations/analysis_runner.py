@@ -31,7 +31,6 @@ class AnalysisRunnerInput:
     script: str
     description: str
     driver_image: str
-    config_path: str
     environment: str
     batch_url: str
     submitting_user: str
@@ -39,6 +38,7 @@ class AnalysisRunnerInput:
     output_path: str
     hail_version: str | None = None
     cwd: str | None = None
+    config_path: str | None = None
 
 
 @strawberry.input
@@ -47,6 +47,8 @@ class AnalysisRunnerUpdateInput:
 
     config_path: str | None = None
     batch_url: str | None = None
+    # merged into the existing meta, a null value removes the key
+    meta: JSON | None = None
 
 
 @strawberry.type
@@ -112,6 +114,7 @@ class AnalysisRunnerMutations:
                 ar_guid=ar_guid,
                 config_path=ar_update_input.config_path,
                 batch_url=ar_update_input.batch_url,
+                meta=ar_update_input.meta,  # type: ignore [arg-type]
             ),
         )
         (updated_entry,) = await alayer.query(
