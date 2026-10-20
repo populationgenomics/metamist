@@ -5,7 +5,12 @@ from psycopg import sql
 from psycopg.rows import class_row
 from psycopg.types.json import Jsonb
 
-from db.python.filters import GenericFilter, GenericFilterModel, is_literally_TRUE
+from db.python.filters import (
+    GenericFilter,
+    GenericFilterModel,
+    GenericMetaFilter,
+    is_literally_TRUE,
+)
 from db.python.tables.base import DbBase
 from models.models.analysis_runner import AnalysisRunnerInternal
 from models.models.project import ProjectId
@@ -22,6 +27,7 @@ class AnalysisRunnerFilter(GenericFilterModel):
     access_level: GenericFilter[str] | None = None
     environment: GenericFilter[str] | None = None
     config_path: GenericFilter[str] | None = None
+    meta: GenericMetaFilter | None = None
 
 
 class AnalysisRunnerTable(DbBase):
@@ -90,6 +96,7 @@ class AnalysisRunnerTable(DbBase):
         ar_guid: str,
         config_path: str | None = None,
         batch_url: str | None = None,
+        meta: dict[str, str | None] | None = None,
     ) -> None:
         """
         Update an existing AnalysisRunner entry, only the given fields are updated
@@ -102,6 +109,11 @@ class AnalysisRunnerTable(DbBase):
 
         if batch_url is not None:
             setters.append(t'batch_url = {batch_url}')
+
+        if meta is not None:
+            setters.append(
+                t"meta = json_merge_patch(COALESCE(meta, '{{}}'::jsonb), {Jsonb(meta)})"
+            )
 
         fields_str = sql.SQL(', ').join(setters)
         _query = t'UPDATE analysis_runner SET {fields_str:q} WHERE ar_guid = {ar_guid}'

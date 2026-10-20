@@ -85,3 +85,4 @@ class AnalysisRunnerUpdateBody(SMBase):
     ar_guid: str
     config_path: str | None = None
     batch_url: str | None = None
+    meta: dict[str, str | None] | None = None

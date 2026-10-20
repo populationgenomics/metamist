@@ -15,8 +15,8 @@ from test.conftest import GraphQLQueryFunction
 
 
 QUERY_BY_CONFIG_PATH = """
-query AnalysisRunners($projects: [Int!]!, $configPath: String!) {
-    analysisRunners(project: {in_: $projects}, configPath: {eq: $configPath}) {
+query AnalysisRunners($projects: [Int!]!, $configPath: StrGraphQLFilter!) {
+    analysisRunners(project: {in_: $projects}, configPath: $configPath) {
         arGuid
         configPath
         project { name }
@@ -35,7 +35,7 @@ query AnalysisRunners($arGuids: [String!]!) {
 
 QUERY_WITHOUT_PROJECT_OR_AR_GUID = """
 query AnalysisRunners {
-    analysisRunners(configPath: {eq: "PENDING"}) {
+    analysisRunners(configPath: {isnull: true}) {
         arGuid
     }
 }
@@ -50,6 +50,26 @@ mutation UpdateAnalysisRunner($arGuid: String!, $update: AnalysisRunnerUpdateInp
             batchUrl
             project { name }
         }
+    }
+}
+"""
+
+QUERY_PENDING_BY_META = """
+query AnalysisRunners($projects: [Int!]!, $meta: JSON!) {
+    analysisRunners(
+        project: {in_: $projects}, configPath: {isnull: true}, meta: $meta
+    ) {
+        arGuid
+        configPath
+        meta
+    }
+}
+"""
+
+CREATE_MUTATION = """
+mutation CreateAnalysisRunner($project: String!, $analysisRunner: AnalysisRunnerInput!) {
+    analysisRunner {
+        createAnalysisRunnerLog(project: $project, analysisRunner: $analysisRunner)
     }
 }
 """
@@ -231,11 +251,9 @@ class TestAnalysisRunner:
     async def test_query_config_path(self) -> None:
         """Test filter Analysis Runner entries given config path"""
 
-        pending_marker = 'PENDING'
         resolved_value = 'gs://bucket/<ar-guid-set>.toml'
 
         config_paths = {
-            '<ar-guid-pending>': pending_marker,
             '<ar-guid-set>': resolved_value,
             '<ar-guid-null>': None,
         }
@@ -244,15 +262,6 @@ class TestAnalysisRunner:
             ar_entry = self.get_test_analysis(ar_guid)
             ar_entry.config_path = config_path
             await self.al.insert_analysis_runner_entry(ar_entry)
-
-        ar_fetched = await self.al.query(
-            AnalysisRunnerFilter(
-                project=GenericFilter(eq=self.project_id),
-                config_path=GenericFilter(eq=pending_marker),
-            )
-        )
-        assert len(ar_fetched) == 1
-        assert ar_fetched[0].ar_guid == '<ar-guid-pending>'
 
         ar_fetched = await self.al.query(
             AnalysisRunnerFilter(
@@ -329,26 +338,83 @@ class TestAnalysisRunner:
     ) -> None:
         """Test query AnalysisRunner entries given config path"""
 
-        pending_marker = 'PENDING'
         resolved_value = 'gs://bucket/<ar-guid-set>.toml'
         for ar_guid, config_path in (
             ('<ar-guid-set>', resolved_value),
-            ('<ar-guid-pending>', pending_marker),
+            ('<ar-guid-null>', None),
         ):
             ar_entry = self.get_test_analysis(ar_guid)
             ar_entry.config_path = config_path
             await self.al.insert_analysis_runner_entry(ar_entry)
 
-        async def get_ids_given_config_path(path: str) -> list[str]:
+        async def get_ids_given_config_path(config_path: dict) -> list[str]:
             result = await graphql_query(
                 QUERY_BY_CONFIG_PATH,
-                {'projects': [self.project_id], 'configPath': path},
+                {'projects': [self.project_id], 'configPath': config_path},
             )
             return [ar['arGuid'] for ar in result['data']['analysisRunners']]
 
-        assert await get_ids_given_config_path(pending_marker) == ['<ar-guid-pending>']
-        assert await get_ids_given_config_path(resolved_value) == ['<ar-guid-set>']
-        assert await get_ids_given_config_path('missing') == []
+        assert await get_ids_given_config_path({'isnull': True}) == ['<ar-guid-null>']
+        assert await get_ids_given_config_path({'eq': resolved_value}) == [
+            '<ar-guid-set>'
+        ]
+
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_graphql_create_without_config_path(
+        self, graphql_query: GraphQLQueryFunction
+    ) -> None:
+        """Test createAnalysisRunnerLog accepts a missing config path"""
+        analysis_runner = {
+            'arGuid': '<ar-guid>',
+            'accessLevel': 'test',
+            'repository': 'repository',
+            'commit': 'commit',
+            'script': 'script',
+            'description': 'description',
+            'driverImage': 'driver_image',
+            'environment': 'gcp',
+            'batchUrl': 'batch_url',
+            'submittingUser': 'submitting_user',
+            'meta': {'seqera_status': 'PENDING'},
+            'outputPath': 'output_path',
+        }
+        await graphql_query(
+            CREATE_MUTATION,
+            {'project': self.project_name, 'analysisRunner': analysis_runner},
+        )
+
+        result = await self.al.query(
+            AnalysisRunnerFilter(ar_guid=GenericFilter(eq='<ar-guid>'))
+        )
+        assert len(result) == 1
+        assert result[0].config_path is None
+
+    @pytest.mark.asyncio
+    async def test_graphql_meta_filter(
+        self, graphql_query: GraphQLQueryFunction
+    ) -> None:
+        """Test query AnalysisRunner entries on meta value"""
+
+        ar_entry = self.get_test_analysis('<ar-guid-pending>')
+        ar_entry.config_path = None
+        ar_entry.meta = {'key': 'value'}
+        await self.al.insert_analysis_runner_entry(ar_entry)
+
+        result = await graphql_query(
+            QUERY_PENDING_BY_META,
+            {
+                'projects': [self.project_id],
+                'meta': {'key': {'eq': 'value'}},
+            },
+        )
+        assert result['data']['analysisRunners'] == [
+            {
+                'arGuid': '<ar-guid-pending>',
+                'configPath': None,
+                'meta': {'key': 'value'},
+            }
+        ]
 
     @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
@@ -356,67 +422,44 @@ class TestAnalysisRunner:
         """Test updateAnalysisRunnerLog sets the config path"""
 
         ar_entry = self.get_test_analysis('<ar-guid>')
-        ar_entry.config_path = 'PENDING'
+        ar_entry.config_path = None
+        ar_entry.batch_url = 'URL UNAVAILABLE'
         await self.al.insert_analysis_runner_entry(ar_entry)
 
         new_config_path = 'gs://bucket/<ar-guid>.toml'
+        new_batch_url = 'new_batch_url'
         result = await graphql_query(
             UPDATE_MUTATION,
-            {'arGuid': '<ar-guid>', 'update': {'configPath': new_config_path}},
+            {
+                'arGuid': '<ar-guid>',
+                'update': {'configPath': new_config_path, 'batchUrl': new_batch_url},
+            },
         )
 
         assert result['data']['analysisRunner']['updateAnalysisRunnerLog'] == {
             'arGuid': '<ar-guid>',
             'configPath': new_config_path,
-            'batchUrl': ar_entry.batch_url,
+            'batchUrl': new_batch_url,
             'project': {'name': self.project_name},
         }
-        ar_entries = await self.al.query(
+
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_graphql_update_meta(
+        self, graphql_query: GraphQLQueryFunction
+    ) -> None:
+        """Test updateAnalysisRunnerLog merges the meta into the existing meta"""
+        ar_entry = self.get_test_analysis('<ar-guid>')
+        ar_entry.meta = {'key1': 'value1', 'key2': 'value2'}
+        await self.al.insert_analysis_runner_entry(ar_entry)
+
+        await graphql_query(
+            UPDATE_MUTATION,
+            {'arGuid': '<ar-guid>', 'update': {'meta': {'key2': 'new_value2'}}},
+        )
+
+        result = await self.al.query(
             AnalysisRunnerFilter(ar_guid=GenericFilter(eq='<ar-guid>'))
         )
-        assert len(ar_entries) == 1
-        assert ar_entries[0].config_path == new_config_path
-
-    @pytest.mark.project_roles(['writer'])
-    @pytest.mark.asyncio
-    async def test_graphql_update_batch_url(
-        self, graphql_query: GraphQLQueryFunction
-    ) -> None:
-        """Test updateAnalysisRunnerLog sets the batch URL"""
-
-        ar_entry = self.get_test_analysis('<ar-guid>')
-        ar_entry.batch_url = 'URL UNAVAILABLE'
-        await self.al.insert_analysis_runner_entry(ar_entry)
-
-        new_batch_url = 'new_batch_url'
-        result = await graphql_query(
-            UPDATE_MUTATION,
-            {'arGuid': '<ar-guid>', 'update': {'batchUrl': new_batch_url}},
-        )
-
-        updated = result['data']['analysisRunner']['updateAnalysisRunnerLog']
-        assert updated['batchUrl'] == new_batch_url
-
-    @pytest.mark.project_roles(['writer'])
-    @pytest.mark.asyncio
-    async def test_graphql_update_config_path_and_batch_url(
-        self, graphql_query: GraphQLQueryFunction
-    ) -> None:
-        """Test updateAnalysisRunnerLog sets the config path and batch URL"""
-
-        ar_entry = self.get_test_analysis('<ar-guid>')
-        ar_entry.config_path = 'PENDING'
-        ar_entry.batch_url = 'URL UNAVAILABLE'
-        await self.al.insert_analysis_runner_entry(ar_entry)
-
-        update = {
-            'configPath': 'gs://bucket/<ar-guid>.config',
-            'batchUrl': 'new_batch_url',
-        }
-        result = await graphql_query(
-            UPDATE_MUTATION, {'arGuid': '<ar-guid>', 'update': update}
-        )
-
-        updated = result['data']['analysisRunner']['updateAnalysisRunnerLog']
-        assert updated['configPath'] == update['configPath']
-        assert updated['batchUrl'] == update['batchUrl']
+        assert len(result) == 1
+        assert result[0].meta == {'key1': 'value1', 'key2': 'new_value2'}
