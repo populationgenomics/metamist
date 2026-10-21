@@ -63,17 +63,17 @@ export const footerCellConfigs: FooterCellConfig[] = [
     {
         key: 'total-families',
         label: 'Total Families',
-        calculateValue: (data) => data.reduce((acc, curr) => acc + curr.total_families, 0),
+        calculateValue: (data) => new Set(data.flatMap((curr) => curr.family_ids ?? [])).size,
     },
     {
         key: 'total-participants',
         label: 'Total Participants',
-        calculateValue: (data) => data.reduce((acc, curr) => acc + curr.total_participants, 0),
+        calculateValue: (data) => new Set(data.flatMap((curr) => curr.participant_ids ?? [])).size,
     },
     {
         key: 'total-samples',
         label: 'Total Samples',
-        calculateValue: (data) => data.reduce((acc, curr) => acc + curr.total_samples, 0),
+        calculateValue: (data) => new Set(data.flatMap((curr) => curr.sample_ids ?? [])).size,
     },
     {
         key: 'total-sequencing-groups',
