@@ -143,7 +143,24 @@ class TestOutputFiles(DbIsolatedTest):
         analysis = await self.al.get_analysis_by_id(analysis_id)
         assert analysis
         self.assertEqual(analysis.output, output_path)
-        self.assertEqual(analysis.outputs, output_path)
+        # A file that wasn't found still comes back file-shaped, with empty values
+        self.assertEqual(
+            analysis.outputs,
+            {
+                'id': None,
+                'parent_id': None,
+                'path': output_path,
+                'basename': 'this_file_doesnt_exist.txt',
+                'dirname': '',
+                'nameroot': 'this_file_doesnt_exist',
+                'nameext': '.txt',
+                'file_checksum': None,
+                'size': 0,
+                'meta': None,
+                'valid': False,
+                'secondary_files': {},
+            },
+        )
 
     @run_as_sync
     async def test_gs_output_path(self):
@@ -495,9 +512,11 @@ class TestOutputFiles(DbIsolatedTest):
                 analysis = await self.al.get_analysis_by_id(analysis_id)
                 assert analysis
 
-                # An invalid file gets no output_file row, so it falls back to a
-                # bare string output rather than a structured one.
-                self.assertEqual(analysis.output, path)
+                # An invalid file gets no output_file row, but is still returned
+                # file-shaped, flagged as not valid.
+                assert isinstance(analysis.outputs, dict)
+                self.assertEqual(analysis.outputs['mt']['path'], path)
+                self.assertFalse(analysis.outputs['mt']['valid'])
 
     @run_as_sync
     async def test_outputs_contains_protocol(self):
