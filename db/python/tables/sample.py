@@ -1,9 +1,7 @@
-import asyncio
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from datetime import date
 from string.templatelib import Template
-from typing import Any
 
 from dateutil.relativedelta import relativedelta
 from psycopg import DatabaseError, sql
@@ -445,103 +443,6 @@ class SampleTable(DbBase):
         _query = t'UPDATE sample SET {fields_str:q} WHERE id = {id_}'
         await self.connection.pg_connection.execute(_query)
         return id_
-
-    async def merge_samples(
-        self,
-        id_keep: int,
-        id_merge: int,
-    ):
-        """Merge two samples together"""
-        sid_merge = sample_id_format(id_merge)
-        (_, sample_keep), (_, sample_merge) = await asyncio.gather(
-            self.get_sample_by_id(id_keep),
-            self.get_sample_by_id(id_merge),
-        )
-
-        def list_merge(l1: Any, l2: Any) -> list:  # noqa: PLR0911
-            if l1 is None:
-                return l2
-            if l2 is None:
-                return l1
-            if l1 == l2:
-                return l1
-            if isinstance(l1, list) and isinstance(l2, list):
-                return l1 + l2
-            if isinstance(l1, list):
-                return l1 + [l2]
-            if isinstance(l2, list):
-                return [l1] + l2
-            return [l1, l2]
-
-        def dict_merge(meta1, meta2):
-            d = dict(meta1)
-            d.update(meta2)
-            for key, value in meta2.items():
-                if key not in meta1 or meta1[key] is None or value is None:
-                    continue
-
-                d[key] = list_merge(meta1[key], value)
-
-            return d
-
-        # this handles merging a sample that has already been merged
-        meta_original = sample_keep.meta
-        meta_original['merged_from'] = list_merge(
-            meta_original.get('merged_from'), sid_merge
-        )
-        meta: dict[str, Any] = dict_merge(meta_original, sample_merge.meta)
-        audit_log_id = await self.audit_log_id()
-
-        # Get the appropriate queries in order
-        queries = []
-
-        # Query to update the kept sample with the merged meta and audit log id
-        meta_value = Jsonb(meta)
-        queries.append(t"""
-            UPDATE sample
-            SET audit_log_id = {audit_log_id},
-                meta = {meta_value}
-            WHERE id = {id_keep}
-        """)
-
-        # Query to update the assay table replacing the merge sid with
-        # the id to keep
-        queries.append(t"""
-            UPDATE assay
-            SET sample_id = {id_keep}, audit_log_id = {audit_log_id}
-            WHERE sample_id = {id_merge}
-        """)
-
-        # Query to update the sequencing group table replacing the merge sid with
-        # the id to keep
-        queries.append(t"""
-            UPDATE analysis_sequencing_group
-            SET sample_id = {id_keep}, audit_log_id = {audit_log_id}
-            WHERE sample_id = {id_merge}
-        """)
-
-        # Query to update the sample table audit log id for the merged sample
-        queries.append(t"""
-            UPDATE sample
-            SET audit_log_id = {audit_log_id}
-            WHERE id = {id_merge}
-        """)
-
-        # Query to delete the merged sample
-        queries.append(t"""
-            DELETE FROM sample
-            WHERE id = {id_merge}
-        """)
-
-        # Execute the queries in a transaction in the order above
-        async with self.connection.pg_connection.transaction():
-            for query in queries:
-                await self.connection.pg_connection.execute(query)
-
-        project, new_sample = await self.get_sample_by_id(id_keep)
-        new_sample.project = project
-
-        return new_sample
 
     async def update_many_participant_ids(
         self, ids: list[int], participant_ids: list[int]

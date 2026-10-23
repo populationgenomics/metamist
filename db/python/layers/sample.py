@@ -398,22 +398,6 @@ class SampleLayer(BaseLayer):
 
         return retval
 
-    async def merge_samples(
-        self,
-        id_keep: int,
-        id_merge: int,
-    ):
-        """Merge two samples into one another"""
-        projects = await self.st.get_project_ids_for_sample_ids([id_keep, id_merge])
-        self.connection.check_access_to_projects_for_ids(
-            projects, allowed_roles=FullWriteAccessRoles
-        )
-
-        return await self.st.merge_samples(
-            id_keep=id_keep,
-            id_merge=id_merge,
-        )
-
     async def update_many_participant_ids(
         self, ids: list[int], participant_ids: list[int]
     ) -> bool:
