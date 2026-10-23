@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from starlette.responses import FileResponse
 
 from api import routes
-from api.graphql.schema import MetamistGraphQLRouter  # type: ignore
+from api.graphql.schema import MetamistGraphQLRouter
 from api.settings import (
     PROFILE_REQUESTS,
     PROFILE_REQUESTS_OUTPUT,
@@ -26,7 +26,7 @@ from db.python.utils import get_logger
 
 
 # This tag is automatically updated by bump-my-version
-_VERSION = '7.14.0'
+_VERSION = '8.0.0'
 
 
 logger = get_logger()
@@ -211,20 +211,20 @@ if static_dir_exists:
     # only allow static files if the static files are available
     app.mount('/', SPAStaticFiles(directory=STATIC_DIR, html=True), name='static')
 
-app.openapi = get_openapi_schema_func(app, _VERSION)  # type: ignore[assignment]
+app.openapi = get_openapi_schema_func(app, _VERSION)
 
 
 if __name__ == '__main__':
     import logging
 
-    from hypercorn.config import Config
-    from hypercorn.run import run
+    import uvicorn
 
     logging.getLogger('watchfiles').setLevel(logging.WARNING)
     logging.getLogger('watchfiles.main').setLevel(logging.WARNING)
 
-    config = Config()
-    config.bind = [f'0.0.0.0:{os.getenv("PORT", "8000")}']
-    config.use_reloader = True
-    config.application_path = 'api.server:app'
-    run(config)
+    uvicorn.run(
+        'api.server:app',
+        host='0.0.0.0',
+        port=int(os.getenv('PORT', '8000')),
+        reload=True,
+    )

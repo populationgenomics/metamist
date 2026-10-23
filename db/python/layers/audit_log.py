@@ -18,7 +18,7 @@ class AuditLogLayer(BaseLayer):
             return []
 
         logs = await self.alayer.get_audit_logs_for_ids(ids)
-        projects = {log.auth_project for log in logs}
+        projects = {log.auth_project for log in logs if log.auth_project is not None}
         self.connection.check_access_to_projects_for_ids(
             project_ids=projects, allowed_roles=ReadAccessRoles
         )

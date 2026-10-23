@@ -71,6 +71,9 @@ def create_migration_resources(
         'metamist-migration-service',
         name=f'metamist-migration-{config.stack}',
         location=config.region,
+        labels={
+            'metamist-private-sha': config.metamist_private_sha,
+        },
         template=gcp.cloudrunv2.ServiceTemplateArgs(
             service_account=migration_service_account.email,
             timeout='600s',

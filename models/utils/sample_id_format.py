@@ -23,7 +23,7 @@ def sample_id_transform_to_raw(identifier: int | str, strict=True) -> int:
         - validating checksum
     """
     expected_type = str if strict else (str, int)
-    if not isinstance(identifier, expected_type):  # type: ignore
+    if not isinstance(identifier, expected_type):
         raise TypeError(
             f'Expected identifier type to be {expected_type!r}, received {type(identifier)!r}'
         )

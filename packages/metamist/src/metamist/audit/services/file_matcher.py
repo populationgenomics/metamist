@@ -149,7 +149,10 @@ class FileMatchingService:
         """
         for analysis in analyses:
             for bucket_file in bucket_files:
-                if analysis.output_file.checksum == bucket_file.checksum:
+                if (
+                    analysis.output_file
+                    and analysis.output_file.checksum == bucket_file.checksum
+                ):
                     analysis.original_file = bucket_file
 
     def find_uningested_files(

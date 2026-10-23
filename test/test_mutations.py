@@ -856,7 +856,7 @@ class TestMutations:
 
         api_result = (
             await self.fl.get_family_by_internal_id(self.family_id)
-        ).to_external()  # type: ignore [arg-type]
+        ).to_external()
 
         assert api_result.external_ids == mutation_result['externalIds']
         assert api_result.description == mutation_result['description']

@@ -9,6 +9,7 @@ from db.python.tables.output_file import OutputFileTable
 from google.api_core.exceptions import Forbidden
 from google.cloud.storage import Client
 from models.models import OutputFileInternal
+from models.models.output_file import DIRECTORY_FORMAT_EXTENSIONS
 
 
 async def get_analyses_without_fileid(connection: Database):
@@ -132,11 +133,21 @@ if __name__ == '__main__':
                     f'Processing bucket {bucket}/{prefix} with {len(analyses)} analyses'
                 )
                 for analysis in analyses:
+                    analysis_params = OutputFileInternal.extract_bucket_params(
+                        analysis['output']
+                    )
+                    is_directory_format = bool(analysis_params) and (
+                        analysis_params['file_extension'] in DIRECTORY_FORMAT_EXTENSIONS
+                    )
                     await oft.process_output_for_analysis(
                         analysis_id=analysis['id'],
                         output=analysis['output'],
                         outputs=None,
-                        blobs=blobs,
+                        # Directory-like outputs (.mt/.ht/.vds) are folders of blobs. The
+                        # delimiter-based bucket listing above rolls their children up into
+                        # prefixes, so the pre-fetched blobs can't confirm the folder exists.
+                        # Pass blobs=None to let get_file_info run a bounded existence check.
+                        blobs=None if is_directory_format else blobs,
                     )
                     # Print progress
                     print(

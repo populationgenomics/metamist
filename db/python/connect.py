@@ -350,7 +350,7 @@ async def configure_pg_connection(connection: AsyncConnection):
     Configure a new connection
 
     - set the search path to include the main and history schemas
-    - set autocommit to True for more predictable behavious
+    - set autocommit to True for more predictable behaviours
         this avoids creating transactions for queries that don't need them, and requires
         us to explictly create transactions when we need them
 

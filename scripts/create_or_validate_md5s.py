@@ -28,8 +28,8 @@ def create_md5(job, filepath: str, billing_project: str, driver_image: str):
     job.command(
         f"""\
     set -euxo pipefail
-    gsutil -u {quote(billing_project)} cat {quote(filepath)} | md5sum | cut -d " " -f1  > /tmp/uploaded.md5
-    gsutil -u {quote(billing_project)} cp /tmp/uploaded.md5 {quote(md5_filepath)}
+    gcloud storage --billing-project {quote(billing_project)} cat {quote(filepath)} | md5sum | cut -d " " -f1  > /tmp/uploaded.md5
+    gcloud storage --billing-project {quote(billing_project)} cp /tmp/uploaded.md5 {quote(md5_filepath)}
     """
     )
 
@@ -47,8 +47,8 @@ def validate_md5(job, filepath: str, billing_project: str, driver_image: str):
     job.command(
         f"""\
     set -euxo pipefail
-    calculated_md5=$(gsutil -u {quote(billing_project)} cat {quote(filepath)} | md5sum | cut -d " " -f1)
-    stored_md5=$(gsutil -u {quote(billing_project)} cat {quote(md5_filepath)} | cut -d " " -f1)
+    calculated_md5=$(gcloud storage --billing-project {quote(billing_project)} cat {quote(filepath)} | md5sum | cut -d " " -f1)
+    stored_md5=$(gcloud storage --billing-project {quote(billing_project)} cat {quote(md5_filepath)} | cut -d " " -f1)
 
     if [ "$calculated_md5" = "$stored_md5" ]; then
         echo "MD5 checksum validation successful."

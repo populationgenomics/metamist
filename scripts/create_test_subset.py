@@ -45,6 +45,71 @@ aapi = AnalysisApi()
 fapi = FamilyApi()
 papi = ParticipantApi()
 
+
+class DryRunAnalysisApi(AnalysisApi):
+    """Dry-run AnalysisApi that merely logs update methods."""
+
+    def create_analysis(self, project, analysis):
+        logger.info(f'[dry-run] Would aapi.create_analysis({project=}): {analysis}')
+
+    def update_analysis(self, analysis_id, analysis_update_model):
+        logger.info(
+            f'[dry-run] Would aapi.update_analysis({analysis_id=}): {analysis_update_model}'
+        )
+
+
+class DryRunFamilyApi(FamilyApi):
+    """Dry-run FamilyApi that merely logs update methods."""
+
+    def import_families(self, file, project):
+        families = file.readlines()
+        logger.info(
+            f'[dry-run] Would fapi.import_families({project=}) with {len(families)} families'
+        )
+
+    def import_pedigree(self, file, has_header, project, create_missing_participants):  # noqa: ARG002
+        ped_row_count = max(0, file.read().count('\n') - 1)
+        logger.info(
+            f'[dry-run] Would fapi.import_pedigree({project=}) with {ped_row_count} pedigree rows'
+        )
+
+
+class DryRunParticipantApi(ParticipantApi):
+    """Dry-run ParticipantApi that merely logs update methods."""
+
+    def __init__(self):
+        super().__init__()
+        self.count = 100000
+
+    def _new_id(self, pid):
+        if pid:
+            return pid
+        self.count += 1
+        return self.count
+
+    def upsert_participants(self, project, participant_upsert):
+        logger.info(
+            f'[dry-run] Would papi.upsert_participants({project=}) with {len(participant_upsert)} participants'
+        )
+        # Return with >100000 placeholder ids for "newly created" participants
+        return [{**p, 'id': self._new_id(p.get('id'))} for p in participant_upsert]
+
+
+class DryRunSampleApi(SampleApi):
+    """Dry-run SampleApi that merely logs update methods."""
+
+    def __init__(self):
+        super().__init__()
+        self.count = 0
+
+    def create_sample(self, project, sample_upsert):
+        logger.info(f'[dry-run] Would sapi.create_sample({project=}): {sample_upsert}')
+        if sample_upsert.id is not None:
+            return sample_upsert.id
+        self.count += 1
+        return f'NEWSAMPLE{self.count}'
+
+
 DEFAULT_SAMPLES_N = 10
 
 PRIMARY_EXTERNAL_ORG = ''
@@ -79,11 +144,12 @@ QUERY_ALL_DATA = gql(
                         meta
                         type
                     }
-                    analyses(type: {in_: ["cram", "gvcf"]}) {
+                    analyses(type: {in_: ["cram", "gvcf", "genotypingarray_gtc"]}) {
                         active
                         id
                         meta
                         output
+                        outputs
                         status
                         timestampCompleted
                         type
@@ -233,9 +299,12 @@ def get_sids_by_random_sampling(
     logger.info(f'Querying all samples in {project}')
     sid_output = query(SG_ID_QUERY, variables={'project': project})
 
-    # all_sids here is a set of all internal IDs in the project, minus any we already selected
+    # all_sids here is a set of all internal IDs in the project, minus any we already selected.
+    # Samples with no active sequencing groups are skipped — nothing to transfer.
     all_sids = {
-        sid['id'] for sid in sid_output.get('project').get('samples')
+        sid['id']
+        for sid in sid_output.get('project').get('samples')
+        if sid.get('sequencingGroups')
     } - samples_so_far
 
     logger.info(
@@ -256,12 +325,25 @@ def main(
     cohorts: set[str],
     skip_ped: bool,
     update_embedded_ids: bool,
+    dry_run: bool = False,
 ):
     """
     Script creates a test subset for a given project.
     A new project with a suffix -test is created, and for any files in sample/meta,
     sequence/meta, or analysis/output a copy in the -test namespace is created.
     """
+    if dry_run:
+        # Replace FooApi globals with dry-run versions that merely log updates.
+        global sapi, aapi, fapi, papi  # noqa: PLW0603
+        sapi = DryRunSampleApi()
+        aapi = DryRunAnalysisApi()
+        fapi = DryRunFamilyApi()
+        papi = DryRunParticipantApi()
+
+    # Skip GCS when seeding a local instance (no real files) or doing a dry-run.
+    sm_environment = os.environ.get('SM_ENVIRONMENT', '').lower()
+    skip_gcs = (sm_environment == 'local') or dry_run
+
     if not any(
         [additional_families, additional_samples, samples_n, families_n, cohorts]
     ):
@@ -310,14 +392,19 @@ def main(
         QUERY_ALL_DATA, {'project': project, 'sids': list(additional_samples)}
     )
 
-    # Pull Participant Data
-    participant_data = []
-    internal_participant_ids: list = []
-    for sg in original_project_subset_data.get('project').get('samples', []):
-        participant = sg.get('participant')
+    # Pull Participant Data. One donor can have multiple samples (e.g. a whole-blood
+    # sample and a PBMC sample), so two of the returned samples can point at the same
+    # participant. Keying by participant id keeps one entry per participant. If a
+    # participant shows up twice, both copies hold the same data, so overwriting is
+    # safe — but it does happen silently, with no warning.
+    participants_by_id: dict[int, dict] = {}
+    for sample in original_project_subset_data.get('project').get('samples', []):
+        participant = sample.get('participant')
         if participant:
-            participant_data.append(participant)
-            internal_participant_ids.append(participant.get('id'))
+            participants_by_id[participant['id']] = participant
+
+    participant_data = list(participants_by_id.values())
+    internal_participant_ids: list[int] = list(participants_by_id.keys())
 
     # Populating test project
     target_project = project + '-test'
@@ -339,9 +426,21 @@ def main(
         family_ids = transfer_families(
             project, target_project, internal_participant_ids
         )
-        upserted_participant_map = transfer_ped(project, target_project, family_ids)
+        upserted_participant_map = transfer_ped(
+            project,
+            target_project,
+            family_ids,
+        )
 
     existing_data = query(EXISTING_DATA_QUERY, {'project': target_project})
+
+    # Skipping GCS means no real files to reheader; disable the Hail Batch jobs.
+    if skip_gcs and update_embedded_ids:
+        logger.info(
+            'SM_ENVIRONMENT == "local" / --dry-run: disabling --update-embedded-ids '
+            '(no real files to reheader)'
+        )
+        update_embedded_ids = False
 
     # Create batch if needed for running header updating jobs
     if update_embedded_ids:
@@ -359,6 +458,7 @@ def main(
         upserted_participant_map=upserted_participant_map,
         target_project=target_project,
         project=project,
+        skip_gcs=skip_gcs,
     )
 
     logger.info('Transferring analyses')
@@ -370,6 +470,8 @@ def main(
         old_sid_to_new_sid,
         sample_to_sg_attribute_map,
         update_embedded_ids,
+        skip_gcs=skip_gcs,
+        dry_run=dry_run,
     )
     logger.info('Subset generation complete!')
 
@@ -384,6 +486,7 @@ def transfer_samples_sgs_assays(
     upserted_participant_map: dict[str, int],
     target_project: str,
     project: str,
+    skip_gcs: bool = False,
 ):
     """
     Transfer samples, sequencing groups, and assays from the original project to the
@@ -410,14 +513,16 @@ def transfer_samples_sgs_assays(
 
         existing_pid: int | None = None
         if s['participant']:
-            existing_pid = upserted_participant_map[s['participant']['externalId']]
+            existing_pid = upserted_participant_map.get(s['participant']['externalId'])
 
         sample_upsert = SampleUpsert(
             external_ids=s['externalIds'],
             type=sample_type or None,
-            meta=(copy_files_in_dict(s['meta'], project) or {}),
+            meta=(copy_files_in_dict(s['meta'], project, skip_gcs=skip_gcs) or {}),
             participant_id=existing_pid,
-            sequencing_groups=upsert_sequencing_groups(s, existing_data, project),
+            sequencing_groups=upsert_sequencing_groups(
+                s, existing_data, project, skip_gcs=skip_gcs
+            ),
             id=existing_sid,
         )
 
@@ -433,7 +538,7 @@ def transfer_samples_sgs_assays(
 
 
 def upsert_sequencing_groups(
-    sample: dict, existing_data: dict, project: str
+    sample: dict, existing_data: dict, project: str, skip_gcs: bool = False
 ) -> list[SequencingGroupUpsert]:
     """Create SG Upsert Objects for a sample"""
     sgs_to_upsert: list[SequencingGroupUpsert] = []
@@ -450,7 +555,12 @@ def upsert_sequencing_groups(
             technology=sg.get('technology'),
             type=sg.get('type'),
             assays=upsert_assays(
-                sg, existing_sgid, existing_data, sample.get('externalId'), project
+                sg,
+                existing_sgid,
+                existing_data,
+                sample.get('externalId'),
+                project,
+                skip_gcs=skip_gcs,
             ),
         )
         sgs_to_upsert.append(sg_upsert)
@@ -464,6 +574,7 @@ def upsert_assays(
     existing_data: dict,
     sample_external_id,
     project: str,
+    skip_gcs: bool = False,
 ) -> list[AssayUpsert]:
     """Create Assay Upsert Objects for a sequencing group"""
     print(sg)
@@ -480,7 +591,7 @@ def upsert_assays(
             type=assay.get('type'),
             id=existing_assay_id,
             external_ids=assay.get('externalIds') or {},
-            meta=copy_files_in_dict(assay.get('meta'), project),
+            meta=copy_files_in_dict(assay.get('meta'), project, skip_gcs=skip_gcs),
         )
 
         assays_to_upsert.append(assay_upsert)
@@ -560,18 +671,36 @@ def transfer_analyses(
     old_sid_to_new_sid: dict[str, str],
     sample_to_sg_attribute_map: dict[tuple, dict[tuple, str]],
     update_embedded_ids: bool,
+    skip_gcs: bool = False,
+    dry_run: bool = False,
 ):
     """
     This function will transfer the analyses from the original project to the test project.
     """
-    new_sg_data = query(SG_ID_QUERY, {'project': target_project})
-
-    new_sg_map = {}
-    for s in new_sg_data.get('project').get('samples'):
-        sg_ids: list = []
-        for sg in s.get('sequencingGroups'):
-            sg_ids.append(sg.get('id'))
-        new_sg_map[s.get('externalId')] = sg_ids
+    if dry_run:
+        # Target has no new SGs in dry-run; reuse source IDs as the "new" ids.
+        new_sg_data = {
+            'project': {
+                'samples': [
+                    {
+                        'id': old_sid_to_new_sid.get(s['id'], s['id']),
+                        'externalId': s['externalId'],
+                        'sequencingGroups': [
+                            {
+                                'id': sg['id'],
+                                'type': sg['type'],
+                                'platform': sg['platform'],
+                                'technology': sg['technology'],
+                            }
+                            for sg in s['sequencingGroups']
+                        ],
+                    }
+                    for s in samples
+                ]
+            }
+        }
+    else:
+        new_sg_data = query(SG_ID_QUERY, {'project': target_project})
 
     for s in samples:
         for sg in s['sequencingGroups']:
@@ -590,7 +719,24 @@ def transfer_analyses(
                 existing_data, s.get('externalId'), sg.get('type')
             )
             existing_sgid = existing_sg.get('id') if existing_sg else None
+            copied_analysis_files = set()
             for analysis in sg['analyses']:
+                # Newer analyses store the path in the structured `outputs` field;
+                # older ones use the plain `output` string. Prefer the former.
+                analysis_path = (
+                    analysis['outputs'].get('path')
+                    if isinstance(analysis.get('outputs'), dict)
+                    else None
+                ) or analysis['output']
+
+                if analysis_path in copied_analysis_files:
+                    # Avoid copying the same file multiple times if it was linked to multiple analyses
+                    logger.info(
+                        f'Skipping copy of analysis output file at {analysis_path} since it was already copied from another analysis'
+                    )
+                    continue
+                copied_analysis_files.add(analysis_path)
+
                 existing_analysis: dict = {}
                 if existing_sgid:
                     existing_analysis = get_existing_analysis(
@@ -603,15 +749,16 @@ def transfer_analyses(
                     am = AnalysisUpdateModel(
                         type=analysis['type'],
                         output=copy_files_in_dict(
-                            analysis['output'],
+                            analysis_path,
                             project,
-                            (str(sg['id']), new_sg_map[s['externalId']][0]),
+                            (str(sg['id']), new_sequencing_group_id[0]),
                             update_embedded_ids,
+                            skip_gcs=skip_gcs,
                         ),
                         status=AnalysisStatus(
                             analysis['status'].lower().replace('_', '-')
                         ),
-                        sequencing_group_ids=new_sg_map[s['externalId']],
+                        sequencing_group_ids=new_sequencing_group_id,
                         meta=analysis['meta'],
                     )
                     aapi.update_analysis(
@@ -622,10 +769,11 @@ def transfer_analyses(
                     am = Analysis(
                         type=analysis['type'],
                         output=copy_files_in_dict(
-                            analysis['output'],
+                            analysis_path,
                             project,
-                            (str(sg['id']), new_sg_map[s['externalId']][0]),
+                            (str(sg['id']), new_sequencing_group_id[0]),
                             update_embedded_ids,
+                            skip_gcs=skip_gcs,
                         ),
                         status=AnalysisStatus(
                             analysis['status'].lower().replace('_', '-')
@@ -634,7 +782,7 @@ def transfer_analyses(
                         meta=analysis['meta'],
                     )
 
-                    logger.info(f'Creating {analysis["type"]}analysis entry in test')
+                    logger.info(f'Creating {analysis["type"]} analysis entry in test')
                     aapi.create_analysis(project=target_project, analysis=am)
 
 
@@ -794,7 +942,9 @@ def get_sids_for_cohorts(
 
 
 def transfer_families(
-    initial_project: str, target_project: str, internal_participant_ids: list[int]
+    initial_project: str,
+    target_project: str,
+    internal_participant_ids: list[int],
 ) -> list[int]:
     """Pull relevant families from the input project, and copy to target_project"""
     family_data = query(
@@ -837,7 +987,9 @@ def transfer_families(
 
 
 def transfer_ped(
-    initial_project: str, target_project: str, family_ids: list[int]
+    initial_project: str,
+    target_project: str,
+    family_ids: list[int],
 ) -> dict[str, int]:
     """Pull pedigree from the input project, and copy to target_project"""
     ped_tsv = fapi.get_pedigree(
@@ -857,6 +1009,8 @@ def transfer_ped(
             project=target_project,
             create_missing_participants=True,
         )
+
+    # TODO Special-case for dry_run if we want to see SampleUpsert participant_id values.
 
     # Get map of external participant id to internal
     participant_output = query(PARTICIPANT_QUERY, {'project': target_project})
@@ -883,24 +1037,28 @@ def transfer_participants(
 
     participants_to_transfer = []
     for participant in participant_data:
-        for alt_id in participant['externalIds'].values():
-            if alt_id in target_project_pid_map:
-                # Participants with id field will be updated & those without will be inserted
-                participant['id'] = target_project_pid_map[alt_id]
-            else:
-                del participant['id']
-            transfer_participant = {
+        # Match a single target participant if any of this source participant's
+        # external_ids already exists there; otherwise leave id None to insert.
+        target_id = next(
+            (
+                target_project_pid_map[alt_id]
+                for alt_id in participant['externalIds'].values()
+                if alt_id in target_project_pid_map
+            ),
+            None,
+        )
+        participants_to_transfer.append(
+            {
                 'external_ids': participant['externalIds'],
                 'meta': participant.get('meta') or {},
                 'karyotype': participant.get('karyotype'),
                 'reported_gender': participant.get('reportedGender'),
                 'reported_sex': participant.get('reportedSex'),
                 'phenotypes': participant.get('phenotypes'),
-                'id': participant.get('id'),
+                'id': target_id,
                 'samples': [],
             }
-            # Participants are being created before the samples are, so this will be empty for now.
-            participants_to_transfer.append(transfer_participant)
+        )
 
     upserted_participants = papi.upsert_participants(
         target_project, participant_upsert=participants_to_transfer
@@ -1015,26 +1173,25 @@ def extra_file_commands(batch, job, new_path: str):
         batch.write_output(job.new_md5, new_path)
 
 
-def copy_files_in_dict(
+def copy_files_in_dict(  # noqa: PLR0911
     d,
     dataset: str,
     sid_replacement: tuple[str, str] = None,
     update_embedded_ids: bool = False,
+    skip_gcs: bool = False,
 ):
     """
     Replaces all `gs://cpg-{project}-main*/` paths
     into `gs://cpg-{project}-test*/` and creates copies if needed
     If `d` is dict or list, recursively calls this function on every element
     If `d` is str, replaces the path
+
+    `skip_gcs` rewrites the path but skips all GCS calls.
     """
     if not d:
         return d
     if isinstance(d, str) and d.startswith(f'gs://cpg-{dataset}-main'):
-        logger.info(f'Looking for analysis file {d}')
         old_path = d
-        if not file_exists(old_path):
-            logger.warning(f'File {old_path} does not exist')
-            return d
         new_path = old_path.replace(
             f'gs://cpg-{dataset}-main', f'gs://cpg-{dataset}-test'
         )
@@ -1042,6 +1199,15 @@ def copy_files_in_dict(
         # With the new internal sample ID from the test project
         if sid_replacement is not None:
             new_path = new_path.replace(sid_replacement[0], sid_replacement[1])
+
+        if skip_gcs:
+            logger.info(f'[skip-gcs] Would rewrite {old_path} -> {new_path}')
+            return new_path
+
+        logger.info(f'Looking for analysis file {old_path}')
+        if not file_exists(old_path):
+            logger.warning(f'File {old_path} does not exist')
+            return d
 
         job = None
 
@@ -1077,9 +1243,11 @@ def copy_files_in_dict(
                 logger.error(f'{new_path} already exists')
         return new_path
     if isinstance(d, list):
-        return [copy_files_in_dict(x, dataset) for x in d]
+        return [copy_files_in_dict(x, dataset, skip_gcs=skip_gcs) for x in d]
     if isinstance(d, dict):
-        return {k: copy_files_in_dict(v, dataset) for k, v in d.items()}
+        return {
+            k: copy_files_in_dict(v, dataset, skip_gcs=skip_gcs) for k, v in d.items()
+        }
     return d
 
 
@@ -1158,6 +1326,11 @@ if __name__ == '__main__':
         help='Update IDs embedded within CRAM and VCF files (on by default)',
         default=True,
     )
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='Log metamist writes without executing them. Skips GCS calls. Safe against any environment.',
+    )
     args, fail = parser.parse_known_args()
     if fail:
         parser.print_help()
@@ -1173,4 +1346,5 @@ if __name__ == '__main__':
         skip_ped=args.skip_ped,
         cohorts=set(args.cohorts),
         update_embedded_ids=args.update_embedded_ids,
+        dry_run=args.dry_run,
     )

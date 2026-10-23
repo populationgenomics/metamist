@@ -33,13 +33,13 @@ class SequencingGroupInternal(SMBase):
     # similar to a sample ID, this is stored internally as an integer,
     # but displayed as a string
     id: SequencingGroupInternalId | None = None
-    type: str | None = None
-    technology: str | None = None
-    platform: str | None = None
+    type: str
+    technology: str
+    platform: str
     meta: dict[str, Any] | None = None
-    sample_id: int | None = None
+    sample_id: int
     external_ids: dict[str, str] | None = {}
-    archived: bool | None = None
+    archived: bool
 
     project: int | None = None
 

@@ -2,7 +2,7 @@ import unittest
 
 from metamist.graphql import configure_sync_client, validate
 
-from api.graphql.schema import schema  # type: ignore
+from api.graphql.schema import schema
 from test.data.generate_data import QUERY_ENUMS, QUERY_SG_ID
 
 

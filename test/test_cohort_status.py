@@ -287,7 +287,7 @@ class TestCohortStatusGraphQL:
                 },
                 'cohortCriteria': {
                     'projects': [self.project_name],
-                    'sampleType': ['blood'],
+                    'sampleType': ['saliva'],
                 },
             },
         )
@@ -400,7 +400,7 @@ class TestCohortStatusGraphQL:
                     },
                     'cohortCriteria': {
                         'projects': [self.project_name],
-                        'sampleType': ['blood'],
+                        'sampleType': ['saliva'],
                     },
                 },
             )

@@ -69,8 +69,7 @@ web/src/__generated__
 # pyenv
 .python-version
 
-# mypy
-.mypy_cache/
+
 
 # Don't version pulumi configs, these are stored in metamist-private
 deploy/Pulumi.development.yaml

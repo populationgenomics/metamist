@@ -1,13 +1,14 @@
 # ^ Do this because of the loader decorator
 import copy
 import dataclasses
-import enum
 from collections import defaultdict
+from collections.abc import Awaitable, Callable
 from datetime import date
-from typing import Any, TypedDict
+from typing import Any, TypeVar
 
 from fastapi import Request
 from strawberry.dataloader import DataLoader
+from strawberry.fastapi import BaseContext
 
 from api.utils import ensure_nonnone, group_by
 from api.utils.db import GetConnection, get_projectless_db_connection_getter
@@ -47,68 +48,27 @@ from models.models.comment import CommentEntityType, DiscussionInternal
 from models.models.family import PedRowInternal
 
 
-class LoaderKeys(enum.Enum):
-    """
-    Keys for the data loaders, define them to it's clearer when we add / remove
-    them, and reduces the chance of typos
-    """
-
-    PROJECTS_FOR_IDS = 'projects_for_id'
-
-    AUDIT_LOGS_BY_IDS = 'audit_logs_by_ids'
-    AUDIT_LOGS_BY_ANALYSIS_IDS = 'audit_logs_by_analysis_ids'
-
-    ANALYSES_FOR_PROJECTS = 'analyses_for_projects'
-    ANALYSES_FOR_SEQUENCING_GROUPS = 'analyses_for_sequencing_groups'
-
-    ASSAYS_FOR_IDS = 'assays_for_ids'
-    ASSAYS_FOR_SAMPLES = 'sequences_for_samples'
-    ASSAYS_FOR_SEQUENCING_GROUPS = 'assays_for_sequencing_groups'
-
-    SAMPLES_FOR_IDS = 'samples_for_ids'
-    SAMPLES_FOR_PARTICIPANTS = 'samples_for_participants'
-    SAMPLES_FOR_PROJECTS = 'samples_for_projects'
-    SAMPLES_FOR_PARENTS = 'samples_for_parents'
-
-    PHENOTYPES_FOR_PARTICIPANTS = 'phenotypes_for_participants'
-
-    PARTICIPANTS_FOR_IDS = 'participants_for_ids'
-    PARTICIPANTS_FOR_FAMILIES = 'participants_for_families'
-    PARTICIPANTS_FOR_PROJECTS = 'participants_for_projects'
-
-    FAMILIES_FOR_PARTICIPANTS = 'families_for_participants'
-    FAMILY_PARTICIPANTS_FOR_FAMILIES = 'family_participants_for_families'
-    FAMILY_PARTICIPANTS_FOR_PARTICIPANTS = 'family_participants_for_participants'
-    FAMILIES_FOR_IDS = 'families_for_ids'
-
-    SEQUENCING_GROUPS_FOR_IDS = 'sequencing_groups_for_ids'
-    SEQUENCING_GROUPS_FOR_SAMPLES = 'sequencing_groups_for_samples'
-    SEQUENCING_GROUPS_FOR_PROJECTS = 'sequencing_groups_for_projects'
-    SEQUENCING_GROUPS_FOR_ANALYSIS = 'sequencing_groups_for_analysis'
-    SEQUENCING_GROUPS_COUNTS_FOR_PROJECT = 'sequencing_groups_counts_for_project'
-
-    COMMENTS_FOR_SAMPLE_IDS = 'comments_for_sample_ids'
-    COMMENTS_FOR_PARTICIPANT_IDS = 'comments_for_participant_ids'
-    COMMENTS_FOR_ASSAY_IDS = 'comments_for_assay_ids'
-    COMMENTS_FOR_PROJECT_IDS = 'comments_for_project_ids'
-    COMMENTS_FOR_SEQUENCING_GROUP_IDS = 'comments_for_sequencing_group_ids'
-    COMMENTS_FOR_FAMILY_IDS = 'comments_for_family_ids'
+K = TypeVar('K')
+V = TypeVar('V')
 
 
-loaders: dict[LoaderKeys, Any] = {}
-
-
-def connected_data_loader(id_: LoaderKeys, cache: bool = True):
+def connected_data_loader(
+    cache: bool = True,
+) -> Callable[
+    [Callable[[list[K], GetConnection], Awaitable[list[V]]]],
+    Callable[[GetConnection], DataLoader[K, V]],
+]:
     """Provide connection to a data loader"""
 
-    def connected_data_loader_caller(fn):
-        def inner(get_connection: GetConnection):
-            async def wrapped(*args, **kwargs):
-                return await fn(*args, **kwargs, get_connection=get_connection)
+    def connected_data_loader_caller(
+        fn: Callable[[list[K], GetConnection], Awaitable[list[V]]],
+    ) -> Callable[[GetConnection], DataLoader[K, V]]:
+        def inner(get_connection: GetConnection) -> DataLoader[K, V]:
+            async def wrapped(keys: list[K]) -> list[V]:
+                return await fn(keys, get_connection)
 
             return DataLoader(wrapped, cache=cache)
 
-        loaders[id_] = inner
         return inner
 
     return connected_data_loader_caller
@@ -119,16 +79,21 @@ def _get_connected_data_loader_partial_key(kwargs) -> tuple:
 
 
 def connected_data_loader_with_params(
-    id_: LoaderKeys, default_factory=None, copy_args=True
-):
+    default_factory: Callable[[], Any] | None = None, copy_args: bool = True
+) -> Callable[
+    [Callable[..., Awaitable[dict[Any, V]]]],
+    Callable[[GetConnection], DataLoader[Any, V | None]],
+]:
     """
     DataLoader Decorator for allowing DB connection to be bound to a loader
     """
 
-    def connected_data_loader_caller(fn):
-        def inner(get_connection: GetConnection):
-            async def wrapped(query: list[dict[str, Any]]) -> list[Any]:
-                by_key: dict[tuple, Any] = {}
+    def connected_data_loader_caller(
+        fn: Callable[..., Awaitable[dict[Any, V]]],
+    ) -> Callable[[GetConnection], DataLoader[Any, V | None]]:
+        def inner(get_connection: GetConnection) -> DataLoader[Any, V | None]:
+            async def wrapped(query: list[Any]) -> list[V | None]:
+                by_key: dict[tuple, V | None] = {}
 
                 if any('connection' in q or 'get_connection' in q for q in query):
                     raise ValueError('Cannot pass connection in query')
@@ -169,13 +134,12 @@ def connected_data_loader_with_params(
                 cache=False,
             )
 
-        loaders[id_] = inner
         return inner
 
     return connected_data_loader_caller
 
 
-@connected_data_loader(LoaderKeys.AUDIT_LOGS_BY_IDS)
+@connected_data_loader()
 async def load_audit_logs_by_ids(
     audit_log_ids: list[int], get_connection: GetConnection
 ) -> list[AuditLogInternal | None]:
@@ -189,7 +153,7 @@ async def load_audit_logs_by_ids(
         return [logs_by_id.get(a) for a in audit_log_ids]
 
 
-@connected_data_loader(LoaderKeys.AUDIT_LOGS_BY_ANALYSIS_IDS)
+@connected_data_loader()
 async def load_audit_logs_by_analysis_ids(
     analysis_ids: list[int], get_connection: GetConnection
 ) -> list[list[AuditLogInternal]]:
@@ -202,7 +166,7 @@ async def load_audit_logs_by_analysis_ids(
         return [logs.get(a) or [] for a in analysis_ids]
 
 
-@connected_data_loader(LoaderKeys.ASSAYS_FOR_IDS)
+@connected_data_loader()
 async def load_assays_for_ids(
     assay_ids: list[int], get_connection: GetConnection
 ) -> list[AssayInternal]:
@@ -217,7 +181,7 @@ async def load_assays_for_ids(
         return [assays_map[a] for a in assay_ids]
 
 
-@connected_data_loader_with_params(LoaderKeys.ASSAYS_FOR_SAMPLES, default_factory=list)
+@connected_data_loader_with_params(default_factory=list)
 async def load_assays_by_samples(
     get_connection: GetConnection, ids, filter: AssayFilter
 ) -> dict[int, list[AssayInternal]]:
@@ -233,7 +197,7 @@ async def load_assays_by_samples(
     return assay_map
 
 
-@connected_data_loader(LoaderKeys.ASSAYS_FOR_SEQUENCING_GROUPS)
+@connected_data_loader()
 async def load_assays_by_sequencing_groups(
     sequencing_group_ids: list[int], get_connection: GetConnection
 ) -> list[list[AssayInternal]]:
@@ -251,9 +215,7 @@ async def load_assays_by_sequencing_groups(
         return [assays.get(sg, []) for sg in sequencing_group_ids]
 
 
-@connected_data_loader_with_params(
-    LoaderKeys.SAMPLES_FOR_PARTICIPANTS, default_factory=list
-)
+@connected_data_loader_with_params(default_factory=list)
 async def load_samples_for_participant_ids(
     ids: list[int], filter: SampleFilter, get_connection: GetConnection
 ) -> dict[int, list[SampleInternal]]:
@@ -267,7 +229,7 @@ async def load_samples_for_participant_ids(
     return samples_by_pid
 
 
-@connected_data_loader(LoaderKeys.SEQUENCING_GROUPS_FOR_IDS)
+@connected_data_loader()
 async def load_sequencing_groups_for_ids(
     sequencing_group_ids: list[int], get_connection: GetConnection
 ) -> list[SequencingGroupInternal]:
@@ -283,9 +245,7 @@ async def load_sequencing_groups_for_ids(
         return [sequencing_groups_map[sg] for sg in sequencing_group_ids]
 
 
-@connected_data_loader_with_params(
-    LoaderKeys.SEQUENCING_GROUPS_FOR_SAMPLES, default_factory=list
-)
+@connected_data_loader_with_params(default_factory=list)
 async def load_sequencing_groups_for_samples(
     get_connection: GetConnection, ids: list[int], filter: SequencingGroupFilter
 ) -> dict[int, list[SequencingGroupInternal]]:
@@ -307,7 +267,7 @@ async def load_sequencing_groups_for_samples(
         return sg_map
 
 
-@connected_data_loader(LoaderKeys.SEQUENCING_GROUPS_COUNTS_FOR_PROJECT)
+@connected_data_loader()
 async def load_sequencing_group_counts_by_month(
     ids: list[ProjectId], get_connection: GetConnection
 ) -> list[dict[date, dict[str, int]]]:
@@ -321,7 +281,7 @@ async def load_sequencing_group_counts_by_month(
         return [counts_by_month[id] for id in ids]  # noqa: A001
 
 
-@connected_data_loader(LoaderKeys.SAMPLES_FOR_IDS)
+@connected_data_loader()
 async def load_samples_for_ids(
     sample_ids: list[int], get_connection: GetConnection
 ) -> list[SampleInternal]:
@@ -336,9 +296,7 @@ async def load_samples_for_ids(
         return [samples_map[s] for s in sample_ids]
 
 
-@connected_data_loader_with_params(
-    LoaderKeys.SAMPLES_FOR_PROJECTS, default_factory=list
-)
+@connected_data_loader_with_params(default_factory=list)
 async def load_samples_for_projects(
     get_connection: GetConnection, ids: list[ProjectId], filter: SampleFilter
 ):
@@ -353,7 +311,7 @@ async def load_samples_for_projects(
         return samples_by_project
 
 
-@connected_data_loader_with_params(LoaderKeys.SAMPLES_FOR_PARENTS, default_factory=list)
+@connected_data_loader_with_params(default_factory=list)
 async def load_nested_samples_for_parents(
     get_connection: GetConnection, ids: list[int], filter_: SampleFilter
 ):
@@ -369,7 +327,7 @@ async def load_nested_samples_for_parents(
         return samples_by_parent
 
 
-@connected_data_loader(LoaderKeys.PARTICIPANTS_FOR_IDS)
+@connected_data_loader()
 async def load_participants_for_ids(
     participant_ids: list[int], get_connection: GetConnection
 ) -> list[ParticipantInternal]:
@@ -388,7 +346,7 @@ async def load_participants_for_ids(
         return [p_by_id[p] for p in participant_ids]
 
 
-@connected_data_loader(LoaderKeys.SEQUENCING_GROUPS_FOR_ANALYSIS)
+@connected_data_loader()
 async def load_sequencing_groups_for_analysis_ids(
     analysis_ids: list[int], get_connection: GetConnection
 ) -> list[list[SequencingGroupInternal]]:
@@ -404,9 +362,7 @@ async def load_sequencing_groups_for_analysis_ids(
         return [analysis_sg_map.get(aid, []) for aid in analysis_ids]
 
 
-@connected_data_loader_with_params(
-    LoaderKeys.SEQUENCING_GROUPS_FOR_PROJECTS, default_factory=list
-)
+@connected_data_loader_with_params(default_factory=list)
 async def load_sequencing_groups_for_project_ids(
     get_connection: GetConnection, ids: list[int], filter: SequencingGroupFilter
 ) -> dict[int, list[SequencingGroupInternal]]:
@@ -421,7 +377,7 @@ async def load_sequencing_groups_for_project_ids(
         return sg_map
 
 
-@connected_data_loader(LoaderKeys.PROJECTS_FOR_IDS)
+@connected_data_loader()
 async def load_projects_for_ids(
     project_ids: list[int], get_connection: GetConnection
 ) -> list[Project]:
@@ -434,7 +390,7 @@ async def load_projects_for_ids(
         return [p for p in projects if p is not None]
 
 
-@connected_data_loader(LoaderKeys.FAMILIES_FOR_PARTICIPANTS)
+@connected_data_loader()
 async def load_families_for_participants(
     participant_ids: list[int], get_connection: GetConnection
 ) -> list[list[FamilyInternal]]:
@@ -450,7 +406,7 @@ async def load_families_for_participants(
         return [fam_map.get(p, []) for p in participant_ids]
 
 
-@connected_data_loader(LoaderKeys.PARTICIPANTS_FOR_FAMILIES)
+@connected_data_loader()
 async def load_participants_for_families(
     family_ids: list[int], get_connection: GetConnection
 ) -> list[list[ParticipantInternal]]:
@@ -461,9 +417,7 @@ async def load_participants_for_families(
         return [pmap.get(fid, []) for fid in family_ids]
 
 
-@connected_data_loader_with_params(
-    LoaderKeys.PARTICIPANTS_FOR_PROJECTS, default_factory=list
-)
+@connected_data_loader_with_params(default_factory=list)
 async def load_participants_for_projects(
     get_connection: GetConnection, ids: list[ProjectId], filter_: ParticipantFilter
 ) -> dict[ProjectId, list[ParticipantInternal]]:
@@ -479,9 +433,7 @@ async def load_participants_for_projects(
         return pmap
 
 
-@connected_data_loader_with_params(
-    LoaderKeys.ANALYSES_FOR_PROJECTS, default_factory=list
-)
+@connected_data_loader_with_params(default_factory=list)
 async def load_analyses_for_projects(
     get_connection: GetConnection,
     ids: list[int],
@@ -502,9 +454,7 @@ async def load_analyses_for_projects(
         return by_project_id
 
 
-@connected_data_loader_with_params(
-    LoaderKeys.ANALYSES_FOR_SEQUENCING_GROUPS, default_factory=list
-)
+@connected_data_loader_with_params(default_factory=list)
 async def load_analyses_for_sequencing_groups(
     get_connection: GetConnection,
     ids: list[int],
@@ -526,7 +476,7 @@ async def load_analyses_for_sequencing_groups(
         return by_sg_id
 
 
-@connected_data_loader(LoaderKeys.PHENOTYPES_FOR_PARTICIPANTS)
+@connected_data_loader()
 async def load_phenotypes_for_participants(
     participant_ids: list[int], get_connection: GetConnection
 ) -> list[dict]:
@@ -541,7 +491,7 @@ async def load_phenotypes_for_participants(
         return [participant_phenotypes.get(pid, {}) for pid in participant_ids]
 
 
-@connected_data_loader(LoaderKeys.FAMILIES_FOR_IDS)
+@connected_data_loader()
 async def load_families_for_ids(
     family_ids: list[int], get_connection: GetConnection
 ) -> list[FamilyInternal]:
@@ -555,7 +505,7 @@ async def load_families_for_ids(
         return [f_by_id[f] for f in family_ids]
 
 
-@connected_data_loader(LoaderKeys.FAMILY_PARTICIPANTS_FOR_FAMILIES)
+@connected_data_loader()
 async def load_family_participants_for_families(
     family_ids: list[int], get_connection: GetConnection
 ) -> list[list[PedRowInternal]]:
@@ -569,7 +519,7 @@ async def load_family_participants_for_families(
         return [fp_map.get(fid, []) for fid in family_ids]
 
 
-@connected_data_loader(LoaderKeys.FAMILY_PARTICIPANTS_FOR_PARTICIPANTS)
+@connected_data_loader()
 async def load_family_participants_for_participants(
     participant_ids: list[int], get_connection: GetConnection
 ) -> list[list[PedRowInternal]]:
@@ -594,7 +544,7 @@ async def load_family_participants_for_participants(
         return [fp_map.get(pid, []) for pid in participant_ids]
 
 
-@connected_data_loader(LoaderKeys.COMMENTS_FOR_SAMPLE_IDS)
+@connected_data_loader()
 async def load_comments_for_sample_ids(
     sample_ids: list[int], get_connection: GetConnection
 ) -> list[DiscussionInternal | None]:
@@ -609,7 +559,7 @@ async def load_comments_for_sample_ids(
         return comments
 
 
-@connected_data_loader(LoaderKeys.COMMENTS_FOR_PARTICIPANT_IDS)
+@connected_data_loader()
 async def load_comments_for_participant_ids(
     participant_ids: list[int], get_connection: GetConnection
 ) -> list[DiscussionInternal | None]:
@@ -624,7 +574,7 @@ async def load_comments_for_participant_ids(
         return comments
 
 
-@connected_data_loader(LoaderKeys.COMMENTS_FOR_FAMILY_IDS)
+@connected_data_loader()
 async def load_comments_for_family_ids(
     family_ids: list[int], get_connection: GetConnection
 ) -> list[DiscussionInternal | None]:
@@ -639,7 +589,7 @@ async def load_comments_for_family_ids(
         return comments
 
 
-@connected_data_loader(LoaderKeys.COMMENTS_FOR_ASSAY_IDS)
+@connected_data_loader()
 async def load_comments_for_assay_ids(
     assay_ids: list[int], get_connection: GetConnection
 ) -> list[DiscussionInternal | None]:
@@ -654,7 +604,7 @@ async def load_comments_for_assay_ids(
         return comments
 
 
-@connected_data_loader(LoaderKeys.COMMENTS_FOR_PROJECT_IDS)
+@connected_data_loader()
 async def load_comments_for_project_ids(
     project_ids: list[int], get_connection: GetConnection
 ) -> list[DiscussionInternal | None]:
@@ -669,7 +619,7 @@ async def load_comments_for_project_ids(
         return comments
 
 
-@connected_data_loader(LoaderKeys.COMMENTS_FOR_SEQUENCING_GROUP_IDS)
+@connected_data_loader()
 async def load_comments_for_sequencing_group_ids(
     sequencing_group_ids: list[int], get_connection: GetConnection
 ) -> list[DiscussionInternal | None]:
@@ -684,11 +634,93 @@ async def load_comments_for_sequencing_group_ids(
         return comments
 
 
-class GraphQLContext(TypedDict):
-    """Basic dict type for GraphQL context to be passed to resolvers"""
+class LoaderContext:
+    """A context object for all data loaders."""
 
-    loaders: dict[LoaderKeys, Any]
-    get_connection: GetConnection
+    def __init__(self, connection_getter: GetConnection):
+        self.load_audit_logs_by_ids = load_audit_logs_by_ids(connection_getter)
+        self.load_audit_logs_by_analysis_ids = load_audit_logs_by_analysis_ids(
+            connection_getter
+        )
+        self.load_assays_for_ids = load_assays_for_ids(connection_getter)
+        self.load_assays_by_samples = load_assays_by_samples(connection_getter)
+        self.load_assays_by_sequencing_groups = load_assays_by_sequencing_groups(
+            connection_getter
+        )
+        self.load_samples_for_participant_ids = load_samples_for_participant_ids(
+            connection_getter
+        )
+        self.load_sequencing_groups_for_ids = load_sequencing_groups_for_ids(
+            connection_getter
+        )
+        self.load_sequencing_groups_for_samples = load_sequencing_groups_for_samples(
+            connection_getter
+        )
+        self.load_sequencing_group_counts_by_month = (
+            load_sequencing_group_counts_by_month(connection_getter)
+        )
+        self.load_samples_for_ids = load_samples_for_ids(connection_getter)
+        self.load_samples_for_projects = load_samples_for_projects(connection_getter)
+        self.load_nested_samples_for_parents = load_nested_samples_for_parents(
+            connection_getter
+        )
+        self.load_participants_for_ids = load_participants_for_ids(connection_getter)
+        self.load_sequencing_groups_for_analysis_ids = (
+            load_sequencing_groups_for_analysis_ids(connection_getter)
+        )
+        self.load_sequencing_groups_for_project_ids = (
+            load_sequencing_groups_for_project_ids(connection_getter)
+        )
+        self.load_projects_for_ids = load_projects_for_ids(connection_getter)
+        self.load_families_for_participants = load_families_for_participants(
+            connection_getter
+        )
+        self.load_participants_for_families = load_participants_for_families(
+            connection_getter
+        )
+        self.load_participants_for_projects = load_participants_for_projects(
+            connection_getter
+        )
+        self.load_analyses_for_projects = load_analyses_for_projects(connection_getter)
+        self.load_analyses_for_sequencing_groups = load_analyses_for_sequencing_groups(
+            connection_getter
+        )
+        self.load_phenotypes_for_participants = load_phenotypes_for_participants(
+            connection_getter
+        )
+        self.load_families_for_ids = load_families_for_ids(connection_getter)
+        self.load_family_participants_for_families = (
+            load_family_participants_for_families(connection_getter)
+        )
+        self.load_family_participants_for_participants = (
+            load_family_participants_for_participants(connection_getter)
+        )
+        self.load_comments_for_sample_ids = load_comments_for_sample_ids(
+            connection_getter
+        )
+        self.load_comments_for_participant_ids = load_comments_for_participant_ids(
+            connection_getter
+        )
+        self.load_comments_for_family_ids = load_comments_for_family_ids(
+            connection_getter
+        )
+        self.load_comments_for_assay_ids = load_comments_for_assay_ids(
+            connection_getter
+        )
+        self.load_comments_for_project_ids = load_comments_for_project_ids(
+            connection_getter
+        )
+        self.load_comments_for_sequencing_group_ids = (
+            load_comments_for_sequencing_group_ids(connection_getter)
+        )
+
+
+class GraphQLContext(BaseContext):
+    """Custom graphql context with loaders and db connection"""
+
+    def __init__(self, loaders: LoaderContext, get_connection: GetConnection):
+        self.loaders = loaders
+        self.get_connection = get_connection
 
 
 async def get_context(
@@ -696,9 +728,7 @@ async def get_context(
     connection_getter: GetConnection = get_projectless_db_connection_getter,
 ) -> GraphQLContext:
     """Get loaders / cache context for strawberyy GraphQL"""
-    mapped_loaders = {k: fn(connection_getter) for k, fn in loaders.items()}
-
-    return {
-        'get_connection': connection_getter,
-        'loaders': mapped_loaders,
-    }
+    return GraphQLContext(
+        loaders=LoaderContext(connection_getter),
+        get_connection=connection_getter,
+    )

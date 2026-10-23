@@ -3,8 +3,6 @@ from io import BytesIO, StringIO
 from string.templatelib import Template
 from typing import Any
 
-# Unfortunately some of these libs have partially or completely missing
-# type annotations so mypy will have a few red underlines in this file :/
 import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq

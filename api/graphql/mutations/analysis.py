@@ -57,7 +57,7 @@ class AnalysisMutations:
         """Create a new analysis"""
         from api.graphql.schema import GraphQLAnalysis  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             # Should be moved to the analysis layer
             (target_project,) = connection.get_and_check_access_to_projects_for_names(
                 [project], FullWriteAccessRoles
@@ -88,7 +88,7 @@ class AnalysisMutations:
         """Update status of analysis"""
         from api.graphql.schema import GraphQLAnalysis  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             alayer = AnalysisLayer(connection)
             await alayer.update_analysis(
                 analysis_id,

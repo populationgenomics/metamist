@@ -55,6 +55,7 @@ and we want to achieve the following:
 python parse_generic_metadata.py \
     --project $dataset \
     --sample-name-column "Sample ID" \
+    --default-sample-type "unknown" \
     --reads-column "Fastqs" \
     --sample-meta-field-map "sample-collection-date" "collection_date" \
     --assay-meta-field "depth" \
@@ -81,6 +82,7 @@ class GenericMetadataParser(GenericParser):
         search_locations: list[str],
         # sample columns
         sample_primary_eid_column: str,
+        sample_type_column: str | None = None,
         sample_external_id_column_map: dict[str, str] | None = None,
         # Participant columns
         participant_primary_eid_column: str | None = None,
@@ -112,7 +114,7 @@ class GenericMetadataParser(GenericParser):
         # Default values
         default_reference_assembly_location: str | None = None,
         ora_reference_assembly_location: str | None = None,
-        default_sample_type: str | None = None,
+        default_sample_type: str | None = 'unknown',
         default_sequencing=DefaultSequencing(
             seq_type='genome', technology='short-read', platform='illumina'
         ),
@@ -131,6 +133,7 @@ class GenericMetadataParser(GenericParser):
                 A list of locations to search for unqualified files in.
 
             sample_primary_eid_column (str): The name of the column containing the sample name.
+            sample_type_column (str | None, optional): The name of the column containing the sample type.
             sample_external_id_column_map (str | None, optional):
                 {column: eid_name} mapping for sample external_ids. This should NOT
                 include the sample_primary_eid_column.
@@ -221,6 +224,7 @@ class GenericMetadataParser(GenericParser):
 
         self.cpg_id_column = 'Internal CPG Sequencing Group ID'
         self.sample_primary_eid_column = sample_primary_eid_column
+        self.sample_type_column = sample_type_column
         self.sample_external_id_column_map = sample_external_id_column_map or {}
 
         # Participant columns
@@ -273,11 +277,22 @@ class GenericMetadataParser(GenericParser):
         """Get internal cpg id from a row using get_sample_id and an api call"""
         return row.get(self.cpg_id_column, None)
 
-    def get_sample_type(self, row: GroupedRow) -> str:  # noqa: ARG002
+    def get_sample_type_from_row(self, row: SingleRow) -> str | None:
         """Get sample type from row"""
-        if self.default_sample_type:
-            return self.default_sample_type
-        return None
+        if self.sample_type_column and self.sample_type_column in row:
+            value = row[self.sample_type_column]
+            if value:
+                return str(value).lower()
+        return self.default_sample_type
+
+    def get_sample_type(self, row: GroupedRow) -> str:
+        """Get sample type from row or default"""
+        types = [self.get_sample_type_from_row(r) for r in row]
+        if len(set(types)) > 1:
+            raise ValueError(
+                f'Conflicting sample types for sample {self.get_primary_sample_id(row[0])}: {types}'
+            )
+        return types[0] if types else self.default_sample_type
 
     def get_sequencing_types(self, row: GroupedRow) -> list[str]:
         """
@@ -1066,7 +1081,7 @@ class GenericMetadataParser(GenericParser):
     multiple=True,
     help='Two arguments per listing, eg: --qc-meta-field "name-in-manifest" "name-in-analysis.meta"',
 )
-@click.option('--default-sample-type', default='blood')
+@click.option('--default-sample-type', default='unknown')
 @click.option(
     '--confirm', is_flag=True, help='Confirm with user input before updating server'
 )

@@ -61,7 +61,7 @@ class ParticipantMutations:
         # Import needed here to avoid circular import
         from api.graphql.schema import GraphQLComment  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             cl = CommentLayer(connection)
             result = await cl.add_comment_to_entity(
                 entity=CommentEntityType.participant, entity_id=id, content=content
@@ -78,7 +78,7 @@ class ParticipantMutations:
         """Update Participant Data"""
         from api.graphql.schema import GraphQLParticipant  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             player = ParticipantLayer(connection)
 
             participant.id = participant_id
@@ -108,7 +108,7 @@ class ParticipantMutations:
         """
         from api.graphql.schema import GraphQLParticipant  # noqa: PLC0415
 
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             projects = connection.get_and_check_access_to_projects_for_names(
                 [project], FullWriteAccessRoles
             )
@@ -144,7 +144,7 @@ class ParticipantMutations:
         to new_family_id, maintaining all other fields.
         The new_family_id must already exist.
         """
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             player = ParticipantLayer(connection)
 
             return UpdateParticipantFamilyType.from_tuple(

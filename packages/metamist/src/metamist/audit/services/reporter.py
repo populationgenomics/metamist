@@ -69,7 +69,7 @@ class Reporter:
 
     def get_report_entries_stats(self, entries: list[AuditReportEntry]) -> dict:
         """Get statistics for the given report entries."""
-        total_size = sum(int(entry.filesize) or 0 for entry in entries)
+        total_size = sum(int(entry.filesize or 0) for entry in entries)
         return {'total_size': total_size, 'file_count': len(entries)}
 
     # Writing reports #
@@ -160,7 +160,7 @@ class Reporter:
 
         blob = self.gcs_data.storage.get_blob(self.gcs_data.analysis_bucket, blob_path)
         output_path = f'gs://{self.gcs_data.analysis_bucket}/{blob_path}'
-        if blob.exists() and blob.size > 0:
+        if blob.exists() and (blob.size or 0) > 0:
             self.audit_logs.info_nl(
                 f'Existing report found, appending new rows to: {output_path}'
             )
@@ -312,7 +312,9 @@ class Reporter:
         )
 
     # Summary statistics #
-    def generate_summary_statistics(self, audit_result: AuditResult) -> dict[str, int]:
+    def generate_summary_statistics(
+        self, audit_result: AuditResult
+    ) -> dict[str, int | float]:
         """
         Generate summary statistics from audit results.
 
@@ -340,7 +342,7 @@ class Reporter:
 
     # Filtering #
     def filter_rows(
-        self, filter_expressions: list[str], rows: list[AuditReportEntry]
+        self, filter_expressions: list[str] | None, rows: list[AuditReportEntry]
     ) -> list[AuditReportEntry]:
         """Filter report rows based on filter expressions."""
         if not filter_expressions:

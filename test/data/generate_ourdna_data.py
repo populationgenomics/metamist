@@ -7,12 +7,76 @@ Local Backend API needs to run prior executing this script
 
 import argparse
 import datetime
+import os
 import random
+import sys
 import uuid
 from collections.abc import Sequence
 
-from metamist.apis import EnumsApi, ParticipantApi
-from metamist.models import ParticipantUpsert, SampleUpsert
+from metamist.apis import AnalysisApi, EnumsApi, ParticipantApi, ProjectApi, SampleApi
+from metamist.graphql import gql, query
+from metamist.model.analysis import Analysis
+from metamist.model.analysis_status import AnalysisStatus
+from metamist.models import (
+    AssayUpsert,
+    ParticipantUpsert,
+    SampleUpsert,
+    SequencingGroupUpsert,
+)
+
+
+SG_TYPE_GENOME = 'genome'
+SG_TYPE_ARRAY = 'genotypingarray'
+
+SG_DEFINITIONS = {
+    SG_TYPE_GENOME: {
+        'platform': 'illumina',
+        'technology': 'short-read',
+        'analyses': ['cram', 'gvcf'],
+    },
+    SG_TYPE_ARRAY: {
+        'platform': 'illumina',
+        'technology': 'infinium-global-diversity-array-v1.0',
+        'analyses': ['genotypingarray_gtc'],
+    },
+}
+
+ANALYSIS_PATH_TEMPLATES = {
+    'cram': 'FAKE://cpg-ourdna-main/cram/{sg_id}.cram',
+    'gvcf': 'FAKE://cpg-ourdna-main/gvcf/{sg_id}.g.vcf.gz',
+    'genotypingarray_gtc': 'FAKE://cpg-ourdna-main/gtc/{sg_id}.gtc',
+}
+
+SG_QUERY = gql(
+    """
+    query SGsForOurdnaTestData($project: String!) {
+        project(name: $project) {
+            sequencingGroups {
+                id
+                type
+                analyses(project: {eq: $project}) {
+                    id
+                    type
+                }
+            }
+        }
+    }
+    """
+)
+
+WHOLE_BLOOD_QUERY = gql(
+    """
+    query WholeBlood($project: String!) {
+        project(name: $project) {
+            samples(type: {eq: "whole-blood"}) {
+                id
+                externalId
+                sequencingGroups { id }
+            }
+        }
+    }
+    """
+)
 
 
 PRIMARY_EXTERNAL_ORG = ''
@@ -139,6 +203,56 @@ def random_list(
             result.append(choice)
 
     return result
+
+
+def make_sequencing_groups(root_external_id: str) -> list[SequencingGroupUpsert]:
+    """
+    Build the two SGs that hang off a whole-blood sample.
+
+    Every whole-blood sample gets both a genome SG (one R1+R2 fastq assay) and a
+    genotypingarray SG (no assays). This mirrors the prod ourdna 'multi-SG-type'
+    arrangement and exercises the SG matching code in create_test_subset.py.
+    """
+    upload_prefix = f'FAKE://cpg-ourdna-main-upload/{root_external_id}'
+
+    genome_assay = AssayUpsert(
+        type='sequencing',
+        meta={
+            'reads_type': 'fastq',
+            'reads': [
+                {
+                    'location': f'{upload_prefix}_R1.fastq.gz',
+                    'basename': f'{root_external_id}_R1.fastq.gz',
+                    'class': 'File',
+                },
+                {
+                    'location': f'{upload_prefix}_R2.fastq.gz',
+                    'basename': f'{root_external_id}_R2.fastq.gz',
+                    'class': 'File',
+                },
+            ],
+            'sequencing_type': SG_TYPE_GENOME,
+            'sequencing_technology': SG_DEFINITIONS[SG_TYPE_GENOME]['technology'],
+            'sequencing_platform': SG_DEFINITIONS[SG_TYPE_GENOME]['platform'],
+        },
+    )
+
+    return [  # type: ignore[return-value]
+        SequencingGroupUpsert(
+            type=SG_TYPE_GENOME,
+            platform=SG_DEFINITIONS[SG_TYPE_GENOME]['platform'],
+            technology=SG_DEFINITIONS[SG_TYPE_GENOME]['technology'],
+            meta={},
+            assays=[genome_assay],
+        ),
+        SequencingGroupUpsert(
+            type=SG_TYPE_ARRAY,
+            platform=SG_DEFINITIONS[SG_TYPE_ARRAY]['platform'],
+            technology=SG_DEFINITIONS[SG_TYPE_ARRAY]['technology'],
+            meta={},
+            assays=[],
+        ),
+    ]
 
 
 def create_samples():
@@ -348,10 +462,8 @@ def create_participant():
     return participant
 
 
-def main(project='ourdna', num_participants=10):
-    """Doing the generation for you"""
-    participant_api = ParticipantApi()
-
+def register_enums(enums_api: EnumsApi) -> None:
+    """Register the sample/SG/assay/analysis enum values this generator needs."""
     sample_types = [
         'blood',
         'whole-blood',
@@ -360,14 +472,120 @@ def main(project='ourdna', num_participants=10):
         'pbmc',
         'buffy-coat',
     ]
-    enums_api = EnumsApi()
-    # add sample type enums
     for typ in sample_types:
         enums_api.post_sample_types(new_type=typ)
 
+    enums_api.post_assay_types(new_type='sequencing')
+    for sequencing_type, defn in SG_DEFINITIONS.items():
+        enums_api.post_sequencing_types(new_type=sequencing_type)
+        enums_api.post_sequencing_platforms(new_type=defn['platform'])
+        enums_api.post_sequencing_technologys(new_type=defn['technology'])
+        for analysis_type in defn['analyses']:
+            enums_api.post_analysis_types(new_type=analysis_type)
+
+
+def attach_sgs_to_whole_blood_samples(sample_api: SampleApi, project: str) -> None:
+    """
+    Find every whole-blood sample without SGs and attach the two-SG set.
+
+    The participant upsert path only collects SGs from top-level samples, so
+    SGs declared on nested whole-blood samples are silently dropped. Run this
+    as a second pass against the freshly-created whole-blood sample IDs.
+    """
+    resp = query(WHOLE_BLOOD_QUERY, {'project': project})
+    samples = [s for s in resp['project']['samples'] if not s.get('sequencingGroups')]
+    if not samples:
+        return
+
+    print(f'attaching SGs to {len(samples)} whole-blood samples')
+    upserts = [
+        SampleUpsert(
+            id=s['id'],
+            sequencing_groups=make_sequencing_groups(s['externalId']),
+        )
+        for s in samples
+    ]
+    sample_api.upsert_samples(project, upserts)
+
+
+def create_analyses_for_new_sgs(
+    analysis_api: AnalysisApi, project: str, existing_sg_ids: set[str]
+) -> None:
+    """
+    Create one analysis per analysis type for every SG newly added to the project.
+
+    Genome SGs get a cram + gvcf, array SGs get a genotypingarray_gtc. Paths use
+    a FAKE:// scheme so metamist skips GCS validation and stores the path as a
+    plain string in analysis_outputs.
+    """
+    sg_resp = query(SG_QUERY, {'project': project})
+    new_sgs = [
+        sg
+        for sg in sg_resp['project']['sequencingGroups']
+        if sg['id'] not in existing_sg_ids
+    ]
+    print(f'creating analyses for {len(new_sgs)} new sequencing groups')
+
+    for sg in new_sgs:
+        sg_id = sg['id']
+        sg_type = sg['type']
+        existing_analysis_types = {a['type'] for a in sg.get('analyses', [])}
+
+        for analysis_type in SG_DEFINITIONS[sg_type]['analyses']:
+            if analysis_type not in existing_analysis_types:
+                path = ANALYSIS_PATH_TEMPLATES[analysis_type].format(sg_id=sg_id)
+                analysis_api.create_analysis(
+                    project=project,
+                    analysis=Analysis(
+                        type=analysis_type,
+                        status=AnalysisStatus('completed'),
+                        sequencing_group_ids=[sg_id],
+                        output=path,
+                        meta={'sequencing_type': sg_type},
+                    ),
+                )
+
+
+def main(project: str, num_participants: int):
+    """Doing the generation for you"""
+    project_api = ProjectApi()
+    participant_api = ParticipantApi()
+    sample_api = SampleApi()
+    enums_api = EnumsApi()
+    analysis_api = AnalysisApi()
+
+    register_enums(enums_api)
+
+    # Create the project if it doesn't exist
+    existing_projects = project_api.get_my_projects()
+    if project not in existing_projects:
+        project_api.create_project(
+            name=project, dataset=project, create_test_project=False
+        )
+        default_user = os.getenv('SM_LOCALONLY_DEFAULTUSER')
+        if not default_user:
+            print(
+                'SM_LOCALONLY_DEFAULTUSER env var is not set, please set it before generating data'
+            )
+            sys.exit(1)
+
+        project_api.update_project_members(
+            project=project,
+            project_member_update=[
+                {'member': default_user, 'roles': ['reader', 'writer']}
+            ],
+        )
+
+    # Snapshot existing SGs so we only create analyses for fresh ones this run.
+    pre_sgs = query(SG_QUERY, {'project': project})
+    existing_sg_ids = {sg['id'] for sg in pre_sgs['project']['sequencingGroups']}
+
     participants = [create_participant() for _ in range(num_participants)]
     participants_rec = participant_api.upsert_participants(project, participants)
-    print('inserted participants:', participants_rec)
+    print(f'inserted {len(participants_rec)} participants')
+
+    attach_sgs_to_whole_blood_samples(sample_api, project)
+    create_analyses_for_new_sgs(analysis_api, project, existing_sg_ids)
 
 
 if __name__ == '__main__':
@@ -375,6 +593,6 @@ if __name__ == '__main__':
         description='Script for generating data in the ourdna test project'
     )
     parser.add_argument('--project', type=str, default='ourdna')
-    parser.add_argument('--num-participants', type=int, default=10)
+    parser.add_argument('--num-participants', type=int, default=5)
     args = vars(parser.parse_args())
     main(**args)

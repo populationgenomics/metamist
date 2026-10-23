@@ -1,3 +1,4 @@
+Writing: /dev/stdout
 \restrict dbmate
 
 -- Dumped from database version 18.3 (Debian 18.3-1.pgdg13+1)
@@ -1241,7 +1242,7 @@ CREATE TABLE main.sample (
     id integer NOT NULL,
     project integer NOT NULL,
     participant_id integer,
-    active boolean,
+    active boolean NOT NULL,
     meta jsonb DEFAULT '{}'::jsonb,
     type text,
     sample_root_id integer,
@@ -1322,9 +1323,9 @@ CREATE TABLE main.sequencing_group (
     sample_id integer NOT NULL,
     type text NOT NULL,
     technology text NOT NULL,
-    platform text,
+    platform text NOT NULL,
     meta jsonb DEFAULT '{}'::jsonb,
-    archived boolean,
+    archived boolean NOT NULL,
     author text,
     audit_log_id integer,
     sys_period tstzrange NOT NULL
@@ -3350,4 +3351,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260120061616'),
     ('20260120061617'),
     ('20260129010059'),
-    ('20260212055045');
+    ('20260212055045'),
+    ('20260804021835');

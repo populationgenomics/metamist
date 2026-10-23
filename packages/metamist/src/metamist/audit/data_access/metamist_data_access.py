@@ -19,7 +19,7 @@ from metamist.audit.models import (
 class MetamistDataAccess:
     """Layer for accessing Metamist data."""
 
-    def __init__(self, graphql_client: GraphQLClient = None):
+    def __init__(self, graphql_client: GraphQLClient | None = None):
         """
         Initialize the data access layer.
 
@@ -187,10 +187,12 @@ class MetamistDataAccess:
             Validated configuration
         """
 
-        async def validate_enum_input(enum_type: str, input_values: tuple[str]) -> str:
+        async def validate_enum_input(
+            enum_type: str, input_values: tuple[str, ...]
+        ) -> tuple[str, ...]:
             valid_values = await self.get_enum_values(enum_type)
             if 'all' in input_values:
-                return valid_values
+                return tuple(valid_values)
             if any(value.lower() not in valid_values for value in input_values):
                 raise ValueError(
                     f'Invalid {enum_type} values: {", ".join(input_values)}. '
@@ -311,12 +313,15 @@ class MetamistDataAccess:
             filesize=output_size,
             checksum=output_checksum,
         )
+        timestamp_completed = data.get('timestampCompleted')
         return Analysis(
             id=data['id'],
             type=data['type'],
             output_file=output_file,
             sequencing_group_id=sg_id,
-            timestamp_completed=self._parse_timestamp(data.get('timestampCompleted')),
+            timestamp_completed=self._parse_timestamp(timestamp_completed)
+            if isinstance(timestamp_completed, str)
+            else None,
         )
 
     def _parse_timestamp(self, timestamp_str: str) -> datetime:

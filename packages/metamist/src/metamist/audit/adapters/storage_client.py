@@ -77,7 +77,7 @@ class StorageClient:
         bucket_name: str,
         prefixes: set[str] | None = None,
         file_extensions: tuple[str] | None = None,
-        excluded_prefixes: tuple[str] | None = None,
+        excluded_prefixes: tuple[str, ...] | None = None,
     ) -> list[FileMetadata]:
         """
         List blobs in a bucket with optional filtering.
@@ -98,12 +98,15 @@ class StorageClient:
             for item in self.client.list_blobs(bucket, prefix=prefix):
                 blob = cast(storage.Blob, item)
                 # Skip if file doesn't match extensions
-                if file_extensions and not blob.name.endswith(file_extensions):
+                if file_extensions and not (
+                    blob.name and blob.name.endswith(file_extensions)
+                ):
                     continue
 
                 # Skip if file matches excluded prefixes
                 if excluded_prefixes and any(
-                    blob.name.startswith(prefix) for prefix in excluded_prefixes
+                    (blob.name and blob.name.startswith(prefix))
+                    for prefix in excluded_prefixes
                 ):
                     continue
 

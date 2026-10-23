@@ -10,9 +10,10 @@ import {
 import { TableFromQuery, TableProps } from './TableFromQuery'
 
 type BaseReportItemProps = {
+    cardVariant?: 'outlined' | 'elevation'
     title?: string
     subtitle?: string
-    description?: string
+    description?: React.ReactNode
     height: number
     flexBasis?: number | string
     flexGrow: number
@@ -27,9 +28,10 @@ type ReportItemContentProps = {
 }
 
 export function ReportItem(props: BaseReportItemProps & ReportItemContentProps) {
-    const { flexBasis, flexGrow, flexShrink, minWidth, maxWidth } = props
+    const { flexBasis, flexGrow, flexShrink, minWidth, maxWidth, cardVariant } = props
     return (
         <Card
+            variant={cardVariant}
             sx={{
                 position: 'relative',
                 display: 'flex',
@@ -155,10 +157,10 @@ export function ReportItemTable(props: ReportItemTableProps) {
     )
 }
 
-type ReportItemMetricProps = BaseReportItemProps & MetricProps
+type ReportItemMetricProps = BaseReportItemProps & MetricProps & { showActions?: boolean }
 
 export function ReportItemMetric(props: ReportItemMetricProps) {
-    const { project, query: unformattedQuery, ...reportItemProps } = props
+    const { project, query: unformattedQuery, showActions = true, ...reportItemProps } = props
     const query = formatQuery(unformattedQuery)
 
     return (
@@ -169,10 +171,12 @@ export function ReportItemMetric(props: ReportItemMetricProps) {
                 </Box>
             }
             actions={
-                <Box>
-                    <ActionViewEditSql project={props.project} query={query} />
-                    <ActionViewExpandedTable project={props.project} query={query} />
-                </Box>
+                showActions ? (
+                    <Box>
+                        <ActionViewEditSql project={props.project} query={query} />
+                        <ActionViewExpandedTable project={props.project} query={query} />
+                    </Box>
+                ) : null
             }
             {...reportItemProps}
         />

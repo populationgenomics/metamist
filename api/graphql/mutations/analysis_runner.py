@@ -45,7 +45,7 @@ class AnalysisRunnerMutations:
         info: Info[GraphQLContext, AnalysisRunnerMutations],
     ) -> str:
         """Create a new analysis runner log"""
-        async with info.context['get_connection']() as connection:
+        async with info.context.get_connection() as connection:
             # Should be moved to the analysis runner layer
             (target_project,) = connection.get_and_check_access_to_projects_for_names(
                 [project], FullWriteAccessRoles

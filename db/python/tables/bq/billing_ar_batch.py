@@ -43,12 +43,11 @@ class BillingArBatchTable(BillingBaseTable):
         """
         _query = f"""
         SELECT
-            batch_id,
+            CASE WHEN batch_id IS NOT NULL THEN batch_id ELSE 'NA' END as batch_id,
             MIN(min_day) as start_day,
             MAX(max_day) as end_day
         FROM `{self.table_name}`
         WHERE ar_guid = @ar_guid
-        AND batch_id IS NOT NULL
         GROUP BY batch_id
         ORDER BY batch_id;
         """

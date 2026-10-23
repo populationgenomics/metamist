@@ -17,7 +17,7 @@ class CohortInternal(SMBase):
     project: ProjectId
     description: str
     template_id: int | None
-    status: CohortStatus | None
+    status: CohortStatus
 
 
 class CohortUpdateBody(SMBase):

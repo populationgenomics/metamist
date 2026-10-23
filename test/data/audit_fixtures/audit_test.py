@@ -2,6 +2,8 @@
 Contains fixtured data for the audit unit tests
 """
 
+import datetime
+
 from cpg_utils import to_path
 from metamist.audit.models import (
     Analysis,
@@ -72,7 +74,7 @@ ANALYSES = {
         type='cram',
         output_file=FileMetadata(to_path('gs://cpg-dataset-main/cram/SG01_1.cram')),
         sequencing_group_id='SG01_1',
-        timestamp_completed='2025-06-15T12:00:00Z',
+        timestamp_completed=datetime.datetime.fromisoformat('2025-06-15T12:00:00Z'),
     ),
     2: Analysis(
         id=2,
@@ -81,35 +83,35 @@ ANALYSES = {
             to_path('gs://cpg-dataset-main/exome/cram/SG01_2.cram')
         ),
         sequencing_group_id='SG01_2',
-        timestamp_completed='2025-06-16T12:00:00Z',
+        timestamp_completed=datetime.datetime.fromisoformat('2025-06-16T12:00:00Z'),
     ),
     3: Analysis(
         id=3,
         type='cram',
         output_file=FileMetadata(to_path('gs://cpg-dataset-main/cram/SG02.cram')),
         sequencing_group_id='SG02',
-        timestamp_completed='2025-06-17T12:00:00Z',
+        timestamp_completed=datetime.datetime.fromisoformat('2025-06-17T12:00:00Z'),
     ),
     4: Analysis(
         id=4,
         type='cram',
         output_file=FileMetadata(to_path('gs://cpg-dataset-main/exome/cram/SG03.cram')),
         sequencing_group_id='SG03',
-        timestamp_completed='2025-06-18T12:00:00Z',
+        timestamp_completed=datetime.datetime.fromisoformat('2025-06-18T12:00:00Z'),
     ),
     5: Analysis(
         id=5,
         type='cram',
         output_file=FileMetadata(to_path('gs://cpg-dataset-main/cram/SG05.cram')),
         sequencing_group_id='SG05',
-        timestamp_completed='2025-06-19T12:00:00Z',
+        timestamp_completed=datetime.datetime.fromisoformat('2025-06-19T12:00:00Z'),
     ),
     6: Analysis(
         id=6,
         type='cram',
         output_file=FileMetadata(to_path('gs://cpg-dataset-main/cram/SG06.cram')),
         sequencing_group_id='SG06',
-        timestamp_completed='2025-06-20T12:00:00Z',
+        timestamp_completed=datetime.datetime.fromisoformat('2025-06-20T12:00:00Z'),
     ),
     7: Analysis(
         id=7,
@@ -120,7 +122,7 @@ ANALYSES = {
             checksum='abcd1234',
         ),
         sequencing_group_id='SG06',
-        timestamp_completed='2025-06-21T12:00:00Z',
+        timestamp_completed=datetime.datetime.fromisoformat('2025-06-21T12:00:00Z'),
     ),
 }
 

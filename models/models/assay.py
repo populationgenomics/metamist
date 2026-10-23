@@ -98,6 +98,6 @@ class AssayUpsert(SMBase):
             id=self.id,  # type: ignore
             type=self.type,  # type: ignore
             external_ids=self.external_ids,  # type: ignore
-            sample_id=_sample_id,  # type: ignore
+            sample_id=_sample_id,
             meta=self.meta,  # type: ignore
         )

@@ -60,6 +60,4 @@ jobs:
           uv run regenerate_api.py
 
       - name: pre-commit
-        env:
-          PRE_COMMIT_ARGS: --from-ref ${{ github.event.pull_request.base.sha }} --to-ref ${{ github.event.pull_request.head.sha }}
-        run: uv run pre-commit run $PRE_COMMIT_ARGS
+        run: uv run pre-commit run --all-files

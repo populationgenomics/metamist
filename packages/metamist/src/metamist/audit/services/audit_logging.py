@@ -3,8 +3,8 @@ import tempfile
 
 
 def setup_logger(
-    dataset: str, name: str, level: str = 'INFO', log_file: str = None
-) -> logging.Logger:
+    dataset: str, name: str, level: str = 'INFO', log_file: str | None = None
+) -> logging.LoggerAdapter:
     """Set up logger for audit reviews."""
     logger = logging.getLogger(name)
 

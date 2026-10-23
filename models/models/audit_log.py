@@ -15,7 +15,7 @@ class AuditLogInternal(SMBase):
     id: AuditLogId
     timestamp: datetime.datetime
     author: str
-    auth_project: ProjectId
+    auth_project: ProjectId | None
     on_behalf_of: str | None
     ar_guid: str | None
     comment: str | None

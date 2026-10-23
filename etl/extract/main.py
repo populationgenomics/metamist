@@ -7,7 +7,7 @@ import uuid
 import flask
 import functions_framework
 import google.cloud.bigquery as bq
-from google.cloud import pubsub_v1  # type: ignore
+from google.cloud import pubsub_v1
 
 from cpg_utils.cloud import email_from_id_token
 

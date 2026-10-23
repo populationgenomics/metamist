@@ -1,3 +1,4 @@
+import os
 from typing import Any
 
 import pulumi_gcp as gcp
@@ -46,6 +47,11 @@ class ServerConfig(BaseModel):
     cloudrun_min_instances: int
     cloudrun_max_instances: int
     cloudrun_max_concurrent_requests: int
+    # Cloud run only accepts '1', '2', '4' or '8' for cpu, and the memory value
+    # caps out based on the cpu chosen, see
+    # https://cloud.google.com/run/docs/configuring/services/memory-limits
+    cloudrun_cpu: str
+    cloudrun_memory: str
 
 
 class MigrationsConfig(BaseModel):
@@ -72,6 +78,8 @@ class InfraConfig(BaseModel):
 
     # Migrations configuration
     migrations: MigrationsConfig
+
+    metamist_private_sha: str
 
     @property
     def registry_url(self) -> str:
@@ -109,4 +117,5 @@ def load_config() -> InfraConfig:
         common=common,
         server=server,
         migrations=migrations,
+        metamist_private_sha=os.environ.get('METAMIST_PRIVATE_SHA', 'unknown'),
     )

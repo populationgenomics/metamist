@@ -48,6 +48,9 @@ ANALYSES_QUERY = gql(
                     type
                     meta
                     outputs
+                    project {
+                        name
+                    }
                 }
             }
         }
@@ -98,6 +101,7 @@ UNRECORDED_ANALYSIS_FILES = [
     # Stripy stage files
     'gs://{bucket_name}-analysis/stripy/{sg_id}.stripy.json',
     'gs://{bucket_name}-analysis/stripy/{sg_id}.stripy.log.txt',
+    'gs://cpg-{bucket_name}-main-web/stripy/{sg_id}.stripy.html',  # latest global report
     # MitoReport stage files
     'gs://{bucket_name}-analysis/mito/{sg_id}.coverage_mean.txt',
     'gs://{bucket_name}-analysis/mito/{sg_id}.coverage_median.txt',
@@ -134,6 +138,10 @@ def get_analyses_to_update_and_files_to_move(
     files_to_move = []
     for sg in analysis_query_result['project']['sequencingGroups']:
         for analysis in sg['analyses']:
+            if analysis['project']['name'] != new_dataset:
+                # This skips the analyses that haven't been updated with the new project
+                continue
+
             if (
                 analysis['type'] == 'sv'
                 and analysis['meta'].get('stage') != 'GatherSampleEvidence'

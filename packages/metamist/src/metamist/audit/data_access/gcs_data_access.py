@@ -87,7 +87,7 @@ class GCSDataAccess:
         Returns:
             Lists of found CRAM paths and missing CRAM paths
         """
-        assert all(p.bucket == self.main_bucket for p in cram_paths), (
+        assert all(p.bucket == self.main_bucket for p in cram_paths), (  # type: ignore - type stubs think that bucket doesn't exist on path
             'All CRAM paths must be in the main(|test) bucket'
         )
         crams_in_bucket = self.storage.check_blobs(self.main_bucket, cram_paths)

@@ -253,7 +253,7 @@ class SampleLayer(BaseLayer):
                 else:
                     # Otherwise update
                     await self.st.update_sample(
-                        id_=s.id,  # type: ignore
+                        id_=s.id,
                         external_ids=s.external_ids,
                         meta=s.meta,
                         participant_id=s.participant_id,

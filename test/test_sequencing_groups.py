@@ -62,7 +62,7 @@ def sequencing_group_model(test_sample: int) -> SequencingGroupUpsertInternal:
             'meta-key': 'meta-value',
         },
         sample_id=test_sample,
-        external_ids={'ext': 'some-ext-id'},
+        external_ids={'ext': 'some-ext-id', '': 'some-other-ext-id'},
         assays=[
             AssayUpsertInternal(
                 type='sequencing',
@@ -157,6 +157,53 @@ class TestSequencingGroup:
         sg_from_db = await sg_layer.get_sequencing_group_by_id(initial_sg[0].id)
 
         assert sg_from_db.meta == {'another-meta': 'field', 'meta-key': 'meta-value'}
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['writer'])
+    async def test_insert_sequencing_group_with_external_ids(
+        self,
+        connection_with_project: Connection,
+        sequencing_group_model: SequencingGroupUpsertInternal,
+    ):
+        """Test that external IDs are properly attached during sequencing group upsert"""
+        sg_layer = SequencingGroupLayer(connection_with_project)
+
+        # Test that external IDs are correctly attached to the sequencing group
+        initial_sg = await sg_layer.upsert_sequencing_groups([sequencing_group_model])
+        assert initial_sg[0].id is not None
+
+        sg = await sg_layer.get_sequencing_group_by_id(initial_sg[0].id)
+        assert sg.external_ids == initial_sg[0].external_ids
+
+        # Now test that when sequencing groups are recreated, the new sg has the same external IDs
+
+        # Recreate with new assays
+        updated_sg = SequencingGroupUpsertInternal(
+            id=initial_sg[0].id,
+            sample_id=sequencing_group_model.sample_id,
+            type='genome',
+            technology='short-read',
+            platform='ILLUMINA',
+            assays=[
+                AssayUpsertInternal(
+                    type='sequencing',
+                    external_ids={},
+                    meta={**DEFAULT_SEQUENCING_META, 'sequencing_type': 'exome'},
+                )
+            ],
+        )
+
+        updated_sg = await sg_layer.upsert_sequencing_groups([updated_sg])
+        assert updated_sg[0].id is not None
+        assert updated_sg[0].id != initial_sg[0].id
+
+        # Verify the old sg is archived
+        archived_sg = await sg_layer.get_sequencing_group_by_id(initial_sg[0].id)
+        assert archived_sg.archived
+
+        # Verify the new sg has same external IDs
+        new_sg = await sg_layer.get_sequencing_group_by_id(updated_sg[0].id)
+        assert new_sg.external_ids == initial_sg[0].external_ids
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['writer'])
@@ -451,9 +498,9 @@ class TestSequencingGroup:
         current_date = date(2026, 1, 1)
         current_query = t"""
             INSERT INTO sequencing_group
-                (sample_id, type, technology, archived, sys_period)
+                (sample_id, type, technology, platform, archived, sys_period)
             VALUES
-                ({test_sample}, 'genome', 'short-read', false, tstzrange({current_date.isoformat()}, null))
+                ({test_sample}, 'genome', 'short-read', 'illumina', false, tstzrange({current_date.isoformat()}, null))
         """
         conn = connection_with_project.pg_connection
         async with conn.transaction():
@@ -526,14 +573,14 @@ class TestSequencingGroup:
         sg_layer = SequencingGroupLayer(connection_with_project)
 
         test_sg_data = [
-            {'type': 'genome', 'technology': 'short-read'},
-            {'type': 'genome', 'technology': 'long-read'},
+            {'type': 'genome', 'technology': 'short-read', 'platform': 'illumina'},
+            {'type': 'genome', 'technology': 'long-read', 'platform': 'illumina'},
         ]
 
         # Firstly create two sequencing groups to attach analyses to
         insert_sgs = sql.SQL("""
-            INSERT INTO sequencing_group (sample_id, type, technology, archived)
-            VALUES ({test_sample}, %(type)s, %(technology)s, false)
+            INSERT INTO sequencing_group (sample_id, type, technology, platform, archived)
+            VALUES ({test_sample}, %(type)s, %(technology)s, %(platform)s, false)
             RETURNING id""").format(test_sample=test_sample)
 
         async with connection_with_project.pg_connection.cursor() as cur:

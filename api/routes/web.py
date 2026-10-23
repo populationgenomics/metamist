@@ -264,7 +264,7 @@ async def search_by_keyword(
         if res.data.project in pmap:
             # the solution to the type issue is to create internal / external models
             # and convert between them for transport
-            res.data.project = pmap[res.data.project].name  # type: ignore
+            res.data.project = pmap[res.data.project].name
         else:
             res.data.project = str(res.data.project)
 
