@@ -1,10 +1,16 @@
 import dataclasses
 import datetime
 
+from psycopg import sql
 from psycopg.rows import class_row
 from psycopg.types.json import Jsonb
 
-from db.python.filters import GenericFilter, GenericFilterModel, is_literally_TRUE
+from db.python.filters import (
+    GenericFilter,
+    GenericFilterModel,
+    GenericMetaFilter,
+    is_literally_TRUE,
+)
 from db.python.tables.base import DbBase
 from models.models.analysis_runner import AnalysisRunnerInternal
 from models.models.project import ProjectId
@@ -20,6 +26,8 @@ class AnalysisRunnerFilter(GenericFilterModel):
     repository: GenericFilter[str] | None = None
     access_level: GenericFilter[str] | None = None
     environment: GenericFilter[str] | None = None
+    config_path: GenericFilter[str] | None = None
+    meta: GenericMetaFilter | None = None
 
 
 class AnalysisRunnerTable(DbBase):
@@ -82,3 +90,32 @@ class AnalysisRunnerTable(DbBase):
 
         await self.connection.pg_connection.execute(_query)
         return analysis_runner.ar_guid
+
+    async def update_analysis_runner_entry(
+        self,
+        ar_guid: str,
+        config_path: str | None = None,
+        batch_url: str | None = None,
+        meta: dict[str, str | None] | None = None,
+    ) -> None:
+        """
+        Update an existing AnalysisRunner entry, only the given fields are updated
+        """
+        audit_log_id = await self.audit_log_id()
+        setters = [t'audit_log_id = {audit_log_id}']
+
+        if config_path is not None:
+            setters.append(t'config_path = {config_path}')
+
+        if batch_url is not None:
+            setters.append(t'batch_url = {batch_url}')
+
+        if meta is not None:
+            setters.append(
+                t"meta = json_merge_patch(COALESCE(meta, '{{}}'::jsonb), {Jsonb(meta)})"
+            )
+
+        fields_str = sql.SQL(', ').join(setters)
+        _query = t'UPDATE analysis_runner SET {fields_str:q} WHERE ar_guid = {ar_guid}'
+
+        await self.connection.pg_connection.execute(_query)
