@@ -654,16 +654,16 @@ class SampleTable(DbBase):
         where_str = t'WHERE project = ANY({project_ids})' if project_ids else t''
 
         _query = t"""
-        WITH t AS(
-            SELECT project, sample.id, MIN(lower(sample_hist.sys_period)) as sample_first_date
-            FROM sample
-            INNER JOIN (
-                SELECT id, sys_period FROM sample
-                UNION ALL
-                SELECT id, sys_period FROM sample_history
-            ) sample_hist ON sample.id = sample_hist.id
+        WITH all_versions AS (
+            SELECT id, project, lower(sys_period) AS row_start FROM sample
+            UNION ALL
+            SELECT id, project, lower(sys_period) AS row_start FROM sample_history
+        ),
+        t AS(
+            SELECT project, id, MIN(row_start) as sample_first_date
+            FROM all_versions
             {where_str:q}
-            GROUP BY project, sample.id
+            GROUP BY project, id
         )
         SELECT project,
         CAST(EXTRACT(YEAR FROM sample_first_date) AS INTEGER) AS year,
