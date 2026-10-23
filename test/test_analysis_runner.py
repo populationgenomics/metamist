@@ -419,7 +419,7 @@ class TestAnalysisRunner:
     @pytest.mark.project_roles(['writer'])
     @pytest.mark.asyncio
     async def test_graphql_update(self, graphql_query: GraphQLQueryFunction) -> None:
-        """Test updateAnalysisRunnerLog sets the config path"""
+        """Test updateAnalysisRunnerLog sets input values"""
 
         ar_entry = self.get_test_analysis('<ar-guid>')
         ar_entry.config_path = None
