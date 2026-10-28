@@ -5,6 +5,7 @@ from graphql.error import GraphQLError
 from db.python.filters import GenericFilter
 from db.python.layers.analysis_runner import AnalysisRunnerLayer
 from db.python.tables.analysis_runner import AnalysisRunnerFilter
+from db.python.utils import ConflictError
 from db.python.utils import NotFoundError
 from models.models.analysis_runner import (
     AnalysisRunnerInternal,
@@ -173,8 +174,8 @@ class TestAnalysisRunner(DbIsolatedTest):
         self.assertSetEqual({a.ar_guid for a in db_ars}, guids_to_query)
 
     @run_as_sync
-    async def test_insert_skip_duplicates(self):
-        """Test inserting an existing ar_guid does not throw an error"""
+    async def test_insert_duplicate_raises_conflict(self):
+        """Test inserting an existing ar_guid raises a ConflictError"""
         analysis = self.get_test_analysis('<ar-guid>')
 
         # Insert entry
@@ -183,9 +184,8 @@ class TestAnalysisRunner(DbIsolatedTest):
         )
 
         # Insert entry again
-        self.assertEqual(
-            await self.al.insert_analysis_runner_entry(analysis), analysis.ar_guid
-        )
+        with self.assertRaises(ConflictError):
+            await self.al.insert_analysis_runner_entry(analysis)
 
         db_ars = await self.al.query(
             AnalysisRunnerFilter(ar_guid=GenericFilter(eq=analysis.ar_guid))
