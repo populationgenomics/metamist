@@ -1,8 +1,8 @@
 import dataclasses
 import datetime
 
-from psycopg.errors import UniqueViolation
 from psycopg import sql
+from psycopg.errors import UniqueViolation
 from psycopg.rows import class_row
 from psycopg.types.json import Jsonb
 
