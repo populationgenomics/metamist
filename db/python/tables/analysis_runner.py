@@ -1,11 +1,13 @@
 import dataclasses
 import datetime
 
+from psycopg.errors import UniqueViolation
 from psycopg.rows import class_row
 from psycopg.types.json import Jsonb
 
 from db.python.filters import GenericFilter, GenericFilterModel, is_literally_TRUE
 from db.python.tables.base import DbBase
+from db.python.utils import ConflictError
 from models.models.analysis_runner import AnalysisRunnerInternal
 from models.models.project import ProjectId
 
@@ -77,8 +79,12 @@ class AnalysisRunnerTable(DbBase):
         {analysis_runner.hail_version}, {analysis_runner.batch_url}, {analysis_runner.submitting_user}, {meta_param},
         {analysis_runner.output_path}, {audit_log_id}
         )
-        ON CONFLICT (ar_guid) DO NOTHING
         """
 
-        await self.connection.pg_connection.execute(_query)
+        try:
+            await self.connection.pg_connection.execute(_query)
+        except UniqueViolation as e:
+            raise ConflictError(
+                f'Analysis runner log with ar_guid {analysis_runner.ar_guid} already exists'
+            ) from e
         return analysis_runner.ar_guid

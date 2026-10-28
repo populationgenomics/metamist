@@ -44,6 +44,10 @@ class InternalError(Exception):
     """An internal programming error"""
 
 
+class ConflictError(Exception):
+    """Custom error when a resource already exists"""
+
+
 class ProjectDoesNotExist(Forbidden):
     """Custom error for ProjectDoesNotExist"""
 
