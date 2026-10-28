@@ -196,6 +196,26 @@ class OutputFileInternal(SMBase):
         }
 
     @staticmethod
+    def not_found(path: str) -> OutputFileInternal:
+        """
+        Stand-in for an output that wasn't found when it was registered, so it
+        keeps the same shape as a found file. Fields we can't know are left empty.
+        """
+        params = OutputFileInternal.extract_bucket_params(path)
+        basename = params.get('basename') or os.path.basename(path.rstrip('/'))  # noqa: PTH119
+        nameroot, nameext = os.path.splitext(basename)  # noqa: PTH122
+        return OutputFileInternal(
+            path=path,
+            basename=basename,
+            dirname=params.get('dirname', ''),
+            nameroot=nameroot,
+            nameext=nameext,
+            file_checksum=None,
+            size=0,
+            valid=False,
+        )
+
+    @staticmethod
     def get_file_info(
         path: str,
         client: Client | None = None,

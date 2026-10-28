@@ -287,45 +287,46 @@ class AnalysisTable(DbBase):
         self, analysis_ids: list[int]
     ) -> dict[int, dict[str, RecursiveDict]]:
         """Fetches all output files for a list of analysis IDs"""
+        # The order by statement here is to match the inherent ordering of rows in
+        # mariadb to maintain backwards compatibility and ensure that an analysis
+        # with multiple outputs populates the `output` field in the same way mariadb did.
+        # Once we do away with the `output` field entirely, this can be removed.
         _query = t"""
             SELECT DISTINCT ao.analysis_id, f.*, ao.json_structure, ao.output
             FROM analysis_outputs ao
             LEFT JOIN output_file f ON ao.file_id = f.id
             WHERE ao.analysis_id = ANY({analysis_ids})
+            ORDER BY
+                ao.analysis_id,
+                f.id NULLS FIRST,
+                ao.json_structure NULLS FIRST,
+                ao.output NULLS FIRST
         """
         acur = await self.connection.pg_connection.execute(_query)
         rows = await acur.fetchall()
 
         # Preparing to accumulate analysis files
-        analysis_files: dict[
-            int, dict[str, list[tuple[OutputFileInternal, str] | str] | str]
-        ] = defaultdict(lambda: defaultdict(list))
+        analysis_files: dict[int, dict[str, Any]] = defaultdict(
+            lambda: defaultdict(list)
+        )
 
         for row in rows:
-            file_id = row['id']
-            if file_id:
-                # Building OutputFileInternal object with secondary files if available
+            if row['id']:
                 file_internal = OutputFileInternal.from_db(**dict(row))
-                # If no json_structure, just set to the output.
-
-                if row['json_structure'] is None:
-                    analysis_files[row['analysis_id']]['output'] = row['path']
-                else:
-                    analysis_files[row['analysis_id']]['output'] = ''
-
-                # if analysis_files[row['analysis_id']]['outputs'] is a str, we set it to a list and append the str to it:
-                outputs = analysis_files[row['analysis_id']]['outputs']
-                new_output = (file_internal, row['json_structure'] or '')
-                if isinstance(outputs, str):
-                    outputs = [outputs, new_output]
-                else:
-                    outputs.append(new_output)
-
-                analysis_files[row['analysis_id']]['outputs'] = outputs
             else:
-                # If no file_id, just set to the output.
-                analysis_files[row['analysis_id']]['output'] = row['output']
-                analysis_files[row['analysis_id']]['outputs'] = row['output']
+                # The file wasn't found when the output was registered, so it was
+                # stored as a plain string. Keep `outputs` file-shaped regardless.
+                file_internal = OutputFileInternal.not_found(row['output'])
+
+            # If no json_structure, just set to the output.
+            if row['json_structure'] is None:
+                analysis_files[row['analysis_id']]['output'] = file_internal.path
+            else:
+                analysis_files[row['analysis_id']]['output'] = ''
+
+            analysis_files[row['analysis_id']]['outputs'].append(
+                (file_internal, row['json_structure'])
+            )
 
         # Transforming analysis_files into the desired output format
         analysis_output_files = {
