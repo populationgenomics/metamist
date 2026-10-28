@@ -6,8 +6,73 @@ from db.python.connect import Connection
 from db.python.filters import GenericFilter
 from db.python.layers.analysis_runner import AnalysisRunnerLayer
 from db.python.tables.analysis_runner import AnalysisRunnerFilter
-from db.python.utils import ConflictError
-from models.models.analysis_runner import AnalysisRunnerInternal
+from db.python.utils import ConflictError, NotFoundError
+from models.models.analysis_runner import (
+    AnalysisRunnerInternal,
+    AnalysisRunnerUpdateBody,
+)
+from test.conftest import GraphQLQueryFunction
+
+
+QUERY_BY_CONFIG_PATH = """
+query AnalysisRunners($projects: [Int!]!, $configPath: StrGraphQLFilter!) {
+    analysisRunners(project: {in_: $projects}, configPath: $configPath) {
+        arGuid
+        configPath
+        project { name }
+    }
+}
+"""
+
+QUERY_BY_AR_GUID = """
+query AnalysisRunners($arGuids: [String!]!) {
+    analysisRunners(arGuid: {in_: $arGuids}) {
+        arGuid
+        project { name }
+    }
+}
+"""
+
+QUERY_WITHOUT_PROJECT_OR_AR_GUID = """
+query AnalysisRunners {
+    analysisRunners(configPath: {isnull: true}) {
+        arGuid
+    }
+}
+"""
+
+UPDATE_MUTATION = """
+mutation UpdateAnalysisRunner($arGuid: String!, $update: AnalysisRunnerUpdateInput!) {
+    analysisRunner {
+        updateAnalysisRunnerLog(arGuid: $arGuid, arUpdateInput: $update) {
+            arGuid
+            configPath
+            batchUrl
+            project { name }
+        }
+    }
+}
+"""
+
+QUERY_PENDING_BY_META = """
+query AnalysisRunners($projects: [Int!]!, $meta: JSON!) {
+    analysisRunners(
+        project: {in_: $projects}, configPath: {isnull: true}, meta: $meta
+    ) {
+        arGuid
+        configPath
+        meta
+    }
+}
+"""
+
+CREATE_MUTATION = """
+mutation CreateAnalysisRunner($project: String!, $analysisRunner: AnalysisRunnerInput!) {
+    analysisRunner {
+        createAnalysisRunnerLog(project: $project, analysisRunner: $analysisRunner)
+    }
+}
+"""
 
 
 class TestAnalysisRunner:
@@ -182,3 +247,220 @@ class TestAnalysisRunner:
             AnalysisRunnerFilter(ar_guid=GenericFilter(eq=ar_entry.ar_guid))
         )
         assert len(db_ars) == 1
+
+    @pytest.mark.asyncio
+    async def test_query_config_path(self) -> None:
+        """Test filter Analysis Runner entries given config path"""
+
+        resolved_value = 'gs://bucket/<ar-guid-set>.toml'
+
+        config_paths = {
+            '<ar-guid-set>': resolved_value,
+            '<ar-guid-null>': None,
+        }
+
+        for ar_guid, config_path in config_paths.items():
+            ar_entry = self.get_test_analysis(ar_guid)
+            ar_entry.config_path = config_path
+            await self.al.insert_analysis_runner_entry(ar_entry)
+
+        ar_fetched = await self.al.query(
+            AnalysisRunnerFilter(
+                project=GenericFilter(eq=self.project_id),
+                config_path=GenericFilter(eq=resolved_value),
+            )
+        )
+        assert len(ar_fetched) == 1
+        assert ar_fetched[0].ar_guid == '<ar-guid-set>'
+
+        ar_fetched = await self.al.query(
+            AnalysisRunnerFilter(
+                project=GenericFilter(eq=self.project_id),
+                config_path=GenericFilter(isnull=True),
+            )
+        )
+        assert len(ar_fetched) == 1
+        assert ar_fetched[0].ar_guid == '<ar-guid-null>'
+
+    @pytest.mark.asyncio
+    async def test_update_nonexistent_entry(self) -> None:
+        """Test updating a nonexistent AnalysisRunner entry raises NotFoundError"""
+        with pytest.raises(NotFoundError):
+            await self.al.update_analysis_runner_entry(
+                AnalysisRunnerUpdateBody(
+                    ar_guid='<missing-ar-guid>',
+                    config_path='gs://bucket/missing.toml',
+                )
+            )
+
+    @pytest.mark.asyncio
+    async def test_update_requires_a_field(self) -> None:
+        """Test updating an AnalysisRunner entry without input fields raises ValueError"""
+        await self.al.insert_analysis_runner_entry(self.get_test_analysis('<ar-guid>'))
+
+        with pytest.raises(ValueError):
+            await self.al.update_analysis_runner_entry(
+                AnalysisRunnerUpdateBody(ar_guid='<ar-guid>')
+            )
+
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_graphql_ar_guid_filter(self, graphql_query) -> None:
+        """Test query AnalysisRunner entries on arGuids"""
+
+        await self.al.insert_analysis_runner_entry(
+            self.get_test_analysis('<ar-guid-1>')
+        )
+        await self.al.insert_analysis_runner_entry(
+            self.get_test_analysis('<ar-guid-2>')
+        )
+
+        result = await graphql_query(
+            QUERY_BY_AR_GUID,
+            {'arGuids': ['<ar-guid-1>', '<ar-guid-2>', '<ar-guid-3>']},
+        )
+        ar_entries = result['data']['analysisRunners']
+        ar_guids = [ar['arGuid'] for ar in ar_entries]
+        assert '<ar-guid-1>' in ar_guids
+        assert '<ar-guid-2>' in ar_guids
+        assert '<ar-guid-3>' not in ar_guids
+
+    @pytest.mark.asyncio
+    async def test_graphql_requires_project_or_ar_guid(self, graphql_query) -> None:
+        """Test throws error when neither project nor arGuid is given"""
+
+        result = await graphql_query(QUERY_WITHOUT_PROJECT_OR_AR_GUID)
+        assert result['errors']
+        assert result['data'] is None
+
+    @pytest.mark.asyncio
+    async def test_graphql_config_path_filter(
+        self, graphql_query: GraphQLQueryFunction
+    ) -> None:
+        """Test query AnalysisRunner entries given config path"""
+
+        resolved_value = 'gs://bucket/<ar-guid-set>.toml'
+        for ar_guid, config_path in (
+            ('<ar-guid-set>', resolved_value),
+            ('<ar-guid-null>', None),
+        ):
+            ar_entry = self.get_test_analysis(ar_guid)
+            ar_entry.config_path = config_path
+            await self.al.insert_analysis_runner_entry(ar_entry)
+
+        async def get_ids_given_config_path(config_path: dict) -> list[str]:
+            result = await graphql_query(
+                QUERY_BY_CONFIG_PATH,
+                {'projects': [self.project_id], 'configPath': config_path},
+            )
+            return [ar['arGuid'] for ar in result['data']['analysisRunners']]
+
+        assert await get_ids_given_config_path({'isnull': True}) == ['<ar-guid-null>']
+        assert await get_ids_given_config_path({'eq': resolved_value}) == [
+            '<ar-guid-set>'
+        ]
+
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_graphql_create_without_config_path(
+        self, graphql_query: GraphQLQueryFunction
+    ) -> None:
+        """Test createAnalysisRunnerLog accepts a missing config path"""
+        analysis_runner = {
+            'arGuid': '<ar-guid>',
+            'accessLevel': 'test',
+            'repository': 'repository',
+            'commit': 'commit',
+            'script': 'script',
+            'description': 'description',
+            'driverImage': 'driver_image',
+            'environment': 'gcp',
+            'batchUrl': 'batch_url',
+            'submittingUser': 'submitting_user',
+            'meta': {'seqera_status': 'PENDING'},
+            'outputPath': 'output_path',
+        }
+        await graphql_query(
+            CREATE_MUTATION,
+            {'project': self.project_name, 'analysisRunner': analysis_runner},
+        )
+
+        result = await self.al.query(
+            AnalysisRunnerFilter(ar_guid=GenericFilter(eq='<ar-guid>'))
+        )
+        assert len(result) == 1
+        assert result[0].config_path is None
+
+    @pytest.mark.asyncio
+    async def test_graphql_meta_filter(
+        self, graphql_query: GraphQLQueryFunction
+    ) -> None:
+        """Test query AnalysisRunner entries on meta value"""
+
+        ar_entry = self.get_test_analysis('<ar-guid-pending>')
+        ar_entry.config_path = None
+        ar_entry.meta = {'key': 'value'}
+        await self.al.insert_analysis_runner_entry(ar_entry)
+
+        result = await graphql_query(
+            QUERY_PENDING_BY_META,
+            {
+                'projects': [self.project_id],
+                'meta': {'key': {'eq': 'value'}},
+            },
+        )
+        assert result['data']['analysisRunners'] == [
+            {
+                'arGuid': '<ar-guid-pending>',
+                'configPath': None,
+                'meta': {'key': 'value'},
+            }
+        ]
+
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_graphql_update(self, graphql_query: GraphQLQueryFunction) -> None:
+        """Test updateAnalysisRunnerLog sets input values"""
+
+        ar_entry = self.get_test_analysis('<ar-guid>')
+        ar_entry.config_path = None
+        ar_entry.batch_url = 'URL UNAVAILABLE'
+        await self.al.insert_analysis_runner_entry(ar_entry)
+
+        new_config_path = 'gs://bucket/<ar-guid>.toml'
+        new_batch_url = 'new_batch_url'
+        result = await graphql_query(
+            UPDATE_MUTATION,
+            {
+                'arGuid': '<ar-guid>',
+                'update': {'configPath': new_config_path, 'batchUrl': new_batch_url},
+            },
+        )
+
+        assert result['data']['analysisRunner']['updateAnalysisRunnerLog'] == {
+            'arGuid': '<ar-guid>',
+            'configPath': new_config_path,
+            'batchUrl': new_batch_url,
+            'project': {'name': self.project_name},
+        }
+
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_graphql_update_meta(
+        self, graphql_query: GraphQLQueryFunction
+    ) -> None:
+        """Test updateAnalysisRunnerLog merges the meta into the existing meta"""
+        ar_entry = self.get_test_analysis('<ar-guid>')
+        ar_entry.meta = {'key1': 'value1', 'key2': 'value2'}
+        await self.al.insert_analysis_runner_entry(ar_entry)
+
+        await graphql_query(
+            UPDATE_MUTATION,
+            {'arGuid': '<ar-guid>', 'update': {'meta': {'key2': 'new_value2'}}},
+        )
+
+        result = await self.al.query(
+            AnalysisRunnerFilter(ar_guid=GenericFilter(eq='<ar-guid>'))
+        )
+        assert len(result) == 1
+        assert result[0].meta == {'key1': 'value1', 'key2': 'new_value2'}
