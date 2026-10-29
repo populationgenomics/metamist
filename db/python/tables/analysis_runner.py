@@ -1,11 +1,17 @@
 import dataclasses
 import datetime
 
+from pymysql.err import IntegrityError
+
 from db.python.filters import GenericFilter, GenericFilterModel
 from db.python.tables.base import DbBase
-from db.python.utils import to_db_json
+from db.python.utils import ConflictError, to_db_json
 from models.models.analysis_runner import AnalysisRunnerInternal
 from models.models.project import ProjectId
+
+
+# MariaDB error code for a unique / primary key violation
+DUPLICATE_ENTRY_ERROR_CODE = 1062
 
 
 @dataclasses.dataclass
@@ -87,6 +93,13 @@ VALUES (
             'project': self.project_id,
         }
 
-        await self.connection.execute(_query, values)
+        try:
+            await self.connection.execute(_query, values)
+        except IntegrityError as e:
+            if e.args[0] != DUPLICATE_ENTRY_ERROR_CODE:
+                raise
+            raise ConflictError(
+                f'Analysis runner log with ar_guid {analysis_runner.ar_guid} already exists'
+            ) from e
 
         return analysis_runner.ar_guid
