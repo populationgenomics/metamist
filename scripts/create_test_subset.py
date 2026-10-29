@@ -144,7 +144,7 @@ QUERY_ALL_DATA = gql(
                         meta
                         type
                     }
-                    analyses(type: {in_: ["cram", "gvcf", "genotypingarray_gtc", "longtr"]}) {
+                    analyses(type: {in_: ["cram", "gvcf", "genotypingarray_gtc", "longtr", "qc"]}) {
                         active
                         id
                         meta
