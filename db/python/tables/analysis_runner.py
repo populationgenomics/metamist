@@ -1,9 +1,10 @@
 import dataclasses
 import datetime
+from typing import Any
 
 from pymysql.err import IntegrityError
 
-from db.python.filters import GenericFilter, GenericFilterModel
+from db.python.filters import GenericFilter, GenericFilterModel, GenericMetaFilter
 from db.python.tables.base import DbBase
 from db.python.utils import ConflictError, to_db_json
 from models.models.analysis_runner import AnalysisRunnerInternal
@@ -24,6 +25,8 @@ class AnalysisRunnerFilter(GenericFilterModel):
     repository: GenericFilter[str] | None = None
     access_level: GenericFilter[str] | None = None
     environment: GenericFilter[str] | None = None
+    config_path: GenericFilter[str] | None = None
+    meta: GenericMetaFilter | None = None
 
 
 class AnalysisRunnerTable(DbBase):
@@ -90,7 +93,7 @@ VALUES (
             'meta': to_db_json(analysis_runner.meta),
             'output_path': analysis_runner.output_path,
             'audit_log_id': await self.audit_log_id(),
-            'project': self.project_id,
+            'project': analysis_runner.project,
         }
 
         try:
@@ -103,3 +106,36 @@ VALUES (
             ) from e
 
         return analysis_runner.ar_guid
+
+    async def update_analysis_runner_entry(
+        self,
+        ar_guid: str,
+        config_path: str | None = None,
+        batch_url: str | None = None,
+        meta: dict[str, str | None] | None = None,
+    ) -> None:
+        """
+        Update an existing AnalysisRunner entry, only the given fields are updated
+        """
+        fields: dict[str, Any] = {
+            'ar_guid': ar_guid,
+            'audit_log_id': await self.audit_log_id(),
+        }
+        updaters = ['audit_log_id = :audit_log_id']
+
+        if config_path is not None:
+            updaters.append('config_path = :config_path')
+            fields['config_path'] = config_path
+
+        if batch_url is not None:
+            updaters.append('batch_url = :batch_url')
+            fields['batch_url'] = batch_url
+
+        if meta is not None:
+            updaters.append('meta = JSON_MERGE_PATCH(COALESCE(meta, "{}"), :meta)')
+            fields['meta'] = to_db_json(meta)
+
+        fields_str = ', '.join(updaters)
+        _query = f'UPDATE analysis_runner SET {fields_str} WHERE ar_guid = :ar_guid'
+
+        await self.connection.execute(_query, fields)

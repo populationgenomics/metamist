@@ -22,7 +22,6 @@ async def create_analysis_runner_log(  # noqa: PLR0913
     script: str,
     description: str,
     driver_image: str,
-    config_path: str,
     environment: str,
     batch_url: str,
     submitting_user: str,
@@ -30,6 +29,7 @@ async def create_analysis_runner_log(  # noqa: PLR0913
     output_path: str,
     hail_version: str | None = None,
     cwd: str | None = None,
+    config_path: str | None = None,
     connection: Connection = get_project_db_connection(FullWriteAccessRoles),
 ) -> str:
     """Create a new analysis runner log"""
