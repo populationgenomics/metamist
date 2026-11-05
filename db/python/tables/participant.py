@@ -486,7 +486,7 @@ RETURNING id
                 ]
                 await self.connection.execute_many(_update_query, _eid_values)
 
-        if reported_sex:
+        if reported_sex is not None:
             updaters.append('reported_sex = :reported_sex')
             fields['reported_sex'] = reported_sex
 
