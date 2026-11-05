@@ -472,7 +472,9 @@ class ParticipantTable:
 
             updates: list[Template | None] = [t'audit_log_id = {audit_log_id}']
 
-            updates.append(t'reported_sex = {reported_sex}' if reported_sex else None)
+            updates.append(
+                t'reported_sex = {reported_sex}' if reported_sex is not None else None
+            )
             updates.append(
                 t'reported_gender = {reported_gender}' if reported_gender else None
             )
