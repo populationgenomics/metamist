@@ -386,6 +386,12 @@ def main(
             )
         )
 
+    # Interlude - if the above searches did not
+    if not additional_samples:
+        raise ValueError(
+            'No samples selected based on provided criteria, please check arguments.'
+        )
+
     # 2. Query all the samples from the selected sgs
     logger.info(f'Transferring {len(additional_samples)} samples. Querying metadata.')
     original_project_subset_data = query(
