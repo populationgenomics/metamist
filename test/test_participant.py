@@ -4,6 +4,7 @@ import pytest
 
 from db.python.connect import Connection
 from db.python.filters import GenericFilter
+from db.python.layers.family import FamilyLayer
 from db.python.layers.participant import ParticipantLayer
 from db.python.tables.participant import ParticipantFilter
 from models.base import PRIMARY_EXTERNAL_ORG
@@ -288,6 +289,53 @@ class TestParticipant:
         assert resp_participant['id'] == p2.id
 
         assert resp_participant['meta'] == {'baz': 'qux'}
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
+    async def test_update_participant_reported_sex_to_unknown(
+        self, connection_with_project: Connection
+    ):
+        """Test updating reported_sex to 0 (unknown) is persisted"""
+
+        player = ParticipantLayer(connection_with_project)
+
+        p1 = await player.upsert_participant(get_participant_to_insert_no_samples())
+
+        p2 = await player.upsert_participant(
+            ParticipantUpsertInternal(id=p1.id, reported_sex=0)
+        )
+
+        # ensure second upsert didn't create a new participant
+        assert p1.id == p2.id
+
+        ps = await player.query(ParticipantFilter(id=GenericFilter(eq=p1.id)))
+
+        assert len(ps) == 1
+        assert ps[0].reported_sex == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.project_roles(['reader', 'writer'])
+    @pytest.mark.parametrize('sex', ['0', 'unknown', 'u'])
+    async def test_import_pedigree_updates_reported_sex_to_unknown(
+        self, connection_with_project: Connection, sex: str
+    ):
+        """Test importing a pedigree with an unknown sex updates reported_sex to 0"""
+
+        player = ParticipantLayer(connection_with_project)
+        flayer = FamilyLayer(connection_with_project)
+
+        p = await player.upsert_participant(get_participant_to_insert_no_samples())
+
+        await flayer.import_pedigree(
+            header=None,
+            rows=[['FAM01', 'P0_NO_SAMP1', '', '', sex, '0']],
+            perform_sex_check=False,
+        )
+
+        ps = await player.query(ParticipantFilter(id=GenericFilter(eq=p.id)))
+
+        assert len(ps) == 1
+        assert ps[0].reported_sex == 0
 
     @pytest.mark.asyncio
     @pytest.mark.project_roles(['reader', 'writer'])
