@@ -144,7 +144,7 @@ QUERY_ALL_DATA = gql(
                         meta
                         type
                     }
-                    analyses(type: {in_: ["cram", "gvcf", "genotypingarray_gtc", "longtr"]}) {
+                    analyses(type: {in_: ["cram", "gvcf", "genotypingarray_gtc", "longtr", "qc"]}) {
                         active
                         id
                         meta
@@ -384,6 +384,12 @@ def main(
                 sample_count=samples_n,
                 samples_so_far=additional_samples,
             )
+        )
+
+    # Interlude - if the above searches did not
+    if not additional_samples:
+        raise ValueError(
+            'No samples selected based on provided criteria, please check arguments.'
         )
 
     # 2. Query all the samples from the selected sgs
@@ -721,6 +727,12 @@ def transfer_analyses(
             existing_sgid = existing_sg.get('id') if existing_sg else None
             copied_analysis_files = set()
             for analysis in sg['analyses']:
+                # only take mosdepth files
+                if (
+                    analysis['type'] == 'qc'
+                    and analysis.get('meta', {}).get('tool') != 'mosdepth'
+                ):
+                    continue
                 # Newer analyses store the path in the structured `outputs` field;
                 # older ones use the plain `output` string. Prefer the former.
                 analysis_path = (
