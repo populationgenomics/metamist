@@ -298,11 +298,12 @@ class SampleTable(DbBase):
         audit_log_id = await self.audit_log_id()
         meta_value = Jsonb(meta or {})
         project_value = project or self.project_id
+        status = 'active' if active else 'archived'
 
         _query = t"""
-            INSERT INTO sample (participant_id, meta, type, active,
+            INSERT INTO sample (participant_id, meta, type, active, status,
                 audit_log_id, sample_parent_id, sample_root_id, project)
-            VALUES ({participant_id}, {meta_value}, {sample_type}, {active},
+            VALUES ({participant_id}, {meta_value}, {sample_type}, {active}, {status},
                 {audit_log_id}, {sample_parent_id}, {sample_root_id}, {project_value})
             RETURNING id;
         """
