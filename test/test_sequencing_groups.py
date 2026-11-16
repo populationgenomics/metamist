@@ -760,8 +760,8 @@ class TestSequencingGroup:
 
             await cur.execute(
                 t"""
-                INSERT INTO sample (project, type, active)
-                VALUES ({project_2}, 'blood', true)
+                INSERT INTO sample (project, type, active, status)
+                VALUES ({project_2}, 'blood', true, 'active')
                 RETURNING id
                 """
             )
