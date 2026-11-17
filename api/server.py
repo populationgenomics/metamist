@@ -4,6 +4,7 @@ import time
 import traceback
 from contextlib import asynccontextmanager
 
+import sentry_sdk
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -16,6 +17,7 @@ from api.graphql.schema import MetamistGraphQLRouter
 from api.settings import (
     PROFILE_REQUESTS,
     PROFILE_REQUESTS_OUTPUT,
+    SENTRY_DSN,
     SKIP_DATABASE_CONNECTION,
     SM_ENVIRONMENT,
 )
@@ -53,6 +55,16 @@ async def app_lifespan(_: FastAPI):
         if not SKIP_DATABASE_CONNECTION:
             await postgres_pool.close()
 
+
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=SM_ENVIRONMENT,
+        release=_VERSION,
+        traces_sample_rate=1.0,
+        profile_session_sample_rate=1.0,
+        profile_lifecycle='trace',
+    )
 
 app = FastAPI(lifespan=app_lifespan)
 
