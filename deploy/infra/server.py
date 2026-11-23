@@ -181,6 +181,16 @@ def create_server_resources(
                             if config.server.seqr_slack_notification_channel
                             else []
                         ),
+                        *(
+                            [
+                                gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
+                                    name='SM_SENTRY_DSN',
+                                    value=config.server.sentry_dsn,
+                                )
+                            ]
+                            if config.server.sentry_dsn
+                            else []
+                        ),
                         gcp.cloudrunv2.ServiceTemplateContainerEnvArgs(
                             name='SM_SEQUENCINGGROUPPREFIX',
                             value=config.server.sequencing_group_prefix,
