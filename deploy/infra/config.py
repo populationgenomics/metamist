@@ -30,6 +30,7 @@ class ServerConfig(BaseModel):
     seqr_audience: str
     seqr_map_location: str
     seqr_slack_notification_channel: str | None = None
+    sentry_dsn: str | None = None
     sequencing_group_prefix: str
     sequencing_group_check_offset: str
     gcp_bq_aggreg_view: str
