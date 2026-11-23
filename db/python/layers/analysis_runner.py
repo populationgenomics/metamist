@@ -52,12 +52,19 @@ class AnalysisRunnerLayer(BaseLayer):
         """Update an AnalysisRunner entry, only the given fields are updated"""
         ar_guid = ar_update_body.ar_guid
 
+        if ar_update_body.clear_config_path and ar_update_body.config_path is not None:
+            raise ValueError('Cannot provide both config_path and clear_config_path')
+
         if (
             ar_update_body.config_path is None
+            and not ar_update_body.clear_config_path
             and ar_update_body.batch_url is None
+            and ar_update_body.submitting_user is None
             and ar_update_body.meta is None
         ):
-            raise ValueError('Must provide config_path, batch_url or meta')
+            raise ValueError(
+                'No input field to update AnalysisRunner entry.'
+            )
 
         ar_entries = await self.at.query(
             AnalysisRunnerFilter(ar_guid=GenericFilter(eq=ar_guid))
@@ -73,9 +80,4 @@ class AnalysisRunnerLayer(BaseLayer):
             [project], allowed_roles=FullWriteAccessRoles
         )
 
-        await self.at.update_analysis_runner_entry(
-            ar_guid,
-            config_path=ar_update_body.config_path,
-            batch_url=ar_update_body.batch_url,
-            meta=ar_update_body.meta,
-        )
+        await self.at.update_analysis_runner_entry(ar_update_body)

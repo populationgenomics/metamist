@@ -48,6 +48,7 @@ mutation UpdateAnalysisRunner($arGuid: String!, $update: AnalysisRunnerUpdateInp
             arGuid
             configPath
             batchUrl
+            submittingUser
             project { name }
         }
     }
@@ -429,11 +430,16 @@ class TestAnalysisRunner:
 
         new_config_path = 'gs://bucket/<ar-guid>.toml'
         new_batch_url = 'new_batch_url'
+        new_submitting_user = 'new_user@example.com'
         result = await graphql_query(
             UPDATE_MUTATION,
             {
                 'arGuid': '<ar-guid>',
-                'update': {'configPath': new_config_path, 'batchUrl': new_batch_url},
+                'update': {
+                    'configPath': new_config_path,
+                    'batchUrl': new_batch_url,
+                    'submittingUser': new_submitting_user,
+                },
             },
         )
 
@@ -441,6 +447,7 @@ class TestAnalysisRunner:
             'arGuid': '<ar-guid>',
             'configPath': new_config_path,
             'batchUrl': new_batch_url,
+            'submittingUser': new_submitting_user,
             'project': {'name': self.project_name},
         }
 
@@ -464,3 +471,35 @@ class TestAnalysisRunner:
         )
         assert len(result) == 1
         assert result[0].meta == {'key1': 'value1', 'key2': 'new_value2'}
+
+    @pytest.mark.project_roles(['writer'])
+    @pytest.mark.asyncio
+    async def test_graphql_update_clears_config_path(
+        self, graphql_query: GraphQLQueryFunction
+    ) -> None:
+        """Test updateAnalysisRunnerLog clears configPath with clearConfigPath"""
+        ar_entry = self.get_test_analysis('<ar-guid>')
+        ar_entry.config_path = 'config_path'
+        await self.al.insert_analysis_runner_entry(ar_entry)
+
+        result = await graphql_query(
+            UPDATE_MUTATION,
+            {'arGuid': '<ar-guid>', 'update': {'clearConfigPath': True}},
+        )
+
+        updated = result['data']['analysisRunner']['updateAnalysisRunnerLog']
+        assert updated['configPath'] is None
+
+    @pytest.mark.asyncio
+    async def test_update_rejects_config_path_and_clear(self) -> None:
+        """Test giving both config_path and clear_config_path raises ValueError"""
+        await self.al.insert_analysis_runner_entry(self.get_test_analysis('<ar-guid>'))
+
+        with pytest.raises(ValueError):
+            await self.al.update_analysis_runner_entry(
+                AnalysisRunnerUpdateBody(
+                    ar_guid='<ar-guid>',
+                    config_path='config_path',
+                    clear_config_path=True,
+                )
+            )

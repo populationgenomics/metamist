@@ -48,7 +48,10 @@ class AnalysisRunnerUpdateInput:
     """Input for updating analysis runner logs, only the given fields are updated"""
 
     config_path: str | None = None
+    # set config_path to null, can't be combined with config_path
+    clear_config_path: bool = False
     batch_url: str | None = None
+    submitting_user: str | None = None
     # merged into the existing meta, a null value removes the key
     meta: JSON | None = None
 
@@ -114,7 +117,9 @@ class AnalysisRunnerMutations:
                 ar_update_body=AnalysisRunnerUpdateBody(
                     ar_guid=ar_guid,
                     config_path=ar_update_input.config_path,
+                    clear_config_path=ar_update_input.clear_config_path,
                     batch_url=ar_update_input.batch_url,
+                    submitting_user=ar_update_input.submitting_user,
                     meta=ar_update_input.meta,  # type: ignore [arg-type]
                 ),
             )

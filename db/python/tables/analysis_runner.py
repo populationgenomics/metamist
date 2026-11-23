@@ -14,7 +14,10 @@ from db.python.filters import (
 )
 from db.python.tables.base import DbBase
 from db.python.utils import ConflictError
-from models.models.analysis_runner import AnalysisRunnerInternal
+from models.models.analysis_runner import (
+    AnalysisRunnerInternal,
+    AnalysisRunnerUpdateBody,
+)
 from models.models.project import ProjectId
 
 
@@ -98,29 +101,33 @@ class AnalysisRunnerTable(DbBase):
         return analysis_runner.ar_guid
 
     async def update_analysis_runner_entry(
-        self,
-        ar_guid: str,
-        config_path: str | None = None,
-        batch_url: str | None = None,
-        meta: dict[str, str | None] | None = None,
+        self, ar_update_body: AnalysisRunnerUpdateBody
     ) -> None:
         """
-        Update an existing AnalysisRunner entry, only the given fields are updated
+        Update an existing AnalysisRunner entry, only the given fields are updated.
+        clear_config_path sets config_path to null.
         """
         audit_log_id = await self.audit_log_id()
         setters = [t'audit_log_id = {audit_log_id}']
 
-        if config_path is not None:
-            setters.append(t'config_path = {config_path}')
+        if ar_update_body.clear_config_path:
+            setters.append(t'config_path = NULL')
+        elif ar_update_body.config_path is not None:
+            setters.append(t'config_path = {ar_update_body.config_path}')
 
-        if batch_url is not None:
-            setters.append(t'batch_url = {batch_url}')
+        if ar_update_body.batch_url is not None:
+            setters.append(t'batch_url = {ar_update_body.batch_url}')
 
-        if meta is not None:
+        if ar_update_body.submitting_user is not None:
+            setters.append(t'submitting_user = {ar_update_body.submitting_user}')
+
+        if ar_update_body.meta is not None:
+            meta = Jsonb(ar_update_body.meta)
             setters.append(
-                t"meta = json_merge_patch(COALESCE(meta, '{{}}'::jsonb), {Jsonb(meta)})"
+                t"meta = json_merge_patch(COALESCE(meta, '{{}}'::jsonb), {meta})"
             )
 
+        ar_guid = ar_update_body.ar_guid
         fields_str = sql.SQL(', ').join(setters)
         _query = t'UPDATE analysis_runner SET {fields_str:q} WHERE ar_guid = {ar_guid}'
 
