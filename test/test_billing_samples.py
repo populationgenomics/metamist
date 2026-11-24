@@ -121,8 +121,8 @@ class TestMonthlySamplesCountQuery:
         async with self.connection.pg_connection.cursor() as cur:
             await cur.execute(
                 t"""
-                INSERT INTO sample (project, type, active)
-                VALUES ({project}, 'blood', true)
+                INSERT INTO sample (project, type, active, status)
+                VALUES ({project}, 'blood', true, 'active')
                 RETURNING id
                 """
             )
